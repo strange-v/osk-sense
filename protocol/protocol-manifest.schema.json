@@ -7,6 +7,43 @@
     { "$ref": "#/$defs/vector_document" }
   ],
   "$defs": {
+    "security_v3": {
+      "type": "object",
+      "properties": {
+        "protocol_major": { "const": 3 },
+        "node_tag_bytes": { "const": 8 },
+        "gateway_tag_bytes": { "const": 6 },
+        "counter_bytes": { "const": 4 },
+        "counter_encoding": { "const": "uint32_le" },
+        "activation_header": { "const": 106 },
+        "ack_logical_header": { "const": 127 },
+        "max_wire_bytes": { "const": 61 },
+        "max_ack_payload_bytes": { "const": 10 },
+        "salt_bytes": { "const": 8 }
+      },
+      "required": ["protocol_major", "node_tag_bytes", "gateway_tag_bytes", "counter_bytes", "counter_encoding", "activation_header", "ack_logical_header", "max_wire_bytes", "max_ack_payload_bytes", "salt_bytes"],
+      "additionalProperties": false
+    },
+    "crypto_v3": {
+      "type": "object",
+      "properties": {
+        "factory_key": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "salt": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+        "encryption_key": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "authentication_key": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "counter": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "node_id": { "type": "integer", "minimum": 1, "maximum": 99 },
+        "gateway_id": { "const": 100 },
+        "plaintext": { "type": "string", "pattern": "^([0-9a-f]{2})*$" },
+        "telemetry": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
+        "activation": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
+        "ack_floor": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
+        "command": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
+        "join_confirm": { "type": "string", "pattern": "^([0-9a-f]{2})+$" }
+      },
+      "required": ["factory_key", "salt", "encryption_key", "authentication_key", "counter", "node_id", "gateway_id", "plaintext", "telemetry", "activation", "ack_floor", "command", "join_confirm"],
+      "additionalProperties": false
+    },
     "artifact_header": {
       "type": "object",
       "properties": {
@@ -341,6 +378,7 @@
             "$schema": { "type": "string" },
             "schema_version": { "const": 1 },
             "scope": { "const": "gateway_client_telemetry" },
+            "security_v3": { "$ref": "#/$defs/security_v3" },
             "radio": { "$ref": "#/$defs/radio" },
             "commands": { "$ref": "#/$defs/commands" },
             "gateway_stream": { "$ref": "#/$defs/gateway_stream" },
@@ -416,6 +454,7 @@
             "$schema": { "type": "string" },
             "schema_version": { "const": 1 },
             "scope": { "const": "gateway_client_telemetry_vectors" },
+            "crypto_v3": { "$ref": "#/$defs/crypto_v3" },
             "telemetry": {
               "type": "array",
               "items": { "$ref": "#/$defs/telemetry_vector" }

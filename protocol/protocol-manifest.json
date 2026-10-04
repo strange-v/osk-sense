@@ -2,6 +2,18 @@
   "$schema": "./protocol-manifest.schema.json",
   "schema_version": 1,
   "scope": "gateway_client_telemetry",
+  "security_v3": {
+    "protocol_major": 3,
+    "node_tag_bytes": 8,
+    "gateway_tag_bytes": 6,
+    "counter_bytes": 4,
+    "counter_encoding": "uint32_le",
+    "activation_header": 106,
+    "ack_logical_header": 127,
+    "max_wire_bytes": 61,
+    "max_ack_payload_bytes": 10,
+    "salt_bytes": 8
+  },
   "radio": {
     "protocol_major": 2,
     "header": {

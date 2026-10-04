@@ -9,6 +9,7 @@ const readJson = (name) => JSON.parse(readFileSync(resolve(root, name), 'utf8'))
 const manifest = readJson('protocol-manifest.json')
 const schema = readJson('protocol-manifest.schema.json')
 const vectors = readJson('protocol-vectors.json')
+await import('./check_security_vectors.mjs')
 
 assert.equal(manifest.schema_version, 1)
 assert.equal(vectors.schema_version, manifest.schema_version)

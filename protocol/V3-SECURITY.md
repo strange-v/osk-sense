@@ -4,6 +4,21 @@ Authenticated, replay-resistant radio traffic between nodes and the gateway. Eve
 
 ## Phase 1 scope
 
+Implementation status:
+
+| Piece | Status |
+| --- | --- |
+| Shared AES, key derivation, CTR/CMAC frame, ACK and join authentication | Implemented in `shared/RadioProtocol`; native known answers and bit-tampering tests |
+| V3 crypto vectors | `protocol-vectors.json`, checked independently with Node.js AES |
+| Release Flash flags and RFM69 fork | Configured; all four release images build |
+| Pairing entropy | [Hardware capture measurements](../node/crypto_bench/ENTROPY.md); source qualification and runtime health checks pending |
+| Node and gateway radio integration, pairing transactions and command sessions | Pending |
+| EEPROM configuration and node counter reservations | Pending |
+| Gateway bounds, backup activation and failed-tag UI counters | Pending |
+
+The operational radio protocol is version 2. The shared V3 security module is
+not connected to the node or gateway radio services.
+
 | Area | Change |
 | --- | --- |
 | [Crypto](#crypto) | Software AES-128: CTR encryption and a CMAC tag of 8 bytes from the node and 6 from the gateway, two keys per node, K_enc and K_mac. RFM69 hardware AES is not used. One shared implementation for node and gateway. |
@@ -20,6 +35,12 @@ Authenticated, replay-resistant radio traffic between nodes and the gateway. Eve
 AES-128, forward direction only: CTR for confidentiality, CMAC (RFC 4493) truncated to 8 bytes in node frames and 6 bytes in gateway frames for authenticity ([Tag length](#tag-length)), encrypt-then-MAC. CTR uses K_enc and CMAC uses K_mac, two independent [keys](#keys), as SP 800-38B requires for a CMAC key. The implementation computes each round in one pass per output column ("fused round"), with an expanded key and an S-box generated at compile time.
 
 The node and the gateway use the same implementation, in `shared/RadioProtocol`, so nonce and tag formatting are one code path checked by the same native known-answer tests. ESP32 hardware AES would gain nothing: software AES there takes microseconds against the node's 40 ms ACK window.
+
+`node/crypto_bench` environment `size_security` links the shared implementation
+for key derivation, report sealing, ACK verification, join authentication and
+gateway reply decryption. Its image is 2755 bytes of Flash and 472 bytes of
+static RAM; `size_empty` is 492 bytes of Flash. The difference is 2263 bytes,
+including the exercised frame glue; complete firmware still needs a size check.
 
 | Cost on ATtiny1614 at 4 MHz | Value |
 | --- | ---: |

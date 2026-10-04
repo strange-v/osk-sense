@@ -14,6 +14,8 @@ common_sources=(
     ../shared/RadioProtocol/src/GatewayStorage.cpp
     ../shared/RadioProtocol/src/UserManagement.cpp
     ../shared/RadioProtocol/src/CommandBook.cpp
+    ../shared/RadioProtocol/src/RadioCrypto.cpp
+    ../shared/RadioProtocol/src/RadioSecurity.cpp
     "${unity_dir}/unity.c"
 )
 common_flags=(
@@ -30,6 +32,21 @@ run_suite() {
     "${output}"
 }
 
+if [[ "${1:-}" == "--sanitize" ]]; then
+    common_flags+=(-Wall -Wextra -Werror -g -fsanitize=address,undefined)
+    shift
+fi
+if (( $# > 0 )); then
+    for suite in "$@"; do
+        if [[ ! "${suite}" =~ ^test_[a-z_]+$ || ! -f "test/${suite}/test_main.cpp" ]]; then
+            echo "Unknown suite: ${suite}" >&2
+            exit 2
+        fi
+        run_suite "${suite}"
+    done
+    exit 0
+fi
+
 run_suite test_radio_protocol
 run_suite test_node_registry
 run_suite test_commissioning_frames
@@ -37,3 +54,4 @@ run_suite test_gateway_storage
 run_suite test_command_book
 run_suite test_radio_power
 run_suite test_radio_aes
+run_suite test_radio_security

@@ -2,6 +2,21 @@
   "$schema": "./protocol-manifest.schema.json",
   "schema_version": 1,
   "scope": "gateway_client_telemetry_vectors",
+  "crypto_v3": {
+    "factory_key": "000102030405060708090a0b0c0d0e0f",
+    "salt": "1011121314151617",
+    "encryption_key": "4ac736d7387af23c7e43de5b9773c2a7",
+    "authentication_key": "12df1030fa28fc071a900dd45ad1d967",
+    "counter": 305419896,
+    "node_id": 7,
+    "gateway_id": 100,
+    "plaintext": "02bae40c2e09d7119427",
+    "telemetry": "6078563412fc60893cca1dd7cfc7b34e47c4e9e8d359e0",
+    "activation": "6a78563412101112131415161738e5a88b76cea4b959fefc4c3005fe7c8dc6",
+    "ack_floor": "071778573412be32ada96b42",
+    "command": "647856341200603a8212002725b15c0b926486b7a5",
+    "join_confirm": "630102030405060708090a78765412000102037b1e79d42b62ab48"
+  },
   "telemetry": [
     {
       "name": "profile_1_nominal",
