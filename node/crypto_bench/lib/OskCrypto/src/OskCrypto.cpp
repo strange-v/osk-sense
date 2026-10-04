@@ -243,5 +243,63 @@ void ctrApply(
     for (uint8_t i = 0; i < length && i < kBlockSize; ++i) data[i] ^= stream[i];
 }
 
+namespace {
+
+// Absorbs bytes into a CBC-MAC state; returns the new fill position. Zero
+// padding of a final partial block is implicit: unfilled bytes stay as XORed.
+uint8_t cbcAbsorb(
+    const Aes128& aes, uint8_t* state, uint8_t position, const uint8_t* bytes,
+    uint8_t length) {
+    for (uint8_t i = 0; i < length; ++i) {
+        state[position++] ^= bytes[i];
+        if (position == kBlockSize) {
+            aesEncrypt(aes, state);
+            position = 0;
+        }
+    }
+    return position;
+}
+
+}  // namespace
+
+void ccmSeal(
+    const Aes128& aes, const uint8_t* nonce, const uint8_t nonceLength,
+    const uint8_t* aad, const uint8_t aadLength, uint8_t* data,
+    const uint8_t dataLength, uint8_t* tag, const uint8_t tagLength) {
+    const uint8_t lengthSize = static_cast<uint8_t>(15 - nonceLength);
+    uint8_t mac[kBlockSize]{};
+    mac[0] = static_cast<uint8_t>(
+        (aadLength ? 0x40 : 0) | (((tagLength - 2) / 2) << 3) |
+        (lengthSize - 1));
+    memcpy(mac + 1, nonce, nonceLength);
+    mac[kBlockSize - 1] = dataLength;
+    aesEncrypt(aes, mac);
+    if (aadLength != 0) {
+        mac[1] ^= aadLength;
+        uint8_t position = cbcAbsorb(aes, mac, 2, aad, aadLength);
+        if (position != 0) aesEncrypt(aes, mac);
+    }
+    uint8_t position = cbcAbsorb(aes, mac, 0, data, dataLength);
+    if (position != 0) aesEncrypt(aes, mac);
+
+    uint8_t counter[kBlockSize]{};
+    counter[0] = static_cast<uint8_t>(lengthSize - 1);
+    memcpy(counter + 1, nonce, nonceLength);
+    uint8_t stream[kBlockSize];
+    for (uint8_t offset = 0, index = 1; offset < dataLength;
+         offset += kBlockSize, ++index) {
+        counter[kBlockSize - 1] = index;
+        memcpy(stream, counter, kBlockSize);
+        aesEncrypt(aes, stream);
+        for (uint8_t i = 0; i < kBlockSize && offset + i < dataLength; ++i) {
+            data[offset + i] ^= stream[i];
+        }
+    }
+    counter[kBlockSize - 1] = 0;
+    memcpy(stream, counter, kBlockSize);
+    aesEncrypt(aes, stream);
+    for (uint8_t i = 0; i < tagLength; ++i) tag[i] = mac[i] ^ stream[i];
+}
+
 }  // namespace crypto
 }  // namespace osk

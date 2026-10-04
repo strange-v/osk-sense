@@ -7,9 +7,10 @@
 namespace osk {
 namespace crypto {
 
-// Known answers: FIPS-197 C.1, SP 800-38A F.5.1, RFC 4493 section 4.
+// Known answers: FIPS-197 C.1, SP 800-38A F.5.1, RFC 4493 section 4,
+// SP 800-38C example 1, RFC 3610 packet vector 1.
 // Returns a bit mask of failed checks; zero means every check passed.
-inline uint8_t selfTest() {
+inline uint16_t selfTest() {
     static const uint8_t kFipsKey[16] = {
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
         0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
@@ -54,7 +55,7 @@ inline uint8_t selfTest() {
          0xfc, 0x49, 0x74, 0x17, 0x79, 0x36, 0x3c, 0xfe}};
     static const uint8_t kTagLengths[4] = {0, 16, 40, 64};
 
-    uint8_t failed = 0;
+    uint16_t failed = 0;
     Aes128 aes;
     uint8_t block[16];
 
@@ -75,7 +76,49 @@ inline uint8_t selfTest() {
     }
     for (uint8_t i = 0; i < 4; ++i) {
         cmacCompute(cmac, kMessage, kTagLengths[i], block);
-        if (memcmp(block, kTags[i], 16) != 0) failed |= static_cast<uint8_t>(0x08 << i);
+        if (memcmp(block, kTags[i], 16) != 0) failed |= static_cast<uint16_t>(0x08 << i);
+    }
+
+    static const uint8_t kCcm1Key[16] = {
+        0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+        0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f};
+    static const uint8_t kCcm1Nonce[7] = {
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16};
+    static const uint8_t kCcm1Aad[8] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
+    static const uint8_t kCcm1Plain[4] = {0x20, 0x21, 0x22, 0x23};
+    static const uint8_t kCcm1Cipher[4] = {0x71, 0x62, 0x01, 0x5b};
+    static const uint8_t kCcm1Tag[4] = {0x4d, 0xac, 0x25, 0x5d};
+    uint8_t ccmData[23];
+    uint8_t ccmTag[8];
+    aesExpandKey(aes, kCcm1Key);
+    memcpy(ccmData, kCcm1Plain, sizeof(kCcm1Plain));
+    ccmSeal(aes, kCcm1Nonce, sizeof(kCcm1Nonce), kCcm1Aad, sizeof(kCcm1Aad),
+            ccmData, sizeof(kCcm1Plain), ccmTag, 4);
+    if (memcmp(ccmData, kCcm1Cipher, 4) != 0 || memcmp(ccmTag, kCcm1Tag, 4) != 0) {
+        failed |= 0x80;
+    }
+
+    static const uint8_t kCcm2Key[16] = {
+        0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7,
+        0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf};
+    static const uint8_t kCcm2Nonce[13] = {
+        0x00, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00,
+        0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5};
+    static const uint8_t kCcm2Cipher[23] = {
+        0x58, 0x8c, 0x97, 0x9a, 0x61, 0xc6, 0x63, 0xd2,
+        0xf0, 0x66, 0xd0, 0xc2, 0xc0, 0xf9, 0x89, 0x80,
+        0x6d, 0x5f, 0x6b, 0x61, 0xda, 0xc3, 0x84};
+    static const uint8_t kCcm2Tag[8] = {
+        0x17, 0xe8, 0xd1, 0x2c, 0xfd, 0xf9, 0x26, 0xe0};
+    aesExpandKey(aes, kCcm2Key);
+    for (uint8_t i = 0; i < sizeof(ccmData); ++i) {
+        ccmData[i] = static_cast<uint8_t>(0x08 + i);
+    }
+    ccmSeal(aes, kCcm2Nonce, sizeof(kCcm2Nonce), kCcm1Aad, sizeof(kCcm1Aad),
+            ccmData, sizeof(ccmData), ccmTag, 8);
+    if (memcmp(ccmData, kCcm2Cipher, 23) != 0 || memcmp(ccmTag, kCcm2Tag, 8) != 0) {
+        failed |= 0x100;
     }
     return failed;
 }

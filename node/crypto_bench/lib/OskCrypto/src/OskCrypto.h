@@ -35,5 +35,13 @@ void ctrApply(
     const Aes128& aes, const uint8_t counterBlock[kBlockSize], uint8_t* data,
     uint8_t length);
 
+// AES-CCM (SP 800-38C, RFC 3610): encrypts `data` in place and writes a
+// `tagLength`-byte tag. nonceLength is 7..13, tagLength 4..16 and even,
+// aadLength below 0xFF00, dataLength below 256.
+void ccmSeal(
+    const Aes128& aes, const uint8_t* nonce, uint8_t nonceLength,
+    const uint8_t* aad, uint8_t aadLength, uint8_t* data, uint8_t dataLength,
+    uint8_t* tag, uint8_t tagLength);
+
 }  // namespace crypto
 }  // namespace osk
