@@ -5,6 +5,7 @@
 #include <SupplyVoltage.h>
 #include <TelemetrySchedule.h>
 #include <unity.h>
+#include "test_security_storage.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -886,6 +887,15 @@ void test_i2c_recovery_gives_up_after_nine_clocks() {
 
 int main(int, char**) {
     UNITY_BEGIN();
+    RUN_TEST(security_store_tests::test_config_layout_and_crc);
+    RUN_TEST(security_store_tests::test_config_torn_write_is_atomic);
+    RUN_TEST(security_store_tests::test_config_wrap_reset_and_readback);
+    RUN_TEST(security_store_tests::test_counter_lazy_reservation_and_boot_skip);
+    RUN_TEST(security_store_tests::test_counter_corruption_requires_discarding_keys);
+    RUN_TEST(security_store_tests::test_counter_torn_write_never_reuses_counters);
+    RUN_TEST(security_store_tests::test_counter_readback_failure_stops_transmission);
+    RUN_TEST(security_store_tests::test_counter_floor_bounded_and_one_reservation);
+    RUN_TEST(security_store_tests::test_counter_floor_torn_write_and_overflow);
     RUN_TEST(test_layout_fills_eeprom_without_overlap);
     RUN_TEST(test_factory_credentials_round_trip_and_validation);
     RUN_TEST(test_factory_credential_store_reads_user_row_independently);

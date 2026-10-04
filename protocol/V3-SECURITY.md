@@ -13,7 +13,7 @@ Implementation status:
 | Release Flash flags and RFM69 fork | Configured; all four release images build |
 | Pairing entropy | [Hardware capture measurements](../node/crypto_bench/ENTROPY.md); source qualification and runtime health checks pending |
 | Node and gateway radio integration, pairing transactions and command sessions | Pending |
-| EEPROM configuration and node counter reservations | Pending |
+| EEPROM configuration and node counter reservations | Implemented in `node/lib/NodeCore/include/RadioSecurityStorage.h`; native interruption/overflow tests and AVR build; runtime integration pending |
 | Gateway bounds, backup activation and failed-tag UI counters | Pending |
 
 The operational radio protocol is version 2. The shared V3 security module is
@@ -302,6 +302,19 @@ Network configuration slot, 26 bytes: magic (2), schema (1), generation (1), pro
 | `0x40` | 192 | Profile-owned, unchanged |
 
 The reserve fits the space the installation key leaves, so no image moves its profile storage, including `counter_reed`, whose profile area is full.
+
+`RadioSecurityStorage.h` exposes the V3 configuration and frame counter stores.
+Configuration saves and resets are read back before success is returned. A
+counter load returns `KeysMustBeDiscarded` when both reserves are invalid with a
+network configuration present; `take()` then fails until the configuration and
+its keys are discarded. `take()` reserves lazily and returns a new counter for
+new content; retransmissions retain the original frame. `advanceToFloor()`
+accepts a floor only for the last issued counter, within 256 values, and stores
+floor + 1024 before making the floor available.
+
+The `size_security_storage` bench environment compiles these stores with the
+Arduino EEPROM backend: 2534 bytes of Flash and 32 bytes of static RAM, including
+the bench and Arduino core. It does not write EEPROM with its default zero sink.
 
 ## Flash
 
