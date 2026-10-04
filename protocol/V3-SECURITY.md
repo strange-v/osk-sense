@@ -31,7 +31,13 @@ Zigbee and Z-Wave S2 carry a frame counter and a MIC, so reviewers compare again
 
 ## Crypto measurements
 
-Prototype: forward-only AES-128 with an expanded key, compile-time generated S-box, CMAC per RFC 4493, single-block CTR. It passes FIPS-197 C.1, SP 800-38A F.5.1, and RFC 4493 vectors on the host and on the chip. ATtiny1614 at 4 MHz, cycles measured on the chip with `micros()` over 64 runs.
+Prototype in [node/crypto_bench](../node/crypto_bench): forward-only AES-128 with an expanded key, compile-time generated S-box, CMAC per RFC 4493, single-block CTR. It passes FIPS-197 C.1, SP 800-38A F.5.1, and RFC 4493 vectors on the host and on the chip. ATtiny1614 at 4 MHz, cycles measured on the chip with `micros()` over 64 runs.
+
+| Check | Command, from `node/crypto_bench` |
+| --- | --- |
+| Known answers on the host (WSL) | `g++ -std=c++17 -DOSK_AES_FUSED test_host/main.cpp lib/OskCrypto/src/OskCrypto.cpp -o /tmp/osk_crypto && /tmp/osk_crypto` |
+| Flash cost | `pio run -e size_empty -e size_fused`, then subtract |
+| Cycles on the chip | `pio run -e bench_fused -t upload`, then read COM12 at 9600 baud |
 
 | Variant | Flash | AES block | Report (CTR + CMAC) | ACK tag check | CMAC key setup (once) |
 | --- | ---: | ---: | ---: | ---: | ---: |
