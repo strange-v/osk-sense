@@ -12,6 +12,7 @@ enum class Status : uint8_t { Accepted, Pinned, Active, InvalidFrame, StorageErr
 template <typename Storage>
 class Transaction {
 public:
+    explicit Transaction(Storage& storage) : store_(storage) {}
     Transaction(Storage& storage, const uint8_t (&uid)[protocol::kDeviceUidSize]) : store_(storage) {
         memcpy(identity_.uid,uid,sizeof(identity_.uid));
     }
@@ -24,6 +25,18 @@ public:
         if (hasConfig_) identity_.requestNonce = config_.requestNonce;
         return hasConfig_;
     }
+    bool load(const uint8_t (&uid)[protocol::kDeviceUidSize]) {
+        memcpy(identity_.uid,uid,sizeof(identity_.uid)); return load();
+    }
+    bool reset() {
+        if (!store_.factoryReset()) { healthy_ = false; return false; }
+        config_ = security_storage::NetworkConfig{};
+        identity_.requestNonce = 0;
+        hasConfig_ = attempting_ = false; healthy_ = true;
+        return true;
+    }
+    bool active() const { return healthy_ && hasConfig_ && config_.state == storage::ProvisioningState::Active; }
+    bool provisional() const { return healthy_ && hasConfig_ && config_.state == storage::ProvisioningState::Provisional; }
     // The caller allocates the counter and qualifies the entropy before begin.
     bool begin(uint64_t nonce) {
         if (!healthy_ || hasConfig_) return false;

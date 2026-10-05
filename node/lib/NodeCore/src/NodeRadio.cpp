@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include <RFM69registers.h>
-#include <RadioAes.h>
 #include <string.h>
 
 #include "DebugLog.h"
@@ -13,14 +12,10 @@ namespace node {
 namespace {
 constexpr uint32_t kAckWaitMs = 40;
 
-static_assert(radio_aes::kStandbyMode == RF69_MODE_STANDBY, "RFM69 mode");
-static_assert(radio_aes::kPacketConfig2Register == REG_PACKETCONFIG2, "RFM69 map");
-static_assert(radio_aes::kAesKey1Register == REG_AESKEY1, "RFM69 map");
-static_assert(radio_aes::kAesOn == RF_PACKET2_AES_ON, "RFM69 map");
 }
 
 NodeRadio::NodeRadio(const uint8_t chipSelect, const uint8_t interruptPin)
-    : radio_(chipSelect, interruptPin, true) {}
+    : radio_(chipSelect, interruptPin) {}
 
 bool NodeRadio::begin(const uint8_t nodeId, const uint8_t networkId) {
     const bool initialized =
@@ -33,25 +28,13 @@ bool NodeRadio::begin(const uint8_t nodeId, const uint8_t networkId) {
     return initialized;
 }
 
-void NodeRadio::useCommissioningProfile(const uint8_t (&factoryKey)[16]) {
-    applyProfile(0, 0, factoryKey);
-    setPowerLevel(NODE_RADIO_MAX_POWER_LEVEL);
-}
-
-void NodeRadio::useOperationalProfile(const storage::NetworkConfig& config) {
-    applyProfile(config.nodeId, config.networkId, config.installationKey);
-    // Every boot and every join starts at the ceiling; the gateway lowers it.
-    setPowerLevel(NODE_RADIO_MAX_POWER_LEVEL);
-}
-
-void NodeRadio::applyProfile(
-    const uint8_t address, const uint8_t network, const uint8_t (&key)[16]) {
+void NodeRadio::useProfile(const uint8_t address, const uint8_t network) {
     address_ = address;
     network_ = network;
-    memcpy(key_, key, sizeof(key_));
     radio_.setAddress(address);
     radio_.setNetwork(network);
-    radio_aes::enable(radio_, key);
+    radio_.encrypt(nullptr);
+    setPowerLevel(NODE_RADIO_MAX_POWER_LEVEL);
 }
 
 void NodeRadio::setPowerLevel(const uint8_t level) {
@@ -64,7 +47,7 @@ void NodeRadio::setPowerLevel(const uint8_t level) {
 // itself comes back on its default frequency, with AES off and sync value 1.
 bool NodeRadio::configured() {
     return radio_.readReg(REG_FRFMSB) == frequencyMsb_ &&
-        (radio_.readReg(REG_PACKETCONFIG2) & RF_PACKET2_AES_ON) != 0 &&
+        (radio_.readReg(REG_PACKETCONFIG2) & RF_PACKET2_AES_ON) == 0 &&
         radio_.readReg(REG_SYNCVALUE2) == network_;
 }
 
@@ -79,17 +62,17 @@ bool NodeRadio::ensureConfigured() {
         radio_.sleep();
         return false;
     }
-    radio_aes::enable(radio_, key_);
+    radio_.encrypt(nullptr);
     radio_.setPowerLevel(level_);
     radio_.sleep();
     return configured();
 }
 
-bool NodeRadio::sendTelemetry(
+bool NodeRadio::sendAcknowledged(
     const uint8_t gatewayId, const uint8_t* frame, const uint8_t size,
-    const uint8_t attempts, protocol::TelemetryAck& ack,
+    const uint8_t attempts, const osk::crypto::Cmac& mac, const uint32_t counter, security::Ack& ack,
     int8_t& downlinkRssi) {
-    ack = protocol::TelemetryAck{false, false, 0};
+    ack = security::Ack{};
     // sendWithRetry() without its RSSI: the RFM69 keeps measuring the channel
     // after a frame ends, so a read after reception sees anything from the
     // frame to the noise floor. Sample it when the sync word matches, while
@@ -109,7 +92,9 @@ bool NodeRadio::sendTelemetry(
             if (!radio_.ACKReceived(gatewayId)) continue;
             // The acknowledgement stays in DATA until the radio receives
             // again.
-            ack = protocol::decodeTelemetryAck(radio_.DATA, radio_.DATALEN);
+            if (radio_.TARGETID != address_ || radio_.control != 0x80 ||
+                !security::openAck(mac,receivedTransport(),counter,
+                                   radio_.DATA,radio_.DATALEN,ack)) continue;
             downlinkRssi = rssi;
             radio_.sleep();
             return true;
@@ -117,11 +102,6 @@ bool NodeRadio::sendTelemetry(
     }
     radio_.sleep();
     return false;
-}
-
-bool NodeRadio::sendAcknowledged(
-    const uint8_t recipient, const uint8_t* frame, const uint8_t size) {
-    return radio_.sendWithRetry(recipient, frame, size, 2, 40);
 }
 
 void NodeRadio::send(
@@ -151,7 +131,7 @@ uint8_t NodeRadio::receiveMatching(
     while (static_cast<uint32_t>(millis() - started) < timeoutMs) {
         if (!radio_.receiveDone()) continue;
         const uint8_t size = radio_.DATALEN;
-        if (radio_.SENDERID == expectedSender && size >= minimumSize &&
+        if (radio_.TARGETID == address_ && radio_.SENDERID == expectedSender && size >= minimumSize &&
             size <= maximumSize) {
             memcpy(output, radio_.DATA, size);
             return size;
@@ -163,6 +143,11 @@ uint8_t NodeRadio::receiveMatching(
 
 void NodeRadio::sleep() {
     radio_.sleep();
+}
+
+security::Transport NodeRadio::receivedTransport() const {
+    return security::Transport{static_cast<uint8_t>(radio_.TARGETID),
+                               static_cast<uint8_t>(radio_.SENDERID),radio_.control};
 }
 
 }  // namespace node

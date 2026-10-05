@@ -1,4 +1,5 @@
 #pragma once
+#include <RadioSecurityFrames.h>
 
 #include <CommandSessionFrames.h>
 #include <ProfileIds.h>
@@ -84,7 +85,7 @@ public:
     void reportFailed(uint32_t, uint16_t) {}
 
     void applyCommand(
-        const protocol::Command& command, protocol::CommandResult& result) {
+    const security::frames::Command& command, security::frames::CommandResult& result) {
         if (command.type != static_cast<uint8_t>(protocol::CommandType::SetCount)) {
             return;
         }

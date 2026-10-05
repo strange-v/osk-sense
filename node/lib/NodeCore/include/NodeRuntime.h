@@ -38,8 +38,8 @@ namespace node {
 //                          uint8_t* output, size_t capacity);
 //   void reportAcknowledged(uint32_t now, uint16_t supplyMillivolts);
 //   void reportFailed(uint32_t now, uint16_t supplyMillivolts);
-//   void applyCommand(const protocol::Command& command,
-//                     protocol::CommandResult& result);
+//   void applyCommand(const security::frames::Command& command,
+//                     security::frames::CommandResult& result);
 //       // a profile command; `result.status` arrives as Unsupported
 //   void commissioned();  // forget command IDs recorded by the profile
 //
@@ -159,7 +159,7 @@ private:
     bool reportIfDue(const uint32_t now) {
         const bool urgent = profile_.takeUrgentReport() || urgentHeld_;
         urgentHeld_ = false;
-        if (!profile_.reportDue(now) ||
+        if ((!profile_.reportDue(now) && !commissioning_.needsActivation()) ||
             (!urgent && !radioRetry_.allowed(now))) {
             return false;
         }
@@ -179,12 +179,11 @@ private:
         const size_t size =
             profile_.encodeTelemetry(prefix, frame, sizeof(frame));
         bool acknowledged = false;
-        protocol::TelemetryAck ack{false, false, 0};
+        security::Ack ack;
         int8_t ackRssi = protocol::kNoDownlinkRssi;
         if (size != 0 && radio_.ensureConfigured()) {
-            acknowledged = radio_.sendTelemetry(
-                commissioning_.config().gatewayId, frame,
-                static_cast<uint8_t>(size),
+            acknowledged = commissioning_.sendReport(
+                frame, size,
                 telemetryAttempts(unacknowledgedReports_, urgent), ack,
                 ackRssi);
             supplyVoltage_.transmitted(battery_.readMillivolts());
@@ -251,31 +250,35 @@ private:
         WatchdogWindow watchdog;
         if (!radio_.ensureConfigured()) return false;
         const uint8_t gatewayId = commissioning_.config().gatewayId;
-        const uint32_t nonce = commissioning_.createNonce();
-        uint8_t ready[protocol::kCommandReadySize];
-        protocol::encodeCommandReady(nonce, ready, sizeof(ready));
-        uint8_t frame[protocol::kMaxCommandSize];
+        uint8_t ready[13]; size_t readySize; uint32_t counter;
+        if (!commissioning_.sealFrame(security::frames::kCommandReadyHeader,nullptr,0,0,
+                                       ready,sizeof(ready),readySize,counter)) return false;
+        uint8_t frame[22];
         for (uint8_t attempt = 0; attempt < kSessionAttempts; ++attempt) {
-            radio_.send(gatewayId, ready, sizeof(ready));
+            radio_.send(gatewayId, ready,static_cast<uint8_t>(readySize));
             const uint8_t size = radio_.receiveFrame(
                 kSessionWindowMs, gatewayId, frame, sizeof(frame));
-            uint32_t echoed = 0;
-            if (protocol::decodeNoCommand(frame, size, echoed) ==
-                    protocol::CommandSessionCodecStatus::Ok &&
-                echoed == nonce) {
+            const auto transport = radio_.receivedTransport();
+            if (transport.control == 0x80) {
+                security::Ack ack;
+                if (!commissioning_.receiveAck(counter,transport,frame,size,ack)) continue;
+                if (ack.hasChallenge) { radio_.sleep(); return false; }
+                if (ack.hasCounterFloor && !commissioning_.sealFrame(security::frames::kCommandReadyHeader,
+                    nullptr,0,0,ready,sizeof(ready),readySize,counter)) { radio_.sleep(); return false; }
+                continue;
+            }
+            security::frames::Command decoded; bool hasCommand;
+            if (transport.control != 0 || !security::frames::openCommandReply(commissioning_.context(),
+                commissioning_.config().nodeId,transport,counter,frame,size,decoded,hasCommand)) continue;
+            if (!hasCommand) {
 #if defined(NODE_DEBUG)
                 debugLine(F("cmd none"));
 #endif
                 radio_.sleep();
                 return true;
             }
-            protocol::Command command{};
-            if (protocol::decodeCommand(frame, size, command) ==
-                    protocol::CommandSessionCodecStatus::Ok &&
-                command.sessionNonce == nonce) {
-                answerCommand(gatewayId, command);
-                return true;
-            }
+            answerCommand(decoded);
+            return true;
         }
 #if defined(NODE_DEBUG)
         debugLine(F("cmd timeout"));
@@ -284,9 +287,8 @@ private:
         return false;
     }
 
-    void answerCommand(const uint8_t gatewayId, const protocol::Command& command) {
-        protocol::CommandResult result{};
-        result.sessionNonce = command.sessionNonce;
+    void answerCommand(const security::frames::Command& command) {
+        security::frames::CommandResult result;
         result.commandId = command.commandId;
         result.status = protocol::CommandStatus::Unsupported;
         if (command.type == static_cast<uint8_t>(protocol::CommandType::ReadInfo)) {
@@ -294,13 +296,10 @@ private:
         } else {
             profile_.applyCommand(command, result);
         }
-        uint8_t bytes[protocol::kMaxCommandResultSize];
+        uint8_t bytes[security::frames::kMaxCommandPayloadSize]; size_t size;
         const bool sent =
-            protocol::encodeCommandResult(result, bytes, sizeof(bytes)) ==
-                protocol::CommandSessionCodecStatus::Ok &&
-            radio_.sendAcknowledged(
-                gatewayId, bytes,
-                static_cast<uint8_t>(protocol::commandResultFrameSize(result)));
+            security::frames::encodeCommandResult(result,bytes,sizeof(bytes),size) &&
+            commissioning_.sendResult(bytes,size);
         radio_.sleep();
 #if defined(NODE_DEBUG)
         Serial.print(sent ? F("cmd ack id=") : F("cmd noack id="));
@@ -316,7 +315,7 @@ private:
     // Read-only, so unlike a profile command it records no ID: a redelivery
     // answers with the current identity.
     static void readInfo(
-        const protocol::Command& command, protocol::CommandResult& result) {
+        const security::frames::Command& command, security::frames::CommandResult& result) {
         if (command.argumentSize != 0) {
             result.status = protocol::CommandStatus::InvalidArgument;
             return;

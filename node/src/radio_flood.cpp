@@ -58,11 +58,11 @@ void transmit() {
         protocol::TelemetryCodecStatus::Ok) {
         return;
     }
-    protocol::TelemetryAck ack{};
+    security::Ack ack;
     int8_t ackRssi = protocol::kNoDownlinkRssi;
     node::WatchdogWindow watchdog;
-    if (radio.sendTelemetry(
-            commissioning.config().gatewayId, frame,
+    if (commissioning.sendReport(
+            frame,
             static_cast<uint8_t>(sizeof(frame)), node::kTelemetryAttempts,
             ack, ackRssi)) {
         ++acknowledged;

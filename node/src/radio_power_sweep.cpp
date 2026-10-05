@@ -86,10 +86,10 @@ void transmitAtCurrentLevel() {
         return;
     }
 
-    protocol::TelemetryAck ack{};
+    security::Ack ack;
     int8_t ackRssi = protocol::kNoDownlinkRssi;
-    radio.sendTelemetry(
-        commissioning.config().gatewayId, frame,
+    commissioning.sendReport(
+        frame,
         static_cast<uint8_t>(sizeof(frame)), node::kTelemetryAttempts, ack,
         ackRssi);
     // Match the production transaction, which samples loaded supply after

@@ -1,4 +1,5 @@
 #pragma once
+#include <RadioSecurityFrames.h>
 
 #include <CommandSessionFrames.h>
 #include <ProfileIds.h>
@@ -61,7 +62,7 @@ public:
         scheduleNext(now, supplyMillivolts);
     }
 
-    void applyCommand(const protocol::Command&, protocol::CommandResult&) {}
+    void applyCommand(const security::frames::Command&, security::frames::CommandResult&) {}
     void commissioned() {}
 
 private:

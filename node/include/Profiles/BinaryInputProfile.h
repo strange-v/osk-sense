@@ -1,4 +1,5 @@
 #pragma once
+#include <RadioSecurityFrames.h>
 
 #include <CommandSessionFrames.h>
 #include <ProfileIds.h>
@@ -69,7 +70,7 @@ public:
 
     void reportFailed(uint32_t, uint16_t) {}
 
-    void applyCommand(const protocol::Command&, protocol::CommandResult&) {}
+    void applyCommand(const security::frames::Command&, security::frames::CommandResult&) {}
     void commissioned() {}
 
 private:
