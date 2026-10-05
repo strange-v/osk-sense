@@ -11,7 +11,7 @@ namespace node {
 
 class LowPowerClock {
 public:
-    // One ATtiny1614 RTC PIT period. Periodic nodes use 32 s so they do not
+    // One ATtiny3224 RTC PIT period. Periodic nodes use 32 s so they do not
     // pay for wake-ups they never use; polled inputs need 250 ms.
     static constexpr uint32_t kTickMs = NODE_TICK_MS;
 

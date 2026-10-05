@@ -18,7 +18,7 @@ class Capture {
 public:
     Capture() : pit_(RTC.PITCTRLA), pitInterrupt_(RTC.PITINTCTRL), clock_(RTC.CLKSEL),
         rtc_(RTC.CTRLA), rtcInterrupt_(RTC.INTCTRL), period_(RTC.PER), count_(RTC.CNT),
-        channel_(EVSYS.ASYNCCH0), user_(EVSYS.ASYNCUSER0),
+        channel_(EVSYS.CHANNEL0), user_(EVSYS.USERTCB0CAPT),
         timer_(TCB0.CTRLA), mode_(TCB0.CTRLB), event_(TCB0.EVCTRL),
         interrupt_(TCB0.INTCTRL), timerCount_(TCB0.CNT), compare_(TCB0.CCMP) {}
     bool begin() {
@@ -30,8 +30,8 @@ public:
         RTC.CLKSEL = RTC_CLKSEL_INT32K_gc; RTC.PER = 63; RTC.CNT = 0;
         if (!synchronized()) return false;
         TCB0.CTRLA = 0;
-        EVSYS.ASYNCCH0 = EVSYS_ASYNCCH0_RTC_OVF_gc;
-        EVSYS.ASYNCUSER0 = EVSYS_ASYNCUSER0_ASYNCCH0_gc;
+        EVSYS.CHANNEL0 = EVSYS_CHANNEL0_RTC_OVF_gc;
+        EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL0_gc;
         TCB0.CTRLB = TCB_CNTMODE_FRQ_gc; TCB0.EVCTRL = TCB_CAPTEI_bm;
         TCB0.INTCTRL = 0; TCB0.INTFLAGS = TCB_CAPT_bm;
         TCB0.CTRLA = TCB_CLKSEL_CLKDIV1_gc | TCB_ENABLE_bm;
@@ -53,7 +53,7 @@ public:
         TCB0.CTRLA = 0;
         TCB0.CTRLB = mode_; TCB0.EVCTRL = event_; TCB0.INTCTRL = interrupt_;
         TCB0.CNT = timerCount_; TCB0.CCMP = compare_; TCB0.INTFLAGS = TCB_CAPT_bm;
-        EVSYS.ASYNCCH0 = channel_; EVSYS.ASYNCUSER0 = user_; TCB0.CTRLA = timer_;
+        EVSYS.CHANNEL0 = channel_; EVSYS.USERTCB0CAPT = user_; TCB0.CTRLA = timer_;
         RTC.CTRLA = 0; synchronized();
         RTC.CLKSEL = clock_; RTC.PER = period_; RTC.CNT = count_; synchronized();
         RTC.CTRLA = rtc_; RTC.INTCTRL = rtcInterrupt_;

@@ -1,6 +1,6 @@
 # OSK Sense
 
-Local, low-power wireless sensors for Home Assistant. Small ATtiny1614 nodes report over encrypted RFM69 radio to an Ethernet ESP32 gateway; Home Assistant reads them through the [osk-sense-ha](https://github.com/strange-v/osk-sense-ha) integration. No cloud, no Wi-Fi on the sensors.
+Local, low-power wireless sensors for Home Assistant. Small ATtiny3224 nodes report over encrypted RFM69 radio to an Ethernet ESP32 gateway; Home Assistant reads them through the [osk-sense-ha](https://github.com/strange-v/osk-sense-ha) integration. No cloud, no Wi-Fi on the sensors.
 
 ```text
 sensor node -- encrypted RFM69 --> gateway -- REST/WebSocket --> Home Assistant

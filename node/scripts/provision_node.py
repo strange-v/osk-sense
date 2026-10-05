@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provision one ATtiny1614 factory key in USERROW and export its QR credential."""
+"""Provision one ATtiny3224 factory key in USERROW and export its QR credential."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def write_user_row(backend, record: bytes) -> None:
     """Erase and write the complete USERROW page through SerialUPDI.
 
     pymcuprog routes a generic USER_ROW write through its flash page-write
-    implementation.  On the ATtiny1614 that command does not erase the page,
+    implementation.  On the ATtiny3224 that command does not erase the page,
     so it cannot restore zero bits left by an earlier provisioning attempt.
     Use the NVM controller's atomic erase-and-write command instead.
     """
@@ -91,7 +91,7 @@ def provision_over_updi(port: str, baud: int, force: bool) -> tuple[bytes, bytes
 
     backend = Backend()
     backend.connect_to_tool(ToolSerialConnection(serialport=port))
-    session = SessionConfig("attiny1614")
+    session = SessionConfig("attiny3224")
     session.interface = "updi"
     session.interface_speed = baud
     session.special_options = {
@@ -101,7 +101,7 @@ def provision_over_updi(port: str, baud: int, force: bool) -> tuple[bytes, bytes
     try:
         backend.start_session(session)
         backend.read_device_id()
-        # SIGROW_SERNUM0 is mapped at SIGROW base + 3 on ATtiny1614.
+        # SIGROW_SERNUM0 is mapped at SIGROW base + 3 on ATtiny3224.
         uid = bytes(backend.programmer.device_model.avr.read_data(0x1103, UID_SIZE))
         current = bytes(backend.read_memory(MemoryNames.USER_ROW, 0, FACTORY_SIZE)[0].data)
         if decode_factory_record(current) is not None and not force:

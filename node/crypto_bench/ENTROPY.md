@@ -23,8 +23,9 @@ temperature. Source qualification remains pending.
 The node runtime collects 512 samples through RTC overflow events and TCB0
 frequency capture before each Join request. It pauses PIT ticks during the
 burst, restores the sleep-clock registers, and fails on a bounded capture
-timeout. This integrated driver has been compiled for ATtiny1614; hardware
-verification of the integrated image remains pending.
+timeout. The integrated driver and bench target ATtiny3224 at 4 MHz, with
+TCB1 providing `millis()`. Hardware verification and source qualification on
+ATtiny3224 remain pending; the ATtiny1614 capture does not qualify that source.
 
 `PairingEntropy.h` processes 512 capture LSBs in non-overlapping pairs,
 discards equal pairs and keeps 64 Von Neumann bits. It validates the entire
@@ -45,8 +46,8 @@ capture pass them. A factory-key CMAC conditions the material with domain byte
 counter remains the separate low word of `request_nonce`.
 
 `size_security_entropy` links the extractor and conditioning with a synthetic
-source: 1882 bytes of Flash and 219 bytes of static RAM, including the Arduino
-core and CMAC. It collects no hardware entropy.
+source. The ATtiny1614 measurement is 1882 bytes of Flash and 219 bytes of
+static RAM, including the Arduino core and CMAC. It collects no hardware entropy.
 
 | Action | Command from `node/crypto_bench` |
 | --- | --- |

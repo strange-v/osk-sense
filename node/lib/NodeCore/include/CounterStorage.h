@@ -18,7 +18,7 @@ constexpr size_t kCounterRecordSize = 5;
 constexpr size_t kCounterRecordCount = 32;
 static_assert(
     kCounterRingStart + kCounterRecordSize * kCounterRecordCount == kEepromSize,
-    "counter EEPROM layout must fill the ATtiny1614 EEPROM exactly");
+    "counter EEPROM layout must fill the ATtiny3224 EEPROM exactly");
 
 enum class SetCountStatus : uint8_t {
     Pending = 1,

@@ -1,6 +1,6 @@
 # OSK Sense Node firmware
 
-This PlatformIO project produces one statically composed ATtiny1614 image per stable telemetry profile. Shared code owns commissioning, radio, EEPROM, power, the wake clock, and command sessions; profiles own acquisition, report scheduling, and payload encoding.
+This PlatformIO project produces one statically composed ATtiny3224 image per stable telemetry profile. Shared code owns commissioning, radio, EEPROM, power, the wake clock, and command sessions; profiles own acquisition, report scheduling, and payload encoding.
 
 ## Builds
 
@@ -46,8 +46,16 @@ pio run -e climate_tmp112 -t fuses
 ## Runtime composition
 
 Node radio traffic uses V3 software CTR/CMAC and persistent frame counters.
-Gateway V3 integration is pending. All release profiles exceed ATtiny1614 Flash;
+Gateway V3 integration is pending. Release and debug profiles fit the 32 KiB Flash;
 sizes and the inspection command are in [V3-SECURITY.md](../protocol/V3-SECURITY.md#flash).
+
+The SOIC-14 pin assignments are PA4 radio CS, PA7 radio IRQ, PA1/PA2/PA3
+SPI, PB0/PB1 I2C, PA5 contact, PA6 button, PA0 UPDI and PB2/PB3 UART.
+Supply measurement uses the ADC's VDD/10 input against its 1.024 V reference;
+the ADC is disabled after measurement. TCB1 provides `millis()`, TCB0 captures
+RTC events for pairing entropy, and the RTC PIT provides sleep ticks.
+Supply accuracy, sleep current, entropy and stack high-water measurements on
+ATtiny3224 hardware remain pending; [POWER.md](POWER.md) measurements are from ATtiny1614.
 
 Each environment compiles exactly one composition root from `src/` through `build_src_filter`. `NodeRuntime<Profile>` owns commissioning, the provisioning button, radio retry backoff, supply-voltage measurement, and sleep. The profile class in `include/Profiles/` owns acquisition, report scheduling, and payload encoding; the contract is documented in `NodeRuntime.h`. Profiles are template parameters, not virtual interfaces, because avr-gcc keeps vtables in RAM.
 
@@ -61,7 +69,7 @@ A node transmits only while its resting supply is above `NODE_MIN_TRANSMIT_MILLI
 
 ## Factory provisioning
 
-Production firmware contains no shared commissioning key. Each ATtiny1614 must receive a unique 16-byte factory key in its 32-byte USERROW after the common firmware is flashed. Install the QR exporter once and provision a connected node through the same SerialUPDI adapter:
+Production firmware contains no shared commissioning key. Each ATtiny3224 must receive a unique 16-byte factory key in its 32-byte USERROW after the common firmware is flashed. Install the QR exporter once and provision a connected node through the same SerialUPDI adapter:
 
 ```powershell
 & "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" -m pip install -r scripts/requirements-provisioning.txt

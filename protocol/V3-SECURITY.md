@@ -12,7 +12,7 @@ Implementation status:
 | V3 crypto vectors | `protocol-vectors.json`, checked independently with Node.js AES |
 | Pairing and command wire codecs | Implemented in `RadioSecurityFrames`; authenticated join codecs, nonce-free command payloads, counter-bound reply decoding and independent wire vectors |
 | Immutable command reply cache | Implemented in `GatewayReplay`; exact bytes per node/counter, discarded on the next accepted frame or restart |
-| Release Flash flags and RFM69 fork | Configured; all four pure V3 profiles exceed the ATtiny1614 Flash limit; see [Flash](#flash) |
+| Node target and Flash | ATtiny3224 at 4 MHz; all four release and debug profiles fit; see [Flash](#flash) |
 | Pairing entropy | RTC/TCB0 hardware collection integrated; extractor, health guards and CMAC conditioning tested on [captured and synthetic data](../node/crypto_bench/ENTROPY.md); source qualification pending |
 | Pairing transactions | Gateway `PairingTransaction` persists replies and derived keys before sending; node `RadioSecurityPairing` pins salt in EEPROM before confirm; native restart, corruption and write-interruption tests; registry adapter pending |
 | Node radio integration and command sessions | V3 pairing, telemetry, activation, authenticated ACKs and counter-bound command sessions integrated; native service tests cover retries, restart and failures |
@@ -22,8 +22,8 @@ Implementation status:
 | Failed-tag UI counters | Pending |
 
 The node radio service uses V3. The gateway radio service uses V2 and cannot
-communicate with these node images. Gateway integration and the node Flash
-budget remain blockers for a working V3 system.
+communicate with these node images. Gateway integration and ATtiny3224 hardware
+verification remain blockers for a working V3 system.
 
 | Area | Change |
 | --- | --- |
@@ -42,11 +42,14 @@ AES-128, forward direction only: CTR for confidentiality, CMAC (RFC 4493) trunca
 
 The node and the gateway use the same implementation, in `shared/RadioProtocol`, so nonce and tag formatting are one code path checked by the same native known-answer tests. ESP32 hardware AES would gain nothing: software AES there takes microseconds against the node's 40 ms ACK window.
 
+The isolated bench measurements below use ATtiny1614 at 4 MHz. The bench
+environments target ATtiny3224; complete node sizes are under [Flash](#flash).
+
 `node/crypto_bench` environment `size_security` links the shared implementation
 for key derivation, report sealing, ACK verification, join authentication and
 gateway reply decryption. Its image is 2755 bytes of Flash and 472 bytes of
 static RAM; `size_empty` is 492 bytes of Flash. The difference is 2263 bytes,
-including the exercised frame glue; complete firmware still needs a size check.
+including the exercised frame glue.
 
 `size_security_frames` exercises the node-side pairing and command codecs,
 including counter-bound reply verification and shared crypto: 3726 bytes of
@@ -55,11 +58,11 @@ the complete radio, ACK, storage or profile paths.
 
 `size_security_pairing` links node pairing, EEPROM configuration and key setup:
 4792 bytes of Flash and 505 bytes of static RAM. Radio, frame-counter allocation,
-entropy collection and profile paths still need a complete-image check.
+entropy collection and profile paths are absent from this isolated bench.
 
 | Cost on ATtiny1614 at 4 MHz | Value |
 | --- | ---: |
-| Flash, including key derivation | 1 380 B, plus protocol glue (estimated 0.2–0.4 KB) |
+| Crypto Flash, including key derivation | 1 380 B; complete node images are measured separately under [Flash](#flash) |
 | RAM | 384 B (two 176 B expanded keys, 32 B CMAC subkeys); the derivation reuses the CMAC context |
 | One AES block | 6 791 cycles |
 | Report: CTR + CMAC over one block | 14 594 cycles |
@@ -398,36 +401,39 @@ the bench and Arduino core. It does not write EEPROM with its default zero sink.
 
 `lib_deps` points to the `no-readallregs` branch of the strange-v/RFM69 fork, and release environments define `RF69_NO_READALLREGS`. Without it `readAllRegs()` links `Serial`, UART0, and its interrupt vectors into images that never use them.
 
-| Pure V3 release profile | Flash | Excess over 16 384 | Static RAM |
+ATtiny3224 has 32 768 bytes of Flash and 3072 bytes of SRAM. Builds use
+megaTinyCore 2.6.7 and the 4 MHz internal clock.
+
+| V3 profile | Flash | Free Flash | Static RAM |
 | --- | ---: | ---: | ---: |
-| `counter_reed` | 20 971 | 4587 | 770 |
-| `climate_tmp112` | 20 918 | 4534 | 821 |
-| `binary_sht40` | 20 779 | 4395 | 805 |
-| `binary` | 18 949 | 2565 | 716 |
+| `counter_reed` | 20 831 | 11 937 | 764 |
+| `climate_tmp112` | 20 822 | 11 946 | 815 |
+| `binary_sht40` | 20 685 | 12 083 | 799 |
+| `binary` | 18 809 | 13 959 | 710 |
+| `counter_reed_debug` | 22 730 | 10 038 | 909 |
+| `climate_tmp112_debug` | 22 600 | 10 168 | 960 |
+| `binary_sht40_debug` | 22 932 | 9836 | 944 |
+| `binary_debug` | 20 694 | 12 074 | 855 |
 
 Run `node/scripts/probe_v3_size.ps1 -Environment counter_reed` from PowerShell;
 the other release environment names select their own composition roots.
-The probe links the actual release sources, including RTC entropy collection,
-and produces an ELF and map for inspection. Only the linker region expands;
-PlatformIO retains the MCU's 16 KiB check and rejects every profile above.
-No image is uploaded. Flash includes `.text`, `.rodata` and `.data`.
+The script builds the actual release environment, including RTC entropy
+collection, and inspects its ELF without uploading. The MCU's memory limits
+apply unchanged. Flash includes `.text`, `.rodata` and `.data`.
 
-Static RAM leaves 1227–1332 bytes for stack and dynamic state. Peak stack usage
+Static RAM leaves at least 2112 bytes for stack and dynamic state. Peak stack usage
 is unverified: this AVR toolchain produces empty `-fstack-usage` reports with
-LTO. A final fitting image still needs a stack high-water measurement.
+LTO. The integrated image still needs a stack high-water measurement.
 
-## Open decisions
+## ATtiny3224 hardware verification
 
-### Debug images
-
-Debug images include `Serial` and require their own complete V3 size checks
-after the release profiles fit.
-
-| Option | Cost |
+| Check | Required evidence |
 | --- | --- |
-| Fewer, shorter debug messages | Less insight in the field |
-| Debug builds without some features, such as crypto | Debugs logic, not the radio path as shipped |
-| A bench-only 32 KB part with the same pinout (ATtiny3224, if its pinout matches) | Different ADC; release boards stay on the 1614 |
+| Supply measurement | Compare VDD/10 ADC readings with a meter across the battery voltage range; verify the 2000 mV transmit gate |
+| Sleep and wake | PPK2 current measurements with RTC PIT enabled and ADC disabled, including a radio transmission |
+| Pairing entropy | RTC/TCB0 captures across devices, supply voltages, temperature and power cycles; integrated capture restores PIT operation |
+| Provisioning | SerialUPDI USERROW write/readback, factory key preservation and EEPROM reservations after reset |
+| Stack | High-water measurement during pairing and command sessions |
 
 ## Later
 
