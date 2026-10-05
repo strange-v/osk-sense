@@ -2,6 +2,8 @@
 
 #include <Preferences.h>
 #include <RegistryPersistence.h>
+#include <RegistryPairing.h>
+#include <esp_random.h>
 #include <esp_timer.h>
 
 #include <atomic>
@@ -10,56 +12,67 @@
 #include <string.h>
 
 #include "RecoveryService.h"
+#include "ReplayBoundStorage.h"
 
 namespace gateway::registry_store {
 namespace {
 
 constexpr const char* kNamespace = "node-reg";
-constexpr const char* kSlotKeys[2] = {"registry_a", "registry_b"};
+constexpr const char* kKey = "registry";
 
-class NvsSlotStorage final : public radiosensors::registry::RegistrySlotStorage {
+class NvsRegistryStorage final : public radiosensors::replay::BlobStorage {
 public:
     bool begin() {
         return preferences_.begin(kNamespace, false);
     }
 
-    bool read(
-        const uint8_t slot,
+    radiosensors::replay::ReadStatus read(
         uint8_t* const output,
         const size_t capacity,
         size_t& size) override {
+        using radiosensors::replay::ReadStatus;
         size = 0;
-        if (slot >= 2) {
-            return false;
-        }
-        const size_t storedSize = preferences_.getBytesLength(kSlotKeys[slot]);
+        if (!preferences_.isKey(kKey)) return ReadStatus::Missing;
+        const size_t storedSize = preferences_.getBytesLength(kKey);
         if (storedSize == 0 || storedSize > capacity) {
-            return false;
+            return ReadStatus::Invalid;
         }
         const size_t bytesRead = preferences_.getBytes(
-            kSlotKeys[slot], output, storedSize);
+            kKey, output, storedSize);
         if (bytesRead != storedSize) {
-            return false;
+            return ReadStatus::Error;
         }
         size = bytesRead;
-        return true;
+        return ReadStatus::Ok;
     }
 
     bool write(
-        const uint8_t slot,
         const uint8_t* const data,
         const size_t size) override {
-        return slot < 2 && data != nullptr &&
-               preferences_.putBytes(kSlotKeys[slot], data, size) == size;
+        return data != nullptr && preferences_.putBytes(kKey, data, size) == size;
     }
 
 private:
     Preferences preferences_;
 };
 
-NvsSlotStorage storage;
+class RandomSource final : public radiosensors::replay::RandomSource {
+public:
+    bool fill(uint8_t* output, size_t size) override {
+        if (!output) return false;
+        esp_fill_random(output, size);
+        return true;
+    }
+};
+
+NvsRegistryStorage storage;
 radiosensors::registry::NodeRegistry nodes;
-radiosensors::registry::DualSlotRegistryStore store(storage);
+radiosensors::registry::AtomicRegistryStore store(storage);
+ReplayBoundStorage boundStorage;
+radiosensors::replay::Store bounds(boundStorage);
+RandomSource random;
+radiosensors::replay::Guard replayGuard(bounds, random);
+radiosensors::registry::PairingAdapter pairing(nodes, store, bounds, replayGuard, random);
 bool initialized = false;
 SemaphoreHandle_t mutex = nullptr;
 std::atomic<uint32_t> activeNodeIds[4]{};
@@ -88,7 +101,7 @@ void publishLockFreeView() {
     uint32_t words[4]{};
     for (size_t index = 0; index < nodes.size(); ++index) {
         const radiosensors::registry::NodeRecord& record = nodes.records()[index];
-        if (record.state == radiosensors::registry::NodeState::Active &&
+        if (store.writable() && record.state == radiosensors::registry::NodeState::Active &&
             record.nodeId <= radiosensors::registry::kLastNodeId) {
             words[record.nodeId / 32U] |= 1UL << (record.nodeId % 32U);
         }
@@ -113,8 +126,8 @@ CommitTiming commitCandidateLocked(
 #endif
     if (saved) {
         nodes = candidate;
-        publishLockFreeView();
     }
+    publishLockFreeView();
 #if GATEWAY_REGISTRY_TIMING_LOG
     return CommitTiming{
         saved,
@@ -158,6 +171,13 @@ bool begin() {
     }
 
     const radiosensors::registry::LoadStatus status = store.load(nodes);
+    if (status == radiosensors::registry::LoadStatus::Invalid ||
+        status == radiosensors::registry::LoadStatus::StorageError || !boundStorage.begin()) {
+        Serial.println("Node registry storage unavailable; reset or repair required");
+        return false;
+    }
+    bounds.load();
+    replayGuard.restart();
     publishLockFreeView();
     initialized = true;
     Serial.printf(
@@ -204,7 +224,7 @@ bool activeProfileId(const uint8_t nodeId, uint16_t& profileId) {
     if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return false;
     const radiosensors::registry::NodeRecord* const record =
         nodes.findByNodeId(nodeId);
-    const bool found = record != nullptr &&
+    const bool found = store.writable() && record != nullptr &&
         record->state == radiosensors::registry::NodeState::Active;
     if (found) profileId = record->profileId;
     xSemaphoreGive(mutex);
@@ -217,7 +237,7 @@ bool activeIdentity(
     if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return false;
     const radiosensors::registry::NodeRecord* const record =
         nodes.findByNodeId(nodeId);
-    const bool found = record != nullptr &&
+    const bool found = store.writable() && record != nullptr &&
         record->state == radiosensors::registry::NodeState::Active;
     if (found) {
         memcpy(deviceUid, record->deviceUid, sizeof(record->deviceUid));
@@ -233,7 +253,7 @@ bool radioPolicy(
     if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return false;
     const radiosensors::registry::NodeRecord* const record =
         nodes.findByNodeId(nodeId);
-    const bool found = record != nullptr &&
+    const bool found = store.writable() && record != nullptr &&
         record->state == radiosensors::registry::NodeState::Active;
     if (found) {
         maxPowerLevel = record->maxPowerLevel;
@@ -249,6 +269,10 @@ bool snapshot(Snapshot& value) {
         return false;
     }
     value.generation = store.generation();
+    if (!store.writable()) {
+        xSemaphoreGive(mutex);
+        return false;
+    }
     value.count = nodes.size();
     if (value.count != 0) {
         memcpy(
@@ -257,6 +281,42 @@ bool snapshot(Snapshot& value) {
     }
     xSemaphoreGive(mutex);
     return true;
+}
+
+radiosensors::security::pairing::Status pairingRequestAndSave(
+    const osk::crypto::Cmac& factoryMac, const uint8_t* expectedUid,
+    radiosensors::security::Transport transport, const uint8_t* wire, size_t size,
+    uint8_t networkId, radiosensors::security::Transport acceptTransport,
+    uint8_t* output, size_t capacity) {
+    gateway::recovery::Guard guard;
+    if (!guard || gateway::recovery::blocked() || !initialized || !mutex)
+        return radiosensors::security::pairing::Status::StorageError;
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    const auto result = pairing.request(factoryMac, expectedUid, transport, wire, size,
+                                       networkId, acceptTransport, output, capacity);
+    publishLockFreeView();
+    xSemaphoreGive(mutex);
+    return result;
+}
+
+radiosensors::security::pairing::Status pairingConfirmAndSave(
+    uint8_t nodeId, radiosensors::security::Transport transport,
+    const uint8_t* wire, size_t size, uint8_t* output, size_t capacity) {
+    gateway::recovery::Guard guard;
+    if (!guard || gateway::recovery::blocked() || !initialized || !mutex)
+        return radiosensors::security::pairing::Status::StorageError;
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    const auto result = pairing.confirm(nodeId, transport, wire, size, output, capacity);
+    publishLockFreeView();
+    xSemaphoreGive(mutex);
+    return result;
+}
+
+bool activeSecurity(uint8_t nodeId, radiosensors::security::Keys& keys, uint8_t& replaySlot) {
+    if (!initialized || !mutex || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return false;
+    const bool found = pairing.activeKeys(nodeId, keys, replaySlot);
+    xSemaphoreGive(mutex);
+    return found;
 }
 
 RegistryCommitStatus reserveAndSave(

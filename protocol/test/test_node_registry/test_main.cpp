@@ -3,6 +3,7 @@
 #include <RadioPowerControl.h>
 #include <RegistryPersistence.h>
 #include <unity.h>
+#include <string.h>
 
 using namespace radiosensors::protocol;
 using namespace radiosensors::registry;
@@ -23,51 +24,29 @@ JoinRequest makeRequest(
     return request;
 }
 
-class MemorySlotStorage final : public RegistrySlotStorage {
+class MemoryStorage final : public radiosensors::replay::BlobStorage {
 public:
-    MemorySlotStorage() : data_{}, sizes_{0, 0}, present_{false, false} {}
-
-    bool read(
-        const uint8_t slot,
-        uint8_t* const output,
-        const size_t capacity,
-        size_t& size) override {
+    radiosensors::replay::ReadStatus read(
+        uint8_t* output, size_t capacity, size_t& size) override {
         size = 0;
-        if (slot >= 2 || !present_[slot] || sizes_[slot] > capacity) {
-            return false;
-        }
-        for (size_t index = 0; index < sizes_[slot]; ++index) {
-            output[index] = data_[slot][index];
-        }
-        size = sizes_[slot];
+        if (size_ == 0) return radiosensors::replay::ReadStatus::Missing;
+        if (size_ > capacity) return radiosensors::replay::ReadStatus::Invalid;
+        memcpy(output, data_, size_);
+        size = size_;
+        return radiosensors::replay::ReadStatus::Ok;
+    }
+    bool write(const uint8_t* data, size_t size) override {
+        if (!data || size > sizeof(data_)) return false;
+        memcpy(data_, data, size);
+        size_ = size;
         return true;
     }
-
-    bool write(
-        const uint8_t slot,
-        const uint8_t* const data,
-        const size_t size) override {
-        if (slot >= 2 || data == nullptr || size > kMaxRegistrySnapshotSize) {
-            return false;
-        }
-        for (size_t index = 0; index < size; ++index) {
-            data_[slot][index] = data[index];
-        }
-        sizes_[slot] = size;
-        present_[slot] = true;
-        return true;
+    void corrupt(size_t offset) {
+        if (offset < size_) data_[offset] ^= 0x80;
     }
-
-    void corrupt(const uint8_t slot, const size_t offset) {
-        if (slot < 2 && present_[slot] && offset < sizes_[slot]) {
-            data_[slot][offset] ^= 0x80;
-        }
-    }
-
 private:
-    uint8_t data_[2][kMaxRegistrySnapshotSize];
-    size_t sizes_[2];
-    bool present_[2];
+    uint8_t data_[kMaxRegistrySnapshotSize]{};
+    size_t size_ = 0;
 };
 
 }  // namespace
@@ -310,35 +289,37 @@ void test_snapshot_rejects_crc_corruption() {
             encoded, encodedSize, decoded, generation)));
 }
 
-void test_dual_slot_falls_back_to_previous_valid_generation() {
-    MemorySlotStorage slots;
-    DualSlotRegistryStore writer(slots);
+void test_atomic_store_blocks_corruption() {
+    MemoryStorage slots;
+    AtomicRegistryStore writer(slots);
     NodeRegistry registry;
+    writer.load(registry);
     registry.reserve(makeRequest(0x10));
-    TEST_ASSERT_TRUE(writer.save(registry));  // generation 1, slot A
+    TEST_ASSERT_TRUE(writer.save(registry));
     registry.reserve(makeRequest(0x30));
-    TEST_ASSERT_TRUE(writer.save(registry));  // generation 2, slot B
-    slots.corrupt(1, kRegistryHeaderSize);
+    TEST_ASSERT_TRUE(writer.save(registry));
+    slots.corrupt(kRegistryHeaderSize);
 
-    DualSlotRegistryStore reader(slots);
+    AtomicRegistryStore reader(slots);
     NodeRegistry recovered;
     TEST_ASSERT_EQUAL(
-        static_cast<int>(LoadStatus::Loaded),
+        static_cast<int>(LoadStatus::Invalid),
         static_cast<int>(reader.load(recovered)));
-    TEST_ASSERT_EQUAL_UINT32(1, reader.generation());
-    TEST_ASSERT_EQUAL_UINT32(1, recovered.size());
+    TEST_ASSERT_FALSE(reader.save(recovered));
+    TEST_ASSERT_EQUAL_UINT32(0, recovered.size());
 }
 
-void test_dual_slot_loads_newest_valid_generation() {
-    MemorySlotStorage slots;
-    DualSlotRegistryStore writer(slots);
+void test_atomic_store_loads_committed_generation() {
+    MemoryStorage slots;
+    AtomicRegistryStore writer(slots);
     NodeRegistry registry;
+    writer.load(registry);
     registry.reserve(makeRequest(0x10));
     TEST_ASSERT_TRUE(writer.save(registry));
     registry.reserve(makeRequest(0x30));
     TEST_ASSERT_TRUE(writer.save(registry));
 
-    DualSlotRegistryStore reader(slots);
+    AtomicRegistryStore reader(slots);
     NodeRegistry recovered;
     TEST_ASSERT_EQUAL(
         static_cast<int>(LoadStatus::Loaded),
@@ -358,7 +339,7 @@ int main(int, char**) {
     RUN_TEST(test_update_info_replaces_the_identity_of_an_active_node);
     RUN_TEST(test_rename_accepts_utf8_and_rejects_invalid_names);
     RUN_TEST(test_snapshot_rejects_crc_corruption);
-    RUN_TEST(test_dual_slot_falls_back_to_previous_valid_generation);
-    RUN_TEST(test_dual_slot_loads_newest_valid_generation);
+    RUN_TEST(test_atomic_store_blocks_corruption);
+    RUN_TEST(test_atomic_store_loads_committed_generation);
     return UNITY_END();
 }

@@ -1,6 +1,11 @@
 #include "RegistryPersistence.h"
 
 #include "JoinRequest.h"
+#include <string.h>
+#ifndef __AVR__
+#include <memory>
+#include <new>
+#endif
 
 namespace radiosensors {
 namespace registry {
@@ -21,9 +26,6 @@ uint32_t crc32(const uint8_t* data, const size_t size) {
     return ~crc;
 }
 
-bool isNewerGeneration(const uint32_t candidate, const uint32_t current) {
-    return static_cast<int32_t>(candidate - current) > 0;
-}
 
 }  // namespace
 
@@ -69,6 +71,8 @@ SnapshotStatus encodeRegistrySnapshot(
         }
         output[offset + 22 + kNodeDisplayNameSize] = record.maxPowerLevel;
         output[offset + 23 + kNodeDisplayNameSize] = record.powerPolicy;
+        output[offset + 24 + kNodeDisplayNameSize] = record.replaySlot;
+        memcpy(output + offset + 25 + kNodeDisplayNameSize, record.pairing, sizeof(record.pairing));
         offset += kStoredNodeRecordSize;
     }
 
@@ -131,6 +135,8 @@ static SnapshotStatus decodeRegistrySnapshotUsingRecords(
         }
         record.maxPowerLevel = data[offset + 22 + kNodeDisplayNameSize];
         record.powerPolicy = data[offset + 23 + kNodeDisplayNameSize];
+        record.replaySlot = data[offset + 24 + kNodeDisplayNameSize];
+        memcpy(record.pairing, data + offset + 25 + kNodeDisplayNameSize, sizeof(record.pairing));
         offset += kStoredNodeRecordSize;
     }
 
@@ -146,92 +152,56 @@ SnapshotStatus decodeRegistrySnapshot(
     const size_t size,
     NodeRegistry& registry,
     uint32_t& generation) {
-    NodeRecord records[kMaxNodes]{};
+#ifndef __AVR__
+    std::unique_ptr<NodeRecord[]> records(new (std::nothrow) NodeRecord[kMaxNodes]{});
+    if (!records) return SnapshotStatus::InvalidRegistry;
     return decodeRegistrySnapshotUsingRecords(
-        data, size, registry, generation, records);
+        data, size, registry, generation, records.get());
+#else
+    NodeRecord records[kMaxNodes]{};
+    return decodeRegistrySnapshotUsingRecords(data, size, registry, generation, records);
+#endif
 }
 
-DualSlotRegistryStore::DualSlotRegistryStore(RegistrySlotStorage& storage)
-    : storage_(storage), generation_(0), activeSlot_(-1) {}
-
-LoadStatus DualSlotRegistryStore::load(NodeRegistry& registry) {
-    uint32_t newestGeneration = 0;
-    int8_t newestSlot = -1;
-
-    for (uint8_t slot = 0; slot < 2; ++slot) {
-        size_t size = 0;
-        if (!storage_.read(slot, buffer_, kMaxRegistrySnapshotSize, size)) {
-            continue;
-        }
-        scratchRegistry_ = NodeRegistry{};
-        uint32_t candidateGeneration = 0;
-        if (decodeRegistrySnapshotUsingRecords(
-                buffer_,
-                size,
-                scratchRegistry_,
-                candidateGeneration,
-                scratchRecords_) != SnapshotStatus::Ok) {
-            continue;
-        }
-        if (newestSlot < 0 || isNewerGeneration(candidateGeneration, newestGeneration)) {
-            registry = scratchRegistry_;
-            newestGeneration = candidateGeneration;
-            newestSlot = static_cast<int8_t>(slot);
-        }
-    }
-
-    if (newestSlot < 0) {
-        registry = NodeRegistry{};
-        generation_ = 0;
-        activeSlot_ = -1;
+#ifndef __AVR__
+LoadStatus AtomicRegistryStore::load(NodeRegistry& registry) {
+    writable_ = false;
+    generation_ = 0;
+    registry.restore(nullptr, 0);
+    size_t size = 0;
+    const auto status = storage_.read(buffer_, sizeof(buffer_), size);
+    if (status == replay::ReadStatus::Missing) {
+        writable_ = true;
         return LoadStatus::Empty;
     }
-
-    generation_ = newestGeneration;
-    activeSlot_ = newestSlot;
+    if (status == replay::ReadStatus::Error) return LoadStatus::StorageError;
+    if (status != replay::ReadStatus::Ok ||
+        decodeRegistrySnapshot(buffer_, size, registry, generation_) != SnapshotStatus::Ok)
+        return LoadStatus::Invalid;
+    writable_ = true;
     return LoadStatus::Loaded;
 }
 
-bool DualSlotRegistryStore::save(const NodeRegistry& registry) {
-    size_t encodedSize = 0;
-    const uint32_t nextGeneration = generation_ + 1;
-    if (encodeRegistrySnapshot(
-            registry,
-            nextGeneration,
-            buffer_,
-            kMaxRegistrySnapshotSize,
-            encodedSize) != SnapshotStatus::Ok) {
+bool AtomicRegistryStore::save(const NodeRegistry& registry) {
+    if (!writable_) return false;
+    size_t size = 0;
+    const uint32_t next = generation_ + 1;
+    if (encodeRegistrySnapshot(registry, next, buffer_, sizeof(buffer_), size) != SnapshotStatus::Ok)
+        return false;
+    std::unique_ptr<uint8_t[]> readback(new (std::nothrow) uint8_t[size]);
+    if (!readback) return false;
+    size_t readSize = 0;
+    if (!storage_.write(buffer_, size) ||
+        storage_.read(readback.get(), size, readSize) != replay::ReadStatus::Ok ||
+        readSize != size || memcmp(buffer_, readback.get(), size) != 0) {
+        writable_ = false;
         return false;
     }
-
-    const uint8_t targetSlot = activeSlot_ == 0 ? 1 : 0;
-    if (!storage_.write(targetSlot, buffer_, encodedSize)) {
-        return false;
-    }
-
-    size_t verifySize = 0;
-    uint32_t verifiedGeneration = 0;
-    scratchRegistry_ = NodeRegistry{};
-    if (!storage_.read(
-            targetSlot, buffer_, kMaxRegistrySnapshotSize, verifySize) ||
-        decodeRegistrySnapshotUsingRecords(
-            buffer_,
-            verifySize,
-            scratchRegistry_,
-            verifiedGeneration,
-            scratchRecords_) != SnapshotStatus::Ok ||
-        verifiedGeneration != nextGeneration) {
-        return false;
-    }
-
-    generation_ = nextGeneration;
-    activeSlot_ = static_cast<int8_t>(targetSlot);
+    generation_ = next;
     return true;
 }
+#endif
 
-uint32_t DualSlotRegistryStore::generation() const {
-    return generation_;
-}
 
 }  // namespace registry
 }  // namespace radiosensors

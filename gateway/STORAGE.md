@@ -6,7 +6,7 @@ All multi-byte integers are unsigned little-endian unless stated otherwise. No c
 
 ## Common dual-slot rules
 
-The settings, authentication, installation-secret, registry and command stores each own two NVS blobs. A save serializes the complete next generation into the inactive slot, reads it back, validates every field and its CRC32, and only then publishes it as current. The previous valid generation remains recoverable after interruption or corruption.
+The settings, authentication, installation-secret and command stores each own two NVS blobs. A save serializes the complete next generation into the inactive slot, reads it back, validates every field and its CRC32, and only then publishes it as current. The previous valid generation remains recoverable after interruption or corruption. Registry and replay bounds use single blobs with NVS journaling.
 
 Every snapshot begins with:
 
@@ -17,7 +17,7 @@ Every snapshot begins with:
 | 6 | 4 | Wrapping generation |
 | 10 | 2 | Exact total encoded size including CRC |
 
-The final four bytes are CRC32 over every preceding byte, encoded little-endian. Loading validates both slots and selects the newer valid wrapping generation by the same comparison rule as the node registry. An absent store loads documented defaults at generation zero; it does not write merely because the gateway booted.
+The final four bytes are CRC32 over every preceding byte, encoded little-endian. Loading validates both slots and selects the newer valid wrapping generation using a positive signed 32-bit difference. An absent store loads documented defaults at generation zero; it does not write merely because the gateway booted.
 
 Generation advances only after a durable semantic change. Re-saving identical content is a no-op. Readers receive copies or immutable published snapshots and never retain pointers into mutable store memory.
 
@@ -161,7 +161,7 @@ This snapshot holds no commissioning profile. Every node has a unique factory co
 
 ## Node registry snapshot
 
-NVS namespace: `node-reg`; slot keys: `registry_a`, `registry_b`; magic: `RSNR`; schema version 3; maximum size 4624 bytes. The registry has a fixed capacity of 64 records and does not allocate dynamically.
+NVS namespace: `node-reg`; key: `registry`; magic: `RSNR`; schema version 4; maximum size 12,560 bytes. Capacity: 64 records. Serialization and read-back scratch memory are allocated off the ESP32 task stack.
 
 | ID | Use |
 | ---: | --- |
@@ -173,7 +173,7 @@ NVS namespace: `node-reg`; slot keys: `registry_a`, `registry_b`; magic: `RSNR`;
 
 Pending, active, and disabled records retain their ID. Only explicit removal releases it.
 
-Each stored record is 72 bytes:
+Each stored record is 196 bytes:
 
 | Relative offset | Bytes | Field |
 | ---: | ---: | --- |
@@ -182,11 +182,13 @@ Each stored record is 72 bytes:
 | 11 | 2 | Profile ID, little-endian; zero invalid |
 | 13 | 3 | Firmware major, minor, patch |
 | 16 | 1 | State: 1 pending, 2 active, 3 disabled |
-| 17 | 4 | Latest commissioning request nonce, little-endian |
+| 17 | 4 | Commissioning nonce; low counter word of a V3 nonce |
 | 21 | 1 | Display-name byte length, `0..48` |
 | 22 | 48 | Display name, UTF-8, zero-padded |
 | 70 | 1 | Transmit power ceiling from Join request, `0..31` |
 | 71 | 1 | Power policy: 0 automatic; `N + 1` fixed level `N` |
+| 72 | 1 | Stable replay slot, `0..63`; 255 means no V3 transaction |
+| 73 | 123 | `PairingTransaction` snapshot, including full LE64 nonce, exact request/accept and both derived keys; zero without a V3 transaction |
 
 Runtime last-seen time, RSSI, telemetry, radio power control state, and counters are not persisted.
 
@@ -197,20 +199,29 @@ Runtime last-seen time, RSSI, telemetry, radio power control state, and counters
 | 6 | 4 | Generation |
 | 10 | 1 | Record count |
 | 11 | 1 | Reserved, zero |
-| 12 | `count * 21` | Records |
+| 12 | `count * 196` | Records |
 | end | 4 | CRC32 over preceding bytes |
 
-The state flow is `absent -> pending -> active`; explicit management may set `disabled` or remove a record. A repeated request with the same UID and profile retains the node ID and updates pending firmware/nonce. A different profile conflicts. Active or disabled records cannot be replaced through pairing. Matching repeated confirmation for an active record resends `JOIN_COMPLETE` without a write.
+The state flow is `absent -> pending -> active`; explicit management may set `disabled` or remove a record. Active or disabled records cannot be replaced through pairing. `RegistryPairing` authenticates before reserving a UID, persists one immutable reply per transaction and rejects retired counter words. V3 confirmation prepares the replay slot before committing Active. Matching repeated confirmation returns `JOIN_COMPLETE` without any registry or bound write.
+
+Replay slots are unique and retained when removal changes record order. A new
+Pending transaction forgets its slot before committing new keys. Retrying a
+Pending confirmation preserves a Paired bound belonging to those keys.
+
+The single registry blob is replaced through NVS journaling and checked against
+the exact encoded bytes before publication. A failed commit or read-back blocks
+mutations and key lookup until reload. Invalid data blocks initialization and
+requires explicit reset or repair; no older transaction is selected.
 
 NVS work never runs in the radio-owner task. Commissioning persists a reservation before queuing `JOIN_ACCEPT`; synchronized store APIs own all registry access.
 
-A registry commit holds its mutex through the NVS write and read-back validation. One-record hardware measurements across reserve, confirm, rename, power-policy, and remove commits held it for 3.5–5.2 ms. The radio-owner task remains independent and queues accepted telemetry through its lock-free active-node view.
+A registry commit holds its mutex through the NVS write and read-back validation. The radio-owner task queues telemetry through its lock-free active-node view. V3 registry commit timing requires hardware measurement.
 
 ## Command book snapshot
 
 NVS namespace: `node-cmd`; slot keys: `commands_a`, `commands_b`; magic: `RSCB`; exact size: 820 bytes.
 
-The book holds at most 16 records, one per node: its pending command, or the result of its last command. Queuing replaces the node's record; when the book is full, the oldest result is evicted, and a book of 16 pending commands refuses another. The limit keeps both slots under 2 KiB. The 32 KiB NVS partition also holds both slots of the 64-node registry, which use up to about 9 KiB.
+The book holds at most 16 records, one per node: its pending command, or the result of its last command. Queuing replaces the node's record; when the book is full, the oldest result is evicted, and a book of 16 pending commands refuses another. Both command slots fit under 2 KiB. The 64 KiB NVS partition holds the registry, its journal replacement and the other installation stores.
 
 | Offset | Bytes | Field |
 | ---: | ---: | --- |

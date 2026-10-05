@@ -10,7 +10,7 @@
 | Included | Excluded |
 | --- | --- |
 | Hostname, mDNS, NTP, setup/pairing durations | Users, password hashes, API tokens, sessions |
-| Node UID/ID, profile, firmware metadata, state, nonce, name, power policy | Command book and telemetry |
+| Node UID/ID, profile, firmware metadata, state, nonce, name, power policy, V3 pairing transaction and per-node keys | Command book, telemetry and replay bounds |
 | Radio network ID, installation key, device secret | Firmware, Web UI, OTA password, MAC, DHCP lease |
 
 Restoring the radio credentials and registry avoids re-pairing nodes present in the backup. The device secret preserves `gateway_id`. A backup cannot recover later changes; a node whose credentials changed after export may need pairing again. Lost backup passwords cannot be recovered.
@@ -47,7 +47,7 @@ Preview writes nothing and needs no physical window. Restore decrypts and valida
 
 ## Container version 1
 
-Maximum file size: **17,468 bytes**. Multibyte header integers are little-endian. The entire 44-byte header is AES-GCM additional authenticated data.
+Maximum file size: **34,876 bytes**. Multibyte header integers are little-endian. The entire 44-byte header is AES-GCM additional authenticated data.
 
 | Offset | Bytes | Value |
 | ---: | ---: | --- |
@@ -57,7 +57,7 @@ Maximum file size: **17,468 bytes**. Multibyte header integers are little-endian
 | 6 | 1 | Cipher `1`: AES-256-GCM |
 | 7 | 1 | Reserved, zero |
 | 8 | 4 | Exactly 100,000 KDF iterations |
-| 12 | 4 | Ciphertext length, at most 17,408 |
+| 12 | 4 | Ciphertext length, at most 34,816 |
 | 16 | 16 | Random salt |
 | 32 | 12 | Random nonce |
 | 44 | variable | Encrypted UTF-8 JSON |
@@ -65,15 +65,19 @@ Maximum file size: **17,468 bytes**. Multibyte header integers are little-endian
 
 Each export uses hardware randomness for salt and nonce. The KDF runs through the password-hash worker; parsing happens only after GCM authentication succeeds. On Waveshare it dominates each request: export takes about 6.4 s, preview 5.8 s and restore 7.3 s, which adds the new admin's password hash. The web server answers nothing else meanwhile. No plaintext backup is written to flash. This protects the backup file, not HTTP traffic: use the gateway only on the trusted private LAN described in [API.md](API.md#security-and-backup).
 
-Payload keys are `version` (`1`), `created_at_ms` (UTC milliseconds, zero if unavailable), `settings`, `network_id`, `installation_key`, `device_secret`, `nodes`. Keys and UIDs are lowercase hexadecimal. Settings contain `hostname`, `mdns`, `ntp`, `pairing_seconds`, `setup_seconds`, `servers`. Each node contains `uid`, `id`, `profile`, `firmware` (three integers), `state` (1 pending, 2 active, 3 disabled), `nonce`, `name`, `max_power`, `power_policy`. Values obey [storage limits](STORAGE.md); unknown nonzero profile IDs are preserved. Different container/payload versions are rejected.
+Payload keys are `version` (`2`), `created_at_ms` (UTC milliseconds, zero if unavailable), `settings`, `network_id`, `installation_key`, `device_secret`, `nodes`. Keys and UIDs are lowercase hexadecimal. Settings contain `hostname`, `mdns`, `ntp`, `pairing_seconds`, `setup_seconds`, `servers`. Each node contains `uid`, `id`, `profile`, `firmware` (three integers), `state` (1 pending, 2 active, 3 disabled), `nonce`, `name`, `max_power`, `power_policy`, `replay_slot`, `pairing` (123-byte transaction snapshot as hexadecimal). Values obey [storage limits](STORAGE.md); unknown nonzero profile IDs are preserved. Different container/payload versions are rejected.
+
+Restoring excludes replay bounds. Once gateway V3 radio integration is complete,
+each active V3 node must receive a fresh challenge and return an Activation report;
+it needs a working reverse link before its telemetry can be published.
 
 ## Interrupted operations
 
 NVS namespace `gateway-recover`, key `operation` (`uint8`): 0 idle, 1 restore incomplete, 2 factory reset requested. Unknown values or unreadable control data block normal startup.
 
-Restore validates all data and the new admin before persisting marker 1. It clears the five installation namespaces, writes and reads back each snapshot, then commits marker 0 and restarts. The writes take only the final moments of a restore, so a power cut usually leaves the gateway clean and the import can simply be repeated. Marker 1 prevents storage initialization, radio, commissioning and command processing at boot. The previous installation is not retained.
+Restore validates all data and the new admin before persisting marker 1. It clears the installation namespaces, writes and reads back each snapshot, then commits marker 0 and restarts. The writes take only the final moments of a restore, so a power cut usually leaves the gateway clean and the import can simply be repeated. Marker 1 prevents storage initialization, radio, commissioning and command processing at boot. The previous installation is not retained.
 
-Button confirmation persists marker 2 and restarts. Before stores initialize, boot clears the five namespaces and commits marker 0. The control namespace is never part of that erase. Firmware and `web` partitions are untouched.
+Button confirmation persists marker 2 and restarts. Before stores initialize, boot clears the installation namespaces and commits marker 0. The control namespace is never part of that erase. Firmware and `web` partitions are untouched.
 
 ## Verification
 

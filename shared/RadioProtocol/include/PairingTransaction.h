@@ -31,7 +31,7 @@ public:
 enum class Status : uint8_t {
     Accept, RepeatedAccept, Complete, RepeatedComplete,
     InvalidFrame, WrongUid, ConflictingRequest, RetiredCounter,
-    ActiveNode, InvalidAssignment, OutputTooSmall, StorageError
+    ActiveNode, InvalidAssignment, OutputTooSmall, StorageError, RegistryFull, DisabledNode
 };
 
 class Transaction {

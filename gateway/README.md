@@ -105,11 +105,11 @@ Erasing the NVS partition returns a gateway to its first-boot state without touc
 
 The erase deletes every store: settings, users and API tokens, the installation key and network ID, the device secret, the node registry, and the command book. `gateway_id` derives from the device secret, so clients see a new gateway, and every paired node must be factory-reset and paired again.
 
-Both boards use a 32 KiB (`0x8000`) `nvs` partition at the end of their Web UI storage area (see `partitions/`). Erase only the address for the matching board over a cable, with the port `pio device list` shows; `--chip` makes esptool refuse a board of the other type:
+Both boards use a 64 KiB (`0x10000`) `nvs` partition at the end of their Web UI storage area (see `partitions/`). Erase only the address for the matching board over a cable, with the port `pio device list` shows; `--chip` makes esptool refuse a board of the other type:
 
 ```powershell
-pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32s3 --port COM8 erase-region 0xfe8000 0x8000
-pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32 --port COM5 erase-region 0x3e8000 0x8000
+pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32s3 --port COM8 erase-region 0xfe0000 0x10000
+pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32 --port COM5 erase-region 0x3e0000 0x10000
 ```
 
 The first line is for the Waveshare board, the second for WT32-ETH01, which must be in its ROM bootloader as for any cable upload. esptool resets the board afterwards. It boots as a new gateway, with a fresh device secret and a random network ID, and waits for initial setup. Do not use `pio run -t erase`: it erases the whole flash, including the firmware and the Web UI.

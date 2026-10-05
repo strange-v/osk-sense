@@ -9,10 +9,10 @@ namespace {
 
 using namespace radiosensors;
 
-constexpr uint8_t kPayloadVersion = 1;
+constexpr uint8_t kPayloadVersion = 2;
 constexpr size_t kRootFields = 7;
 constexpr size_t kSettingsFields = 6;
-constexpr size_t kNodeFields = 9;
+constexpr size_t kNodeFields = 11;
 
 // Wipes every block it hands back, so JSON holding keys leaves no copy in the heap.
 class SecretAllocator final : public ArduinoJson::Allocator {
@@ -100,6 +100,8 @@ bool decodeNode(JsonObjectConst node, registry::NodeRecord& record) {
     if (node.size() != kNodeFields || !node["id"].is<uint8_t>() ||
         !node["profile"].is<uint16_t>() || !node["state"].is<uint8_t>() ||
         !node["nonce"].is<uint32_t>() || !node["max_power"].is<uint8_t>() ||
+        !node["replay_slot"].is<uint8_t>() ||
+        !unhex(node["pairing"], record.pairing, sizeof(record.pairing)) ||
         !node["power_policy"].is<uint8_t>() || firmware.size() != 3 ||
         !firmware[0].is<uint8_t>() || !firmware[1].is<uint8_t>() ||
         !firmware[2].is<uint8_t>() ||
@@ -113,6 +115,7 @@ bool decodeNode(JsonObjectConst node, registry::NodeRecord& record) {
     record.profileId = node["profile"].as<uint16_t>();
     record.state = static_cast<registry::NodeState>(node["state"].as<uint8_t>());
     record.requestNonce = node["nonce"].as<uint32_t>();
+    record.replaySlot = node["replay_slot"].as<uint8_t>();
     record.firmware = {
         firmware[0].as<uint8_t>(), firmware[1].as<uint8_t>(), firmware[2].as<uint8_t>(),
     };
@@ -175,6 +178,10 @@ bool encode(const Snapshot& snapshot, std::string& output) {
         firmware.add(record.firmware.patch);
         node["state"] = static_cast<uint8_t>(record.state);
         node["nonce"] = record.requestNonce;
+        node["replay_slot"] = record.replaySlot;
+        std::string pairing = hex(record.pairing, sizeof(record.pairing));
+        node["pairing"] = pairing;
+        wipe(pairing.data(), pairing.size());
         node["name"] = std::string(record.displayName, record.displayNameLength);
         node["max_power"] = record.maxPowerLevel;
         node["power_policy"] = record.powerPolicy;

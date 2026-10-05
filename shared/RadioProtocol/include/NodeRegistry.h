@@ -5,6 +5,7 @@
 
 #include "CommandSessionFrames.h"
 #include "JoinRequest.h"
+#include "PairingTransaction.h"
 
 namespace radiosensors {
 namespace registry {
@@ -35,6 +36,8 @@ struct NodeRecord {
     // Transmit power ceiling from Join request, and the radio_power policy.
     uint8_t maxPowerLevel;
     uint8_t powerPolicy;
+    uint8_t replaySlot = 255;
+    uint8_t pairing[security::pairing::kSnapshotSize]{};
 };
 
 enum class PowerPolicyStatus : uint8_t {
@@ -66,6 +69,7 @@ enum class ReserveStatus : uint8_t {
     InvalidProfileId,
     ProfileConflict,
     Full,
+    SecureTransaction,
 };
 
 struct ReserveResult {
@@ -107,6 +111,9 @@ public:
         uint8_t nodeId, const uint8_t* deviceUid, const protocol::NodeInfo& info);
 
     bool restore(const NodeRecord* records, size_t count);
+    // Commits authenticated transaction metadata together with its exact reply and keys.
+    bool setPairing(const security::pairing::Record& pairing, uint32_t generation,
+                    uint8_t replaySlot);
 
 private:
     NodeRecord records_[kMaxNodes];

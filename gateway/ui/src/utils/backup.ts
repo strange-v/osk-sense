@@ -1,4 +1,4 @@
-export const MAX_BACKUP_BYTES = 17_408 + 44 + 16
+export const MAX_BACKUP_BYTES = 34_816 + 44 + 16
 export function validBackupPassword(value: string): boolean {
   const length = new TextEncoder().encode(value).length
   return length >= 12 && length <= 128 && !value.includes('\0')

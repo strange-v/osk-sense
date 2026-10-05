@@ -27,6 +27,16 @@ bool activeIdentity(uint8_t nodeId, uint8_t* deviceUid, uint16_t& profileId);
 // Transmit power ceiling and policy of an active node.
 bool radioPolicy(uint8_t nodeId, uint8_t& maxPowerLevel, uint8_t& powerPolicy);
 bool snapshot(Snapshot& value);
+// V3 authenticated pairing; the caller owns the UID-specific pairing window.
+radiosensors::security::pairing::Status pairingRequestAndSave(
+    const osk::crypto::Cmac& factoryMac, const uint8_t* expectedUid,
+    radiosensors::security::Transport transport, const uint8_t* wire, size_t size,
+    uint8_t networkId, radiosensors::security::Transport acceptTransport,
+    uint8_t* output, size_t capacity);
+radiosensors::security::pairing::Status pairingConfirmAndSave(
+    uint8_t nodeId, radiosensors::security::Transport transport,
+    const uint8_t* wire, size_t size, uint8_t* output, size_t capacity);
+bool activeSecurity(uint8_t nodeId, radiosensors::security::Keys& keys, uint8_t& replaySlot);
 RegistryCommitStatus reserveAndSave(
     const radiosensors::protocol::JoinRequest& request,
     radiosensors::registry::ReserveResult& result);

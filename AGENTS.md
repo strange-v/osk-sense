@@ -52,15 +52,15 @@ The exception is a question whose answer is **not** in the code -- hardware beha
 
 ## How much to verify
 
-Match the check to the change; the full set after every edit is waste.
+Run only tests relevant to the changed behaviour and its direct consumers. Finishing a task does not require the full suite. Run the full suite only when the user explicitly requests it or a broad change makes targeted coverage insufficient. Build only affected components when compilation or bundling needs verification.
 
 | Change | Verification |
 | --- | --- |
 | Answering a question, reading code | none |
 | Pure logic (`utils/`, parsers, formatting) | just that test file |
-| Component or view behaviour | unit plus component tests |
+| Component or view behaviour | relevant unit and component test files |
 | CSS, layout, theming | browser, with a screenshot |
-| Finishing a piece of work | `test` and `build` once, at the end |
+| Finishing a piece of work | relevant tests once at the end; affected builds as needed |
 
 In the browser preview:
 

@@ -14,7 +14,7 @@ Implementation status:
 | Immutable command reply cache | Implemented in `GatewayReplay`; exact bytes per node/counter, discarded on the next accepted frame or restart |
 | Node target and Flash | ATtiny3224 at 4 MHz; all four release and debug profiles fit; see [Flash](#flash) |
 | Pairing entropy | RTC/TCB0 hardware collection integrated; extractor, health guards and CMAC conditioning tested on [captured and synthetic data](../node/crypto_bench/ENTROPY.md); source qualification pending |
-| Pairing transactions | Gateway `PairingTransaction` persists replies and derived keys before sending; node `RadioSecurityPairing` pins salt in EEPROM before confirm; native restart, corruption and write-interruption tests; registry adapter pending |
+| Pairing transactions | Gateway `RegistryPairing` embeds `PairingTransaction` in the atomic registry, with stable replay slots and prepared-bound recovery; node `RadioSecurityPairing` pins salt in EEPROM before confirm; native restart, corruption and write-interruption tests; gateway radio hookup pending |
 | Node radio integration and command sessions | V3 pairing, telemetry, activation, authenticated ACKs and counter-bound command sessions integrated; native service tests cover retries, restart and failures |
 | Gateway radio integration and command sessions | Pending |
 | EEPROM configuration and node counter reservations | Integrated in the node runtime; native interruption, overflow and service tests |
@@ -279,12 +279,20 @@ to the pending keys. Retrying after an interrupted Active commit must preserve
 an already prepared bound. An Active transaction answers matching confirms
 without calling that adapter or writing the record.
 
+`RegistryPairing` commits the UID reservation, exact transaction snapshot and
+derived keys in one registry blob. Each secure record owns a stable replay slot,
+independent of registry order. New pending keys forget that slot before their
+commit; confirm checks key ownership and preserves a prepared Paired bound.
+Registry write or read-back failure blocks pairing until reload; corruption
+blocks the registry instead of selecting an older transaction. Backup preserves
+the transaction and keys but excludes bounds.
+
 `RadioSecurityPairing` saves the first matching accept as Provisional and fixes
 its salt, assignment and nonce across restarts. It authenticates complete with
 that salt and saves Active before allowing operational use. A failed EEPROM
 readback blocks confirm and complete until reload. The caller allocates the
 request counter, qualifies entropy and derives the session MAC from the saved
-salt; the radio services and gateway registry adapter remain unconnected.
+salt. Gateway radio integration remains pending.
 
 ## Counter persistence
 
@@ -315,7 +323,7 @@ Telemetry does not depend on the gateway's reverse link, so a node that cannot h
 
 Guarantee: every published frame of a node has a higher counter than every frame of that node published before it, across gateway restarts and backup restores.
 
-The gateway cannot persist each accepted counter: a registry commit takes 3.5–5.2 ms and rewrites up to 4.6 KB of a 32 KB NVS partition ([STORAGE.md](../gateway/STORAGE.md)). It keeps a reserve instead, mirroring the node:
+The gateway keeps a counter reserve instead of rewriting its registry for every accepted frame. The registry holds up to 12,560 bytes in a 64 KiB NVS partition ([STORAGE.md](../gateway/STORAGE.md)).
 
 | Element | Rule |
 | --- | --- |

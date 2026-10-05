@@ -68,6 +68,7 @@ g++ -std=c++17 -Wall -Wextra -Werror -g -fsanitize=address,undefined \
     test/native/test_backup.cpp \
     src/BackupCodec.cpp src/BackupCrypto.cpp src/BackupService.cpp src/RecoveryService.cpp \
     ../shared/RadioProtocol/src/{GatewayStorage,NodeRegistry,RegistryPersistence}.cpp \
+    ../shared/RadioProtocol/src/{PairingTransaction,RadioCrypto,RadioSecurity,RadioSecurityFrames,GatewayReplay}.cpp \
     "${mbedtls_dir}/library/libmbedcrypto.a" -o "${output_dir}/backup-tests"
 
 fixture="${output_dir}/test.oskbackup"

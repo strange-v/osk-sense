@@ -106,7 +106,7 @@ bool restore(
         static_cast<unsigned>(snapshot.nodes.size()));
     ok = recovery::startRestore();
     if (ok) ok = recovery::eraseInstallation();
-    if (ok) ok = writeVerified("node-reg", "registry_a", bytes, registrySize);
+    if (ok) ok = writeVerified("node-reg", "registry", bytes, registrySize);
     if (ok) {
         gateway_storage::encodeSettings(snapshot.settings, 1, bytes, kBufferSize);
         ok = writeVerified(

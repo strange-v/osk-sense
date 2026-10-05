@@ -121,6 +121,8 @@ ReserveResult NodeRegistry::reserve(const protocol::JoinRequest& request) {
 
     NodeRecord* existing = findMutableByUid(request.deviceUid);
     if (existing != nullptr) {
+        if (existing->replaySlot != 255)
+            return ReserveResult{ReserveStatus::SecureTransaction, existing->nodeId};
         if (existing->profileId != request.profileId) {
             return ReserveResult{ReserveStatus::ProfileConflict, existing->nodeId};
         }
@@ -176,6 +178,7 @@ ConfirmStatus NodeRegistry::confirm(
     if (!uidEquals(record->deviceUid, deviceUid)) {
         return ConfirmStatus::IdentityMismatch;
     }
+    if (record->replaySlot != 255) return ConfirmStatus::NotPending;
     if (record->requestNonce != requestNonce) {
         return ConfirmStatus::NonceMismatch;
     }
@@ -196,7 +199,7 @@ bool NodeRegistry::disable(const uint8_t nodeId) {
         return false;
     }
     record->state = NodeState::Disabled;
-    record->requestNonce = 0;
+    if (record->replaySlot == 255) record->requestNonce = 0;
     return true;
 }
 
@@ -272,6 +275,20 @@ bool NodeRegistry::restore(const NodeRecord* records, const size_t count) {
 
     for (size_t index = 0; index < count; ++index) {
         const NodeRecord& record = records[index];
+        if (record.replaySlot != 255) {
+            security::pairing::Record pairing;
+            uint32_t generation = 0;
+            if (record.replaySlot >= replay::kNodeSlots ||
+                !security::pairing::decode(record.pairing, sizeof(record.pairing), pairing, generation) ||
+                pairing.state == security::pairing::State::Empty ||
+                !uidEquals(record.deviceUid, pairing.request + 1) ||
+                record.nodeId != pairing.accept[27] ||
+                record.requestNonce != protocol::readUint32Le(pairing.request + 11) ||
+                (record.state == NodeState::Pending && pairing.state != security::pairing::State::Pending) ||
+                (record.state == NodeState::Active && pairing.state != security::pairing::State::Active)) return false;
+        } else {
+            for (const uint8_t byte : record.pairing) if (byte != 0) return false;
+        }
         if (record.nodeId < kFirstNodeId || record.nodeId > kLastNodeId ||
             record.profileId == protocol::kUnassignedProfileId ||
             !validDisplayName(record.displayName, record.displayNameLength) ||
@@ -284,6 +301,7 @@ bool NodeRegistry::restore(const NodeRecord* records, const size_t count) {
         }
         for (size_t previous = 0; previous < index; ++previous) {
             if (records[previous].nodeId == record.nodeId ||
+                (record.replaySlot != 255 && records[previous].replaySlot == record.replaySlot) ||
                 uidEquals(records[previous].deviceUid, record.deviceUid)) {
                 return false;
             }
@@ -297,6 +315,40 @@ bool NodeRegistry::restore(const NodeRecord* records, const size_t count) {
     for (size_t index = count; index < kMaxNodes; ++index) {
         records_[index] = NodeRecord{};
     }
+    return true;
+}
+
+bool NodeRegistry::setPairing(const security::pairing::Record& pairing,
+                              const uint32_t generation, const uint8_t replaySlot) {
+    using security::pairing::State;
+    if (pairing.state == State::Empty || replaySlot >= replay::kNodeSlots) return false;
+    uint8_t encoded[security::pairing::kSnapshotSize];
+    if (!security::pairing::encode(pairing, generation, encoded, sizeof(encoded))) return false;
+    NodeRecord* record = findMutableByUid(pairing.request + 1);
+    if (!record) {
+        if (count_ >= kMaxNodes || findByNodeId(pairing.accept[27])) return false;
+        record = &records_[count_];
+    } else if (record->nodeId != pairing.accept[27] || record->state == NodeState::Disabled) {
+        return false;
+    }
+    for (size_t i = 0; i < count_; ++i)
+        if (&records_[i] != record && records_[i].replaySlot == replaySlot) return false;
+    if (record == &records_[count_]) ++count_;
+    memcpy(record->deviceUid, pairing.request + 1, sizeof(record->deviceUid));
+    record->nodeId = pairing.accept[27];
+    // ReadInfo may update an active node's profile independently of pairing.
+    if (record->state != NodeState::Active) {
+        record->profileId = protocol::readUint16Le(pairing.request + 19);
+        record->firmware = {pairing.request[21], pairing.request[22], pairing.request[23]};
+        record->maxPowerLevel = pairing.request[24];
+        if (radio_power::isFixedPolicy(record->powerPolicy) &&
+            radio_power::fixedLevel(record->powerPolicy) > record->maxPowerLevel)
+            record->powerPolicy = radio_power::kPolicyAuto;
+    }
+    record->state = pairing.state == State::Active ? NodeState::Active : NodeState::Pending;
+    record->requestNonce = protocol::readUint32Le(pairing.request + 11);
+    record->replaySlot = replaySlot;
+    memcpy(record->pairing, encoded, sizeof(encoded));
     return true;
 }
 

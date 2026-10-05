@@ -8,10 +8,10 @@
 namespace radiosensors {
 namespace registry {
 
-constexpr uint16_t kRegistryStorageVersion = 3;
+constexpr uint16_t kRegistryStorageVersion = 4;
 constexpr size_t kRegistryHeaderSize = 12;
 constexpr size_t kStoredNodeRecordSize =
-    21 + 1 + kNodeDisplayNameSize + 2;
+    21 + 1 + kNodeDisplayNameSize + 2 + 1 + security::pairing::kSnapshotSize;
 constexpr size_t kRegistryCrcSize = 4;
 constexpr size_t kMaxRegistrySnapshotSize =
     kRegistryHeaderSize + kMaxNodes * kStoredNodeRecordSize + kRegistryCrcSize;
@@ -40,38 +40,30 @@ SnapshotStatus decodeRegistrySnapshot(
     NodeRegistry& registry,
     uint32_t& generation);
 
-class RegistrySlotStorage {
-public:
-    virtual ~RegistrySlotStorage() {}
-    virtual bool read(
-        uint8_t slot,
-        uint8_t* output,
-        size_t capacity,
-        size_t& size) = 0;
-    virtual bool write(uint8_t slot, const uint8_t* data, size_t size) = 0;
-};
 
 enum class LoadStatus : uint8_t {
     Loaded,
     Empty,
+    Invalid,
+    StorageError,
 };
 
-class DualSlotRegistryStore {
+// NVS journals one committed registry blob. Never recover a retired transaction
+// from an older application-level copy after corruption.
+class AtomicRegistryStore {
 public:
-    explicit DualSlotRegistryStore(RegistrySlotStorage& storage);
-
+    explicit AtomicRegistryStore(replay::BlobStorage& storage) : storage_(storage) {}
     LoadStatus load(NodeRegistry& registry);
     bool save(const NodeRegistry& registry);
-    uint32_t generation() const;
-
+    uint32_t generation() const { return generation_; }
+    bool writable() const { return writable_; }
 private:
-    RegistrySlotStorage& storage_;
-    uint32_t generation_;
-    int8_t activeSlot_;
-    uint8_t buffer_[kMaxRegistrySnapshotSize];
-    NodeRecord scratchRecords_[kMaxNodes];
-    NodeRegistry scratchRegistry_;
+    replay::BlobStorage& storage_;
+    uint8_t buffer_[kMaxRegistrySnapshotSize]{};
+    uint32_t generation_ = 0;
+    bool writable_ = false;
 };
+
 
 }  // namespace registry
 }  // namespace radiosensors

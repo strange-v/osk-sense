@@ -7,9 +7,8 @@
 
 namespace gateway::backup {
 
-// The largest valid installation (64 nodes, every field at its longest, names of
-// JSON-escaped quotes) encodes to 16,421 bytes; the native test pins that case.
-constexpr size_t kMaxPayload = 17408;
+// Includes exact pairing snapshots and keys for all 64 nodes.
+constexpr size_t kMaxPayload = 34816;
 constexpr size_t kHeaderSize = 44;
 constexpr size_t kTagSize = 16;
 constexpr size_t kMaxFile = kHeaderSize + kMaxPayload + kTagSize;
@@ -26,6 +25,7 @@ struct Snapshot {
     ~Snapshot() {
         wipe(&settings, sizeof(settings));
         wipe(&secrets, sizeof(secrets));
+        wipe(&nodes, sizeof(nodes));
     }
 };
 
