@@ -14,7 +14,8 @@ Implementation status:
 | Immutable command reply cache | Implemented in `GatewayReplay`; exact bytes per node/counter, discarded on the next accepted frame or restart |
 | Release Flash flags and RFM69 fork | Configured; all four release images build |
 | Pairing entropy | [Hardware capture measurements](../node/crypto_bench/ENTROPY.md); source qualification and runtime health checks pending |
-| Node and gateway radio integration, pairing transactions and command sessions | Pending |
+| Pairing transactions | Gateway `PairingTransaction` persists replies and derived keys before sending; node `RadioSecurityPairing` pins salt in EEPROM before confirm; native restart, corruption and write-interruption tests; registry adapter pending |
+| Node and gateway radio integration and command sessions | Pending |
 | EEPROM configuration and node counter reservations | Implemented in `node/lib/NodeCore/include/RadioSecurityStorage.h`; native interruption/overflow tests and AVR build; runtime integration pending |
 | Gateway bounds and backup activation | Implemented in `shared/RadioProtocol/GatewayReplay`, with `gateway/ReplayBoundStorage` NVS adapter and recovery erasure; native replay/activation/interruption tests; radio integration pending |
 | Failed-tag UI counters | Pending |
@@ -49,6 +50,10 @@ including the exercised frame glue; complete firmware still needs a size check.
 including counter-bound reply verification and shared crypto: 3726 bytes of
 Flash and 456 bytes of static RAM with the Arduino core. It does not include
 the complete radio, ACK, storage or profile paths.
+
+`size_security_pairing` links node pairing, EEPROM configuration and key setup:
+4792 bytes of Flash and 505 bytes of static RAM. Radio, frame-counter allocation,
+entropy collection and profile paths still need a complete-image check.
 
 | Cost on ATtiny1614 at 4 MHz | Value |
 | --- | ---: |
@@ -248,6 +253,7 @@ A pairing transaction is identified by (UID, `request_nonce`).
 | The gateway selects the factory key by the clear UID | Only inside a pairing window for that UID, as today |
 | The gateway stores the salt and `request_nonce` with the pending registry reservation before it sends Join accept, and answers every repeat of the same Join request with the same Join accept bytes, also after its own restart | A replayed Join request cannot make the gateway issue a second salt |
 | A Join request with a known `request_nonce` but other fields is rejected | One transaction has one request |
+| A replacement pending attempt must have a higher frame-counter part of `request_nonce`; an equal or lower counter is rejected. An erased counter requires explicit deletion of the registry reservation before re-enrolment. | A delayed request cannot replace the current attempt or obtain another salt for a retired nonce |
 | After Join complete the gateway rejects that `request_nonce` | A finished transaction cannot restart |
 | The node accepts Join accept only for its current `request_nonce`, stores the first one it accepts in its provisional configuration, and ignores later ones, even with a valid tag and another salt | A late accept cannot switch a transaction in progress |
 | The node then accepts only Join complete under the K_mac of that salt | The transaction finishes under the keys it fixed |
@@ -255,6 +261,25 @@ A pairing transaction is identified by (UID, `request_nonce`).
 | The frame counter part makes `request_nonce` unique for as long as the [counter reserve](#counter-persistence) survives | Uniqueness does not rest on the entropy source |
 | The entropy part is mandatory | An EEPROM erase restarts the counter while the factory key in USERROW stays; then only the entropy keeps `request_nonce` from repeating |
 | The entropy source, such as jitter of the 32 kHz oscillator against the main clock, is measured and checked on the chip before use; `micros()` does not qualify | Right after power-up `micros()` is nearly deterministic |
+
+`PairingTransaction` operates on a registry-owned UID slot through an atomic,
+committed blob interface. Its 123-byte snapshot holds state, both transport
+headers, exact Join request/accept bytes, derived keys, generation and CRC-32;
+it holds no factory key. A failed write or mismatched readback blocks responses
+until reload. Corrupt data requires explicit deletion, never a fresh transaction
+created implicitly from the damaged record.
+
+Before committing Active, its bound adapter ensures the initial bound belongs
+to the pending keys. Retrying after an interrupted Active commit must preserve
+an already prepared bound. An Active transaction answers matching confirms
+without calling that adapter or writing the record.
+
+`RadioSecurityPairing` saves the first matching accept as Provisional and fixes
+its salt, assignment and nonce across restarts. It authenticates complete with
+that salt and saves Active before allowing operational use. A failed EEPROM
+readback blocks confirm and complete until reload. The caller allocates the
+request counter, qualifies entropy and derives the session MAC from the saved
+salt; the radio services and gateway registry adapter remain unconnected.
 
 ## Counter persistence
 
