@@ -62,6 +62,7 @@ bool computePbkdf2Sha256(const char* p, size_t n, const uint8_t* salt, size_t sn
 }
 }
 bool clean = true, physical = true;
+registry::NodeRegistry capturedNodes;
 namespace gateway::configuration_store {
 bool ready() { return true; }
 gateway_storage::GatewaySettings settings() { return gateway_storage::defaultSettings(); }
@@ -70,13 +71,18 @@ gateway_storage::InstallationSecrets secrets() { return gateway_storage::default
 }
 namespace gateway::registry_store {
 size_t recordCount() { return 0; }
-bool snapshot(Snapshot& s) { s.count = 0; return true; }
+bool snapshot(Snapshot& s) {
+    s.count = capturedNodes.size();
+    for (size_t index = 0; index < s.count; ++index) s.records[index] = capturedNodes.records()[index];
+    return true;
+}
 }
 namespace gateway::status { bool setupActive() { return physical; } bool pairingActive() { return false; } }
 namespace gateway::ota { State state() { return State::Ready; } }
 namespace gateway::time_service { uint64_t unixTimeMs() { return 0; } }
 
-void fixture(backup::Snapshot& s) {
+void fixture(backup::Snapshot& s, registry::NodeState state = registry::NodeState::Active,
+             uint8_t nodeId = 7) {
     s.settings = gateway_storage::defaultSettings();
     memcpy(s.settings.hostname, "greenhouse", 10); s.settings.hostnameLength = 10;
     s.secrets = gateway_storage::defaultSecrets();
@@ -85,11 +91,12 @@ void fixture(backup::Snapshot& s) {
     for (size_t i = 0; i < 32; ++i) s.secrets.deviceSecret[i] = i;
     s.createdAt = 1700000000000;
     registry::NodeRecord record{};
-    record.nodeId = 7; record.deviceUid[0] = 4; record.profileId = 6;
-    record.firmware = {1, 2, 3}; record.state = registry::NodeState::Active;
+    record.nodeId = nodeId; record.deviceUid[0] = nodeId - 3; record.profileId = 6;
+    record.firmware = {1, 2, 3}; record.state = state;
     record.maxPowerLevel = 2; record.powerPolicy = 2; record.requestNonce = 42;
     security::pairing::Record pairing;
-    pairing.state = security::pairing::State::Active;
+    pairing.state = state == registry::NodeState::Pending ?
+        security::pairing::State::Pending : security::pairing::State::Active;
     pairing.requestTransport = {100,0,0}; pairing.acceptTransport = {0,100,0};
     security::frames::JoinRequest request;
     memcpy(request.identity.uid, record.deviceUid, sizeof(record.deviceUid));
@@ -102,7 +109,7 @@ void fixture(backup::Snapshot& s) {
     accept.salt[0] = 7;
     assert(security::frames::sealJoinAccept(mac, pairing.acceptTransport, accept, pairing.accept, sizeof(pairing.accept)));
     security::deriveKeys(factory, accept.salt, pairing.keys, mac);
-    record.replaySlot = 3;
+    record.replaySlot = nodeId - 4;
     assert(security::pairing::encode(pairing, 2, record.pairing, sizeof(record.pairing)));
     const std::string name = u8"Лічильник";
     record.displayNameLength = name.size(); memcpy(record.displayName, name.data(), name.size());
@@ -200,6 +207,64 @@ void codecAndCrypto() {
     assert(backup::decode(json.data(), json.size(), decoded) && decoded.nodes.size() == registry::kMaxNodes);
     std::cout << "Codec, maximum registry, tampering, password and crypto round-trip passed\n";
 }
+void pendingBackup() {
+    backup::Snapshot active, pending, disabled, mixed, decoded;
+    fixture(active);
+    fixture(pending, registry::NodeState::Pending, 8);
+    fixture(disabled, registry::NodeState::Disabled, 9);
+    fixture(mixed);
+    const registry::NodeRecord records[] = {
+        pending.nodes.records()[0], active.nodes.records()[0], disabled.nodes.records()[0],
+    };
+    assert(mixed.nodes.restore(records, 3));
+    flash.clear(); recovery::begin(); writes = 0;
+    capturedNodes = mixed.nodes;
+    backup::Snapshot captured;
+    assert(backup::capture(captured));
+    assert(captured.nodes.size() == 2);
+    assert(!captured.nodes.findByNodeId(8));
+    assert(captured.nodes.findByNodeId(7) && captured.nodes.findByNodeId(9));
+    capturedNodes = {};
+
+    std::string json;
+    assert(backup::encode(mixed, json));
+    assert(backup::decode(json.data(), json.size(), decoded));
+    assert(decoded.nodes.size() == 2);
+    assert(!decoded.nodes.findByUid(pending.nodes.records()[0].deviceUid));
+    assert(decoded.nodes.findByNodeId(7)->state == registry::NodeState::Active);
+    assert(decoded.nodes.findByNodeId(9)->state == registry::NodeState::Disabled);
+    assert(backup::restore(decoded, admin()));
+    registry::NodeRegistry restored; uint32_t generation = 0;
+    const auto& raw = flash["node-reg"]["registry"];
+    assert(registry::decodeRegistrySnapshot(raw.data(), raw.size(), restored, generation) == registry::SnapshotStatus::Ok);
+    assert(!restored.findByNodeId(8) && restored.size() == 2);
+    assert(flash["radio-bound"].empty());
+
+    assert(backup::encode(pending, json));
+    assert(backup::decode(json.data(), json.size(), decoded) && decoded.nodes.size() == 0);
+
+    // A structurally valid Pending transaction must not enter through import.
+    assert(backup::encode(active, json));
+    JsonDocument doc; assert(!deserializeJson(doc, json));
+    const auto& record = pending.nodes.records()[0];
+    doc["nodes"][0]["state"] = static_cast<uint8_t>(registry::NodeState::Pending);
+    doc["nodes"][0]["id"] = record.nodeId;
+    doc["nodes"][0]["uid"] = "05000000000000000000";
+    doc["nodes"][0]["replay_slot"] = record.replaySlot;
+    std::string pairing;
+    constexpr char digits[] = "0123456789abcdef";
+    for (const uint8_t byte : record.pairing) {
+        pairing += digits[byte >> 4]; pairing += digits[byte & 15];
+    }
+    doc["nodes"][0]["pairing"] = pairing;
+    json.clear(); serializeJson(doc, json);
+    assert(!backup::decode(json.data(), json.size(), decoded));
+    flash.clear(); recovery::begin(); writes = 0;
+    assert(!backup::restore(mixed, admin()) && writes == 0);
+    assert(!backup::restore(pending, admin()) && writes == 0);
+    assert(!recovery::blocked());
+    std::cout << "Pending nodes: capture/export exclusion, import rejection and restore gates passed\n";
+}
 void restorePowerCuts() {
     backup::Snapshot s; fixture(s); const auto auth = admin();
     flash.clear(); flash["radio-bound"]["bounds"] = {1,2,3}; recovery::begin(); writes = 0;
@@ -257,5 +322,5 @@ void buttonTests() {
 int main(int argc, char** argv) {
     // Optional: where to write an encrypted fixture for check_interop.mjs.
     fixturePath = argc > 1 ? argv[1] : nullptr;
-    codecAndCrypto(); restorePowerCuts(); resetPowerCuts(); buttonTests();
+    codecAndCrypto(); pendingBackup(); restorePowerCuts(); resetPowerCuts(); buttonTests();
 }

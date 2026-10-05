@@ -1094,9 +1094,8 @@ void handleResetRadioNetwork(AsyncWebServerRequest* request, JsonVariant& json) 
         }
     }
 
-    // Clear the registry first: the nodes in it are bound to the old network
-    // and key, and saveSecrets refuses to change the radio profile while any
-    // of them is still active.
+    // saveSecrets refuses to change the radio profile while registered nodes
+    // remain active on the current network.
     size_t removedNodes = 0;
     const RegistryCommitStatus registryStatus = registry_store::clearAndSave(removedNodes);
     if (registryStatus == RegistryCommitStatus::StorageError) {
@@ -2004,7 +2003,7 @@ void handleStatus(AsyncWebServerRequest* request) {
         "{\"status\":\"ok\",\"firmware\":\"%s\",\"api_version\":%u,\"board\":\"%s\",\"hostname\":\"%s\","
         "\"gateway_id\":\"%s\",\"boot_id\":\"%s\","
         "\"reset_reason\":\"%s\",\"uptime_seconds\":%lu,\"free_heap\":%lu,"
-        "\"registry\":{\"records\":%u,\"generation\":%lu},"
+        "\"registry\":{\"ready\":%s,\"records\":%u,\"generation\":%lu},"
         "\"setup\":{\"required\":%s,\"active\":%s,\"remaining_seconds\":%lu},"
         "\"storage\":{\"ready\":%s,\"settings_generation\":%lu,"
         "\"auth_generation\":%lu,\"secrets_generation\":%lu,"
@@ -2066,6 +2065,7 @@ void handleStatus(AsyncWebServerRequest* request) {
         diagnostics::resetReason(),
         static_cast<unsigned long>(uptimeSeconds()),
         ESP.getFreeHeap(),
+        registry_store::ready() ? "true" : "false",
         static_cast<unsigned>(registry_store::recordCount()),
         static_cast<unsigned long>(registry_store::generation()),
         status::setupRequired() ? "true" : "false",
@@ -2181,11 +2181,12 @@ void handleStatus(AsyncWebServerRequest* request) {
         radioSnapshot.lastRssi);
     const auto bench = registry_store::radioDiagnostics();
     response->printf(
-        ",\"bench\":{\"last_receive_us\":%lu,\"max_receive_us\":%lu,"
+        ",\"bench\":{\"acceptance_history_bytes\":%lu,\"last_receive_us\":%lu,\"max_receive_us\":%lu,"
         "\"reservation_writes\":%lu,\"reservation_failures\":%lu,"
         "\"last_reservation_write_us\":%lu,\"max_reservation_write_us\":%lu,"
         "\"acks_measured\":%lu,\"last_ack_us\":%lu,\"max_ack_us\":%lu,\"acks_over_40ms\":%lu,"
         "\"stack_free_bytes\":{\"radio\":%lu,\"commissioning\":%lu,\"commands\":%lu}}}",
+        static_cast<unsigned long>(bench.historyBytes),
         static_cast<unsigned long>(bench.lastReceiveUs), static_cast<unsigned long>(bench.maxReceiveUs),
         static_cast<unsigned long>(bench.reservationWrites), static_cast<unsigned long>(bench.reservationFailures),
         static_cast<unsigned long>(bench.lastReservationWriteUs), static_cast<unsigned long>(bench.maxReservationWriteUs),

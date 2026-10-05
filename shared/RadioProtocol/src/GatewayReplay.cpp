@@ -123,6 +123,28 @@ void AcceptanceHistory::begin(uint64_t now) {
     initialized_ = true;
 }
 
+uint32_t AcceptanceHistory::timeAt(uint16_t index) const {
+    const uint16_t bit = index * kTimeBits;
+    const uint16_t byte = bit / 8;
+    const uint32_t packed = static_cast<uint32_t>(times_[byte]) |
+        (static_cast<uint32_t>(times_[byte + 1]) << 8) |
+        (static_cast<uint32_t>(times_[byte + 2]) << 16);
+    return (packed >> (bit % 8)) & kTimeMask;
+}
+
+void AcceptanceHistory::setTime(uint16_t index, uint32_t time) {
+    const uint16_t bit = index * kTimeBits;
+    const uint16_t byte = bit / 8;
+    const uint8_t shift = bit % 8;
+    uint32_t packed = static_cast<uint32_t>(times_[byte]) |
+        (static_cast<uint32_t>(times_[byte + 1]) << 8) |
+        (static_cast<uint32_t>(times_[byte + 2]) << 16);
+    packed = (packed & ~(kTimeMask << shift)) | ((time & kTimeMask) << shift);
+    times_[byte] = static_cast<uint8_t>(packed);
+    times_[byte + 1] = static_cast<uint8_t>(packed >> 8);
+    times_[byte + 2] = static_cast<uint8_t>(packed >> 16);
+}
+
 void AcceptanceHistory::expire(uint64_t now) {
     constexpr uint32_t day = 86400;
     if (!initialized_ || now < lastAt_) {
@@ -132,7 +154,7 @@ void AcceptanceHistory::expire(uint64_t now) {
     if (now - lastAt_ >= day) {
         head_ = count_ = 0;
     } else {
-        while (count_ && static_cast<uint32_t>(now) - times_[head_] >= day) {
+        while (count_ && ((static_cast<uint32_t>(now) - timeAt(head_)) & kTimeMask) >= day) {
             head_ = (head_ + 1) % kMaxWindow;
             --count_;
         }
@@ -152,7 +174,7 @@ void AcceptanceHistory::accepted(uint64_t now) {
         head_ = (head_ + 1) % kMaxWindow;
         --count_;
     }
-    times_[(head_ + count_) % kMaxWindow] = static_cast<uint32_t>(now);
+    setTime((head_ + count_) % kMaxWindow, static_cast<uint32_t>(now));
     ++count_;
 }
 
@@ -185,6 +207,13 @@ bool Guard::forget(size_t slot) {
     if (!store_.save(candidate)) return false;
     runtime_[slot] = Runtime{};
     return true;
+}
+
+bool Guard::isDuplicate(size_t slot, uint32_t counter) const {
+    if (!store_.writable() || slot >= kNodeSlots ||
+        store_.snapshot().records[slot].state == RecordState::Absent) return false;
+    const Runtime& runtime = runtime_[slot];
+    return !runtime.exhausted && runtime.hasLast && runtime.last == counter;
 }
 
 Decision Guard::inspect(size_t slot, uint32_t counter, uint16_t window,

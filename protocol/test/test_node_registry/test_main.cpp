@@ -24,6 +24,24 @@ JoinRequest makeRequest(
     return request;
 }
 
+uint8_t addRecord(NodeRegistry& registry, const JoinRequest& request) {
+    NodeRecord records[kMaxNodes]{};
+    const size_t count = registry.size();
+    TEST_ASSERT_LESS_THAN_UINT32(kMaxNodes, count);
+    memcpy(records, registry.records(), count * sizeof(NodeRecord));
+    auto& record = records[count];
+    memcpy(record.deviceUid, request.deviceUid, kDeviceUidSize);
+    record.nodeId = static_cast<uint8_t>(count + 1);
+    record.profileId = request.profileId;
+    record.firmware = request.firmware;
+    record.requestNonce = request.requestNonce;
+    record.maxPowerLevel = request.maxPowerLevel;
+    record.powerPolicy = radiosensors::radio_power::kPolicyAuto;
+    record.state = NodeState::Pending;
+    TEST_ASSERT_TRUE(registry.restore(records, count + 1));
+    return record.nodeId;
+}
+
 class MemoryStorage final : public radiosensors::replay::BlobStorage {
 public:
     radiosensors::replay::ReadStatus read(
@@ -54,96 +72,20 @@ private:
 void setUp() {}
 void tearDown() {}
 
-void test_reserves_stable_unique_ids() {
-    NodeRegistry registry;
-    const JoinRequest first = makeRequest(0x10, 0x1001, 0x11111111);
-    const JoinRequest second = makeRequest(0x30, 0x1002, 0x22222222);
-
-    const ReserveResult firstResult = registry.reserve(first);
-    const ReserveResult secondResult = registry.reserve(second);
-    TEST_ASSERT_EQUAL(static_cast<int>(ReserveStatus::Created),
-                      static_cast<int>(firstResult.status));
-    TEST_ASSERT_EQUAL_UINT8(1, firstResult.nodeId);
-    TEST_ASSERT_EQUAL_UINT8(2, secondResult.nodeId);
-    TEST_ASSERT_EQUAL_UINT32(2, registry.size());
-
-    JoinRequest retry = first;
-    retry.requestNonce = 0x33333333;
-    const ReserveResult retryResult = registry.reserve(retry);
-    TEST_ASSERT_EQUAL(static_cast<int>(ReserveStatus::ExistingPendingUpdated),
-                      static_cast<int>(retryResult.status));
-    TEST_ASSERT_EQUAL_UINT8(firstResult.nodeId, retryResult.nodeId);
-    TEST_ASSERT_EQUAL_HEX32(
-        retry.requestNonce,
-        registry.findByUid(first.deviceUid)->requestNonce);
-}
-
-void test_profile_conflict_does_not_change_record() {
-    NodeRegistry registry;
-    const JoinRequest first = makeRequest(0x10, 0x1001);
-    registry.reserve(first);
-    JoinRequest conflicting = first;
-    conflicting.profileId = 0x1002;
-
-    const ReserveResult result = registry.reserve(conflicting);
-    TEST_ASSERT_EQUAL(static_cast<int>(ReserveStatus::ProfileConflict),
-                      static_cast<int>(result.status));
-    TEST_ASSERT_EQUAL_HEX16(
-        first.profileId,
-        registry.findByUid(first.deviceUid)->profileId);
-}
-
-void test_confirm_requires_uid_node_id_and_latest_nonce() {
-    NodeRegistry registry;
-    const JoinRequest request = makeRequest(0x10, 0x1001, 0x12345678);
-    const ReserveResult reserved = registry.reserve(request);
-    const JoinRequest other = makeRequest(0x20, 0x1001, request.requestNonce);
-
-    TEST_ASSERT_EQUAL(
-        static_cast<int>(ConfirmStatus::IdentityMismatch),
-        static_cast<int>(registry.confirm(
-            other.deviceUid, reserved.nodeId, request.requestNonce)));
-    TEST_ASSERT_EQUAL(
-        static_cast<int>(ConfirmStatus::NonceMismatch),
-        static_cast<int>(registry.confirm(
-            request.deviceUid, reserved.nodeId, request.requestNonce + 1)));
-    TEST_ASSERT_EQUAL(
-        static_cast<int>(ConfirmStatus::Confirmed),
-        static_cast<int>(registry.confirm(
-            request.deviceUid, reserved.nodeId, request.requestNonce)));
-    TEST_ASSERT_EQUAL(
-        static_cast<int>(NodeState::Active),
-        static_cast<int>(registry.findByNodeId(reserved.nodeId)->state));
-    TEST_ASSERT_EQUAL(
-        static_cast<int>(ConfirmStatus::AlreadyActive),
-        static_cast<int>(registry.confirm(
-            request.deviceUid, reserved.nodeId, request.requestNonce)));
-    TEST_ASSERT_EQUAL(
-        static_cast<int>(ConfirmStatus::NonceMismatch),
-        static_cast<int>(registry.confirm(
-            request.deviceUid, reserved.nodeId, request.requestNonce + 1)));
-}
-
 void test_registry_capacity_is_bounded() {
     NodeRegistry registry;
     for (size_t index = 0; index < kMaxNodes; ++index) {
-        const JoinRequest request = makeRequest(static_cast<uint8_t>(index * 3), 1);
-        TEST_ASSERT_EQUAL(
-            static_cast<int>(ReserveStatus::Created),
-            static_cast<int>(registry.reserve(request).status));
+        addRecord(registry, makeRequest(static_cast<uint8_t>(index * 3), 1));
     }
-
-    const JoinRequest overflow = makeRequest(0xF0, 1);
-    TEST_ASSERT_EQUAL(
-        static_cast<int>(ReserveStatus::Full),
-        static_cast<int>(registry.reserve(overflow).status));
+    TEST_ASSERT_EQUAL_UINT32(kMaxNodes, registry.size());
+    TEST_ASSERT_FALSE(registry.restore(registry.records(), kMaxNodes + 1));
     TEST_ASSERT_EQUAL_UINT32(kMaxNodes, registry.size());
 }
 
 void test_snapshot_round_trip_preserves_records() {
     NodeRegistry source;
     const JoinRequest request = makeRequest(0x10, 0x1234, 0x89ABCDEF);
-    source.reserve(request);
+    addRecord(source, request);
     const char name[] = "\xD0\x94\xD0\xB0\xD1\x82\xD1\x87\xD0\xB8\xD0\xBA";
     TEST_ASSERT_EQUAL(
         static_cast<int>(RenameStatus::Renamed),
@@ -177,7 +119,7 @@ void test_power_policy_is_bounded_by_the_ceiling_and_persisted() {
     NodeRegistry registry;
     JoinRequest request = makeRequest(0x10, 0x1234, 7);
     request.maxPowerLevel = 5;
-    const uint8_t nodeId = registry.reserve(request).nodeId;
+    const uint8_t nodeId = addRecord(registry, request);
     const NodeRecord* record = registry.findByNodeId(nodeId);
     TEST_ASSERT_EQUAL_UINT8(5, record->maxPowerLevel);
     TEST_ASSERT_EQUAL_UINT8(power::kPolicyAuto, record->powerPolicy);
@@ -208,13 +150,7 @@ void test_power_policy_is_bounded_by_the_ceiling_and_persisted() {
     TEST_ASSERT_EQUAL_UINT8(5, decoded.findByNodeId(nodeId)->maxPowerLevel);
     TEST_ASSERT_EQUAL_UINT8(power::fixedPolicy(5), decoded.findByNodeId(nodeId)->powerPolicy);
 
-    // Pairing again with a lower ceiling returns a fixed level above it to
-    // automatic control.
-    request.maxPowerLevel = 3;
-    TEST_ASSERT_EQUAL(static_cast<int>(ReserveStatus::ExistingPendingUpdated),
-                      static_cast<int>(registry.reserve(request).status));
-    TEST_ASSERT_EQUAL_UINT8(3, record->maxPowerLevel);
-    TEST_ASSERT_EQUAL_UINT8(power::kPolicyAuto, record->powerPolicy);
+
 }
 
 void test_update_info_replaces_the_identity_of_an_active_node() {
@@ -222,12 +158,14 @@ void test_update_info_replaces_the_identity_of_an_active_node() {
     NodeRegistry registry;
     JoinRequest request = makeRequest(0x10, 1, 7);
     request.maxPowerLevel = 20;
-    const uint8_t nodeId = registry.reserve(request).nodeId;
+    const uint8_t nodeId = addRecord(registry, request);
     const NodeInfo info{1, FirmwareVersion{1, 2, 4}, 20};
 
     TEST_ASSERT_EQUAL(static_cast<int>(InfoStatus::NotFound),
                       static_cast<int>(registry.updateInfo(nodeId, request.deviceUid, info)));
-    registry.confirm(request.deviceUid, nodeId, 7);
+    NodeRecord active = registry.records()[0];
+    active.state = NodeState::Active;
+    TEST_ASSERT_TRUE(registry.restore(&active, 1));
     const JoinRequest other = makeRequest(0x30);
     TEST_ASSERT_EQUAL(static_cast<int>(InfoStatus::NotFound),
                       static_cast<int>(registry.updateInfo(nodeId, other.deviceUid, info)));
@@ -256,7 +194,7 @@ void test_update_info_replaces_the_identity_of_an_active_node() {
 
 void test_rename_accepts_utf8_and_rejects_invalid_names() {
     NodeRegistry registry;
-    registry.reserve(makeRequest(0x10));
+    addRecord(registry, makeRequest(0x10));
     const char ukrainian[] = "\xD0\x9A\xD1\x96\xD0\xBC\xD0\xBD\xD0\xB0\xD1\x82\xD0\xB0";
     TEST_ASSERT_EQUAL(
         static_cast<int>(RenameStatus::Renamed),
@@ -275,7 +213,7 @@ void test_rename_accepts_utf8_and_rejects_invalid_names() {
 
 void test_snapshot_rejects_crc_corruption() {
     NodeRegistry source;
-    source.reserve(makeRequest(0x10));
+    addRecord(source, makeRequest(0x10));
     uint8_t encoded[kMaxRegistrySnapshotSize]{};
     size_t encodedSize = 0;
     encodeRegistrySnapshot(source, 1, encoded, sizeof(encoded), encodedSize);
@@ -294,9 +232,9 @@ void test_atomic_store_blocks_corruption() {
     AtomicRegistryStore writer(slots);
     NodeRegistry registry;
     writer.load(registry);
-    registry.reserve(makeRequest(0x10));
+    addRecord(registry, makeRequest(0x10));
     TEST_ASSERT_TRUE(writer.save(registry));
-    registry.reserve(makeRequest(0x30));
+    addRecord(registry, makeRequest(0x30));
     TEST_ASSERT_TRUE(writer.save(registry));
     slots.corrupt(kRegistryHeaderSize);
 
@@ -314,9 +252,9 @@ void test_atomic_store_loads_committed_generation() {
     AtomicRegistryStore writer(slots);
     NodeRegistry registry;
     writer.load(registry);
-    registry.reserve(makeRequest(0x10));
+    addRecord(registry, makeRequest(0x10));
     TEST_ASSERT_TRUE(writer.save(registry));
-    registry.reserve(makeRequest(0x30));
+    addRecord(registry, makeRequest(0x30));
     TEST_ASSERT_TRUE(writer.save(registry));
 
     AtomicRegistryStore reader(slots);
@@ -330,9 +268,6 @@ void test_atomic_store_loads_committed_generation() {
 
 int main(int, char**) {
     UNITY_BEGIN();
-    RUN_TEST(test_reserves_stable_unique_ids);
-    RUN_TEST(test_profile_conflict_does_not_change_record);
-    RUN_TEST(test_confirm_requires_uid_node_id_and_latest_nonce);
     RUN_TEST(test_registry_capacity_is_bounded);
     RUN_TEST(test_snapshot_round_trip_preserves_records);
     RUN_TEST(test_power_policy_is_bounded_by_the_ceiling_and_persisted);

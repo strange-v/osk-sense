@@ -153,7 +153,7 @@ void sendNoCommand(const radio::ReceivedFrame& ready) {
 
 void handleCommandReady(const radio::ReceivedFrame& received) {
     if (received.size != 0) { count(&Counters::rejectedFrames); return; }
-    count(&Counters::sessions);
+    if (!received.retryCommandReady) count(&Counters::sessions);
     const uint8_t nodeId = static_cast<uint8_t>(received.senderId);
     // The node is listening: answer an empty session without taking a lock.
     if (!hasPending(nodeId)) {

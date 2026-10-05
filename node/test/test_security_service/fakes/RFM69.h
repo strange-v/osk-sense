@@ -18,6 +18,7 @@ public:
     inline static std::deque<Packet> incoming;
     inline static std::vector<Packet> outgoing;
     inline static std::function<void(const Packet&)> onSend;
+    inline static std::function<void()> onSleep;
     inline static bool initialized=true, receiving=false;
     RFM69(uint8_t,uint8_t,bool) {}
     virtual ~RFM69() = default;
@@ -48,7 +49,7 @@ public:
         return true;
     }
     bool ACKReceived(uint8_t sender) { return receiveDone() && SENDERID==sender && (control_&0x80); }
-    void sleep() { receiving=false; }
+    void sleep() { receiving=false; if (onSleep) onSleep(); }
 protected:
     virtual void interruptHook(uint8_t) {}
 private:

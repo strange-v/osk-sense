@@ -25,6 +25,7 @@ struct ReceivedFrame {
     radiosensors::protocol::FrameKind kind;
     uint32_t counter;
     uint8_t salt[radiosensors::security::kSaltSize];
+    bool retryCommandReady = false;
 };
 
 enum class State {

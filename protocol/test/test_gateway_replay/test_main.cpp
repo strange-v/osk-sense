@@ -4,6 +4,7 @@
 #include <string.h>
 #include <algorithm>
 #include <initializer_list>
+#include <deque>
 
 using namespace radiosensors::replay;
 namespace {
@@ -413,6 +414,40 @@ void test_adaptive_window_trailing_day_and_clock_wrap() {
     TEST_ASSERT_EQUAL_UINT16(1, history.window(base + 0x100000000ULL + 86401));
 }
 
+void test_compact_history_matches_exact_seconds_across_wraps_and_long_gaps() {
+    AcceptanceHistory history;
+    TEST_ASSERT_LESS_OR_EQUAL_UINT(600, sizeof(history));
+    uint64_t now = (1ULL << 18) - 86400;
+    history.begin(now);
+    for (unsigned index = 0; index < 600; ++index) history.accepted(now + index * 100);
+    TEST_ASSERT_EQUAL_UINT16(256, history.window(now + 86400));
+    for (unsigned expired = 1; expired <= 256; ++expired) {
+        TEST_ASSERT_EQUAL_UINT16(expired == 256 ? 1 : 256 - expired,
+            history.window(now + (343 + expired) * 100 + 86400));
+    }
+    uint64_t started = now;
+    history.begin(now);
+    std::deque<uint64_t> reference;
+    uint32_t random = 7;
+    for (unsigned index = 0; index < 12000; ++index) {
+        random = random * 1664525U + 1013904223U;
+        if (index % 2000 == 1999) {
+            now -= 1;
+            started = now; reference.clear();
+        } else {
+            now += index < 2000 ? random % 5 : random % 120000;
+            while (!reference.empty() && now - reference.front() >= 86400) reference.pop_front();
+        }
+        if (index % 3 != 0) {
+            history.accepted(now);
+            reference.push_back(now);
+            if (reference.size() > 256) reference.pop_front();
+        }
+        const uint16_t expected = now - started < 86400 ? 256 :
+            static_cast<uint16_t>(reference.empty() ? 1 : reference.size());
+        TEST_ASSERT_EQUAL_UINT16(expected, history.window(now));
+    }
+}
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_layout_corruption_and_strict_fields);
@@ -428,5 +463,6 @@ int main() {
     RUN_TEST(test_random_failure_cannot_activate);
     RUN_TEST(test_identical_snapshot_is_noop_and_invalid_candidate_changes_nothing);
     RUN_TEST(test_adaptive_window_trailing_day_and_clock_wrap);
+    RUN_TEST(test_compact_history_matches_exact_seconds_across_wraps_and_long_gaps);
     return UNITY_END();
 }

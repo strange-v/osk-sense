@@ -61,31 +61,6 @@ enum class InfoStatus : uint8_t {
     NotFound,
 };
 
-enum class ReserveStatus : uint8_t {
-    Created,
-    ExistingPendingUpdated,
-    ExistingActive,
-    ExistingDisabled,
-    InvalidProfileId,
-    ProfileConflict,
-    Full,
-    SecureTransaction,
-};
-
-struct ReserveResult {
-    ReserveStatus status;
-    uint8_t nodeId;
-};
-
-enum class ConfirmStatus : uint8_t {
-    Confirmed,
-    AlreadyActive,
-    NotFound,
-    NotPending,
-    IdentityMismatch,
-    NonceMismatch,
-};
-
 class NodeRegistry {
 public:
     NodeRegistry();
@@ -95,11 +70,6 @@ public:
     const NodeRecord* findByUid(const uint8_t* deviceUid) const;
     const NodeRecord* findByNodeId(uint8_t nodeId) const;
 
-    ReserveResult reserve(const protocol::JoinRequest& request);
-    ConfirmStatus confirm(
-        const uint8_t* deviceUid,
-        uint8_t nodeId,
-        uint32_t requestNonce);
     bool disable(uint8_t nodeId);
     bool remove(uint8_t nodeId);
     RenameStatus rename(uint8_t nodeId, const char* displayName, size_t length);
@@ -123,7 +93,6 @@ private:
     static bool firmwareEquals(
         const protocol::FirmwareVersion& left,
         const protocol::FirmwareVersion& right);
-    uint8_t allocateNodeId() const;
     NodeRecord* findMutableByUid(const uint8_t* deviceUid);
     NodeRecord* findMutableByNodeId(uint8_t nodeId);
 };

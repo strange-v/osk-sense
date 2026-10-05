@@ -32,7 +32,8 @@ let timer: number | undefined
 // not make the gateway unhealthy; the two transient states do, because until
 // the clock is set telemetry carries a zero timestamp.
 const timeHealthy = computed(() => health.value?.time.state === 'synchronized' || health.value?.time.state === 'disabled')
-const healthy = computed(() => health.value?.status === 'ok' && health.value?.ethernet.has_ip && health.value?.radio.present && health.value?.storage.ready && timeHealthy.value)
+const storageReady = computed(() => health.value?.storage.ready && health.value?.registry.ready)
+const healthy = computed(() => health.value?.status === 'ok' && health.value?.ethernet.has_ip && health.value?.radio.present && storageReady.value && timeHealthy.value)
 const nodeProblem = computed(() => nodes.value.find((node) => node.state !== 'active'))
 const needsAttention = computed(() => !healthy.value || Boolean(nodeProblem.value))
 const seenNodes = computed(() => nodesAvailable.value ? nodes.value.filter((node) => node.has_telemetry === true).length : health.value?.telemetry.nodes_seen ?? 0)
@@ -149,7 +150,7 @@ onBeforeUnmount(() => window.clearInterval(timer))
               <div><dt><span aria-hidden="true"><Icon name="lan" /></span>{{ $t('status.network') }}</dt><dd><strong>{{ health.ethernet.has_ip ? $t('common.connected') : $t('common.disconnected') }}</strong><small>{{ fmt(health.ethernet.ip) }}<template v-if="info?.hostname"> · {{ info.hostname }}</template></small></dd></div>
               <div><dt><span aria-hidden="true"><Icon name="access-point" /></span>{{ $t('status.radio') }}</dt><dd><strong>{{ health.radio.present ? megahertz(health.radio.frequency_hz) : $t('common.unavailable') }}</strong><small>{{ $t('status.networkId') }} {{ health.radio.network_id }}</small></dd></div>
               <div><dt><span aria-hidden="true"><Icon name="clock-outline" /></span>{{ $t('status.time') }}</dt><dd><strong>{{ $t(`status.timeState.${health.time.state}`) }}</strong><small>{{ dateTime(locale, health.time.last_sync_ms) }}</small></dd></div>
-              <div><dt><span aria-hidden="true"><Icon name="database" /></span>{{ $t('status.storage') }}</dt><dd><strong>{{ health.storage.ready ? $t('common.ready') : $t('common.attention') }}</strong><small>{{ $t('status.registryGeneration') }} {{ health.registry.generation }}</small></dd></div>
+              <div><dt><span aria-hidden="true"><Icon name="database" /></span>{{ $t('status.storage') }}</dt><dd><strong>{{ storageReady ? $t('common.ready') : $t('common.attention') }}</strong><small>{{ $t('status.registryGeneration') }} {{ health.registry.generation }}</small></dd></div>
             </dl>
           </section>
 

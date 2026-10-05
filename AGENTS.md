@@ -21,6 +21,7 @@ Run them in WSL from the repository root. `pio test -e native` does not work on 
 | protocol | `wsl bash protocol/scripts/run_native_tests_wsl.sh` |
 | node | `wsl bash node/scripts/run_native_tests_wsl.sh` |
 | gateway | `wsl bash gateway/scripts/run_native_tests_wsl.sh` |
+| gateway registry/radio only | `wsl bash gateway/scripts/run_native_tests_wsl.sh --registry-radio` |
 
 Firmware images build on Windows with `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e <env>` from `node/` or `gateway/`.
 

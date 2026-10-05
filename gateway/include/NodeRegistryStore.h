@@ -19,9 +19,12 @@ struct Snapshot {
 };
 
 bool begin();
+bool ready();
+void loop();
 struct RadioDiagnostics {
     uint32_t lastReceiveUs, maxReceiveUs;
     uint32_t reservationWrites, reservationFailures, lastReservationWriteUs, maxReservationWriteUs;
+    uint32_t historyBytes;
 };
 RadioDiagnostics radioDiagnostics();
 uint32_t generation();
@@ -50,14 +53,6 @@ radiosensors::registry::ReceiveStatus receiveSecure(
 bool commandReply(uint8_t nodeId, const uint8_t* salt, uint32_t counter,
     uint8_t header, const uint8_t* payload, size_t size,
     uint8_t* output, size_t capacity, size_t& outputSize);
-RegistryCommitStatus reserveAndSave(
-    const radiosensors::protocol::JoinRequest& request,
-    radiosensors::registry::ReserveResult& result);
-RegistryCommitStatus confirmAndSave(
-    const uint8_t* deviceUid,
-    uint8_t nodeId,
-    uint32_t nonce,
-    radiosensors::registry::ConfirmStatus& result);
 RegistryCommitStatus renameAndSave(
     uint8_t nodeId,
     const char* displayName,

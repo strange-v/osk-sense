@@ -11,7 +11,7 @@ const health = {
   status: 'ok', firmware: '2.1.0', api_version: 1, board: 'esp32-poe', hostname: 'osk-hub-a085e3',
   gateway_id: 'a1b2c3d4e5f60718293a4b5c6d7e8f90', boot_id: '00112233445566778899aabbccddeeff',
   reset_reason: 'power_on', uptime_seconds: 191_400, free_heap: 184_320,
-  registry: { records: 6, generation: 12 },
+  registry: { ready: true, records: 6, generation: 12 },
   setup: { required: false, active: false, remaining_seconds: 0 },
   pairing: { active: false, remaining_seconds: 0, indication: 'idle' },
   storage: {

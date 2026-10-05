@@ -201,18 +201,36 @@ Runtime last-seen time, RSSI, telemetry, radio power control state, and counters
 
 The state flow is `absent -> pending -> active`; explicit management may set `disabled` or remove a record. Active or disabled records cannot be replaced through pairing. `RegistryPairing` authenticates before reserving a UID, persists one immutable reply per transaction and rejects retired counter words. V3 confirmation prepares the replay slot before committing Active. Matching repeated confirmation returns `JOIN_COMPLETE` without any registry or bound write.
 
-Replay slots are unique and retained when removal changes record order. A new
-Pending transaction forgets its slot before committing new keys. Retrying a
-Pending confirmation preserves a Paired bound belonging to those keys.
+Replay slots are unique and retained when removal changes record order. Committed
+removal or registry clear forgets unused replay bounds. Startup and storage reload
+finish any interrupted cleanup. A new Pending transaction forgets its slot before
+committing new keys. Retrying a Pending confirmation preserves a Paired bound
+belonging to those keys.
 
 The single registry blob is replaced through NVS journaling and checked against
 the exact encoded bytes before publication. A failed commit or read-back blocks
 mutations and key lookup until reload. Invalid data blocks initialization and
 requires explicit reset or repair; no older transaction is selected.
 
+After a runtime registry or replay-bound write/read-back failure, the main loop
+retries loading both stores at most once per second. Reception and registry
+mutations remain disabled until both stores are writable. A successful reload
+rebuilds replay floors from durable bounds and clears cached command replies
+and acceptance history. `/ui/status` reports `registry.ready`; the overview
+marks storage as needing attention while reception is disabled.
+
+Acceptance histories use at most 600 bytes per active slot (38,400 bytes for
+64 slots, excluding allocator overhead). Committed removal or registry clear
+releases their allocations. `/ui/status` reports current history allocations
+as `bench.acceptance_history_bytes`, alongside the gateway's `free_heap`.
+
 Commissioning persists its registry transaction before queuing `JOIN_ACCEPT`. The radio-owner task persists a replay reservation before acknowledging or publishing a fresh counter outside its bound. Both paths serialize through the registry and recovery locks.
 
-A registry commit holds its mutex through NVS write and read-back. Radio reception takes the registry lock without waiting; a competing mutation drops the frame for the node to retry. Replay reservation latency within the ACK window requires hardware measurement.
+A registry commit holds its mutex through NVS write and read-back. Radio reception and command reply share a 5 ms wait budget across the recovery and registry locks; longer contention drops the frame for the node to retry. Replay reservation latency within the ACK window requires hardware measurement.
+
+`wsl bash gateway/scripts/run_registry_radio_tests_wsl.sh` checks runtime NVS
+fault recovery, retry timing, durable floors and command-cache invalidation
+against `NodeRegistryStore` under ASan/UBSan.
 
 ## Command book snapshot
 

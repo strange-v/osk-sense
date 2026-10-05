@@ -113,6 +113,7 @@ constexpr int interrupt = GATEWAY_RFM69_IRQ;
 constexpr int reset = GATEWAY_RFM69_RESET;
 constexpr uint8_t frequencyBand = GATEWAY_RFM69_FREQUENCY;
 constexpr uint16_t nodeId = GATEWAY_RFM69_NODE_ID;
+static_assert(nodeId == 100, "V3 protocol requires gateway node ID 100");
 constexpr bool highPower = GATEWAY_RFM69_HIGH_POWER != 0;
 constexpr int8_t txPowerDbm = GATEWAY_RFM69_TX_POWER_DBM;
 

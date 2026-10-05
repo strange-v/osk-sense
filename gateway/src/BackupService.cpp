@@ -62,7 +62,13 @@ bool capture(Snapshot& snapshot) {
     snapshot.settings = configuration_store::settings();
     snapshot.secrets = configuration_store::secrets();
     snapshot.createdAt = time_service::unixTimeMs();
-    return snapshot.nodes.restore(registry->records, registry->count);
+    size_t count = 0;
+    for (size_t index = 0; index < registry->count; ++index) {
+        if (registry->records[index].state != registry::NodeState::Pending) {
+            registry->records[count++] = registry->records[index];
+        }
+    }
+    return snapshot.nodes.restore(registry->records, count);
 }
 
 bool cleanGateway() {
@@ -78,6 +84,11 @@ bool restore(
     if (!guard || !cleanGateway() || !status::setupActive() ||
         status::pairingActive() || ota::state() == ota::State::Updating) {
         return false;
+    }
+    for (size_t index = 0; index < snapshot.nodes.size(); ++index) {
+        if (snapshot.nodes.records()[index].state == registry::NodeState::Pending) {
+            return false;
+        }
     }
     std::unique_ptr<uint8_t[]> buffer(new (std::nothrow) uint8_t[kBufferSize]);
     if (!buffer) return false;

@@ -296,8 +296,11 @@ void routeReceivedFrame(ReceivedFrame& received, uint64_t irqAtUs) {
     if (duplicate || action == r::Action::CounterFloor) ++taskStats.replayFrames;
     if (ack.hasChallenge) ++taskStats.activationChallenges;
     portEXIT_CRITICAL(&statsMux);
-    if (!accepted) return;
+    // An accepted ready may have lost its first reply to storage contention.
+    // Until a reply is cached, its retransmission can retry the session handler.
+    if (!accepted && !opened.retryCommandReady) return;
     received.counter = opened.counter;
+    received.retryCommandReady = opened.retryCommandReady;
     memcpy(received.salt, opened.salt, sizeof(received.salt));
     received.kind = telemetry ? radiosensors::protocol::FrameKind::Telemetry
         : header == f::kCommandReadyHeader ? radiosensors::protocol::FrameKind::CommandReady

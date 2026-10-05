@@ -128,6 +128,45 @@ void test_queue_backpressure_does_not_consume_fresh_counter() {
         static_cast<uint8_t>(x.radio.receive({100,1,0},ready.data(),ready.size(),0,true,false,opened)));
     x.open(x.seal(1025,f::kCommandReadyHeader,nullptr,0,nullptr,0),r::Action::Accept,0);
 }
+void test_accepted_reports_and_results_are_reacked_when_consumer_queues_are_full() {
+    Fixture x;
+    const auto reportWire = x.seal(1024);
+    x.open(reportWire,r::Action::Accept);
+    const auto reportWrites = x.boundMemory.writes;
+    auto repeated = reportWire; n::OpenedFrame opened;
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(n::ReceiveStatus::Ok),
+        static_cast<uint8_t>(x.radio.receive({100,1,0x40},repeated.data(),repeated.size(),0,false,false,opened)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(r::Action::Duplicate),static_cast<uint8_t>(opened.decision.action));
+    TEST_ASSERT_FALSE(opened.retryCommandReady);
+    TEST_ASSERT_EQUAL_UINT(reportWrites,x.boundMemory.writes);
+    uint8_t ack[16]; size_t ackSize = 0; s::Ack verified;
+    TEST_ASSERT_TRUE(s::sealAck(opened.mac,{1,100,0x80},opened.counter,{},ack,sizeof(ack),ackSize));
+    TEST_ASSERT_TRUE(s::openAck(x.node.authentication,{1,100,0x80},1024,ack,ackSize,verified));
+
+    f::CommandResult result; result.commandId = 42;
+    uint8_t payload[11]; size_t payloadSize = 0;
+    TEST_ASSERT_TRUE(f::encodeCommandResult(result,payload,sizeof(payload),payloadSize));
+    const auto resultWire = x.seal(1025,f::kCommandResultHeader,payload,payloadSize);
+    auto fresh = resultWire;
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(n::ReceiveStatus::Busy),
+        static_cast<uint8_t>(x.radio.receive({100,1,0x40},fresh.data(),fresh.size(),0,true,false,opened)));
+    TEST_ASSERT_EQUAL_UINT(reportWrites,x.boundMemory.writes);
+    x.open(resultWire,r::Action::Accept);
+    const auto resultWrites = x.boundMemory.writes;
+    repeated = resultWire;
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(n::ReceiveStatus::Ok),
+        static_cast<uint8_t>(x.radio.receive({100,1,0x40},repeated.data(),repeated.size(),0,false,false,opened)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(r::Action::Duplicate),static_cast<uint8_t>(opened.decision.action));
+    TEST_ASSERT_FALSE(opened.retryCommandReady);
+    TEST_ASSERT_EQUAL_UINT(resultWrites,x.boundMemory.writes);
+    TEST_ASSERT_TRUE(s::sealAck(opened.mac,{1,100,0x80},opened.counter,{},ack,sizeof(ack),ackSize));
+    TEST_ASSERT_TRUE(s::openAck(x.node.authentication,{1,100,0x80},1025,ack,ackSize,verified));
+
+    repeated = resultWire; repeated.back() ^= 1;
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(n::ReceiveStatus::FailedTag),
+        static_cast<uint8_t>(x.radio.receive({100,1,0x40},repeated.data(),repeated.size(),0,false,false,opened)));
+    TEST_ASSERT_EQUAL_UINT(resultWrites,x.boundMemory.writes);
+}
 void test_restart_counter_floor_is_authenticated_and_reserves_before_accept() {
     Fixture x; x.open(x.seal(1024),r::Action::Accept); x.restart();
     const auto floor = x.open(x.seal(1024),r::Action::CounterFloor);
@@ -183,6 +222,33 @@ void test_command_replies_are_immutable_and_bound_to_ready_counter() {
     x.restart(); x.open(ready,r::Action::CounterFloor,0);
     TEST_ASSERT_FALSE(x.radio.reply(1,x.salt,1024,f::kNoCommandHeader,nullptr,0,repeated,sizeof(repeated),repeatedSize));
 }
+void test_ready_without_reply_can_retry_consumer_until_reply_is_cached() {
+    Fixture x; const auto ready = x.seal(1024,f::kCommandReadyHeader,nullptr,0,nullptr,0);
+    const auto first = x.open(ready,r::Action::Accept,0);
+    TEST_ASSERT_FALSE(first.retryCommandReady);
+    const auto writes = x.boundMemory.writes;
+    const auto duplicate = x.open(ready,r::Action::Duplicate,0);
+    TEST_ASSERT_TRUE(duplicate.retryCommandReady);
+    TEST_ASSERT_EQUAL_UINT(0,duplicate.replySize);
+    TEST_ASSERT_EQUAL_UINT(writes,x.boundMemory.writes);
+
+    auto blocked = ready; n::OpenedFrame opened;
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(n::ReceiveStatus::Busy),
+        static_cast<uint8_t>(x.radio.receive({100,1,0},blocked.data(),blocked.size(),0,true,false,opened)));
+    TEST_ASSERT_FALSE(opened.retryCommandReady);
+    TEST_ASSERT_TRUE(x.open(ready,r::Action::Duplicate,0).retryCommandReady);
+
+    uint8_t reply[22]; size_t replySize = 0;
+    TEST_ASSERT_TRUE(x.radio.reply(1,x.salt,1024,f::kNoCommandHeader,nullptr,0,reply,sizeof(reply),replySize));
+    auto repeated = ready;
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(n::ReceiveStatus::Ok),
+        static_cast<uint8_t>(x.radio.receive({100,1,0},repeated.data(),repeated.size(),0,true,false,opened)));
+    TEST_ASSERT_FALSE(opened.retryCommandReady);
+    TEST_ASSERT_EQUAL_UINT(replySize,opened.replySize);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(reply,opened.reply,replySize);
+    TEST_ASSERT_FALSE(x.open(x.seal(1025),r::Action::Accept).retryCommandReady);
+    TEST_ASSERT_FALSE(x.open(x.seal(1025),r::Action::Duplicate).retryCommandReady);
+}
 void test_result_clears_reply_and_stale_pairing_work_is_rejected() {
     Fixture x; x.open(x.seal(1024,f::kCommandReadyHeader,nullptr,0,nullptr,0),r::Action::Accept,0);
     uint8_t reply[22]; size_t replySize = 0;
@@ -207,15 +273,57 @@ void test_invalid_authenticated_payload_does_not_consume_counter() {
         static_cast<uint8_t>(x.radio.receive({100,1,0x40},wire.data(),wire.size(),0,true,true,opened)));
     x.open(x.seal(1024),r::Action::Accept);
 }
+void test_history_memory_is_bounded_and_released_for_removed_or_disabled_slots() {
+    Fixture x;
+    n::NodeRecord records[r::kNodeSlots];
+    for (size_t slot = 0; slot < r::kNodeSlots; ++slot) {
+        records[slot] = x.nodes.records()[0];
+        records[slot].nodeId = static_cast<uint8_t>(slot + 1);
+        records[slot].deviceUid[0] = records[slot].nodeId;
+        records[slot].replaySlot = static_cast<uint8_t>(slot);
+        p::Record pairing; uint32_t generation = 0;
+        TEST_ASSERT_TRUE(p::decode(records[slot].pairing,sizeof(records[slot].pairing),pairing,generation));
+        memcpy(pairing.request + 1,records[slot].deviceUid,sizeof(records[slot].deviceUid));
+        memcpy(pairing.accept + 1,records[slot].deviceUid,sizeof(records[slot].deviceUid));
+        pairing.accept[27] = records[slot].nodeId;
+        TEST_ASSERT_TRUE(p::encode(pairing,generation,records[slot].pairing,sizeof(records[slot].pairing)));
+        if (slot != 0) TEST_ASSERT_TRUE(x.guard.initializeFreshKeys(slot));
+    }
+    TEST_ASSERT_TRUE(x.nodes.restore(records,r::kNodeSlots));
+    TEST_ASSERT_TRUE(x.store.save(x.nodes));
+    for (uint8_t nodeId = 1; nodeId <= r::kNodeSlots; ++nodeId) {
+        uint8_t wire[s::kMaxWireSize]; size_t size = 0; n::OpenedFrame opened;
+        TEST_ASSERT_TRUE(s::seal(x.node,s::Direction::Node,nodeId,{100,nodeId,0x40},1024,
+                                 0x60,report,sizeof(report),wire,sizeof(wire),size));
+        TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(n::ReceiveStatus::Ok),
+            static_cast<uint8_t>(x.radio.receive({100,nodeId,0x40},wire,size,0,true,true,opened)));
+    }
+    TEST_ASSERT_EQUAL_UINT(r::kNodeSlots * sizeof(r::AcceptanceHistory),x.radio.historyBytes());
+    TEST_ASSERT_LESS_OR_EQUAL_UINT(38400,x.radio.historyBytes());
+    TEST_ASSERT_TRUE(x.nodes.remove(1));
+    TEST_ASSERT_TRUE(x.nodes.disable(2));
+    TEST_ASSERT_TRUE(x.store.save(x.nodes));
+    x.radio.retainActiveSlots(x.nodes);
+    TEST_ASSERT_EQUAL_UINT(62 * sizeof(r::AcceptanceHistory),x.radio.historyBytes());
+    x.radio.retainActiveSlots(x.nodes);
+    TEST_ASSERT_EQUAL_UINT(62 * sizeof(r::AcceptanceHistory),x.radio.historyBytes());
+    TEST_ASSERT_TRUE(x.nodes.restore(nullptr,0)); TEST_ASSERT_TRUE(x.store.save(x.nodes));
+    x.radio.retainActiveSlots(x.nodes);
+    TEST_ASSERT_EQUAL_UINT(0,x.radio.historyBytes());
+    x.radio.restart(); TEST_ASSERT_EQUAL_UINT(0,x.radio.historyBytes());
+}
 int main() {
     UNITY_BEGIN();
     RUN_TEST(test_pair_receive_and_authenticated_ack);
     RUN_TEST(test_tampering_never_decrypts_or_advances_counter);
     RUN_TEST(test_queue_backpressure_does_not_consume_fresh_counter);
+    RUN_TEST(test_accepted_reports_and_results_are_reacked_when_consumer_queues_are_full);
     RUN_TEST(test_restart_counter_floor_is_authenticated_and_reserves_before_accept);
     RUN_TEST(test_backup_restore_requires_fresh_activation_challenge);
     RUN_TEST(test_command_replies_are_immutable_and_bound_to_ready_counter);
+    RUN_TEST(test_ready_without_reply_can_retry_consumer_until_reply_is_cached);
     RUN_TEST(test_result_clears_reply_and_stale_pairing_work_is_rejected);
     RUN_TEST(test_invalid_authenticated_payload_does_not_consume_counter);
+    RUN_TEST(test_history_memory_is_bounded_and_released_for_removed_or_disabled_slots);
     return UNITY_END();
 }

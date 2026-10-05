@@ -114,6 +114,7 @@ bool decodeNode(JsonObjectConst node, registry::NodeRecord& record) {
     record.nodeId = node["id"].as<uint8_t>();
     record.profileId = node["profile"].as<uint16_t>();
     record.state = static_cast<registry::NodeState>(node["state"].as<uint8_t>());
+    if (record.state == registry::NodeState::Pending) return false;
     record.requestNonce = node["nonce"].as<uint32_t>();
     record.replaySlot = node["replay_slot"].as<uint8_t>();
     record.firmware = {
@@ -164,6 +165,8 @@ bool encode(const Snapshot& snapshot, std::string& output) {
     JsonArray nodes = document["nodes"].to<JsonArray>();
     for (size_t index = 0; index < snapshot.nodes.size(); ++index) {
         const registry::NodeRecord& record = snapshot.nodes.records()[index];
+        // Pending keys may already have been used by the time this backup is restored.
+        if (record.state == registry::NodeState::Pending) continue;
         JsonObject node = nodes.add<JsonObject>();
         node["uid"] = hex(record.deviceUid, sizeof(record.deviceUid));
         node["id"] = record.nodeId;

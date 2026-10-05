@@ -96,6 +96,7 @@ void setup() {
 
 void loop() {
     gateway::recovery::loop();
+    gateway::registry_store::loop();
     gateway::time_service::loop();
     gateway::mdns_service::loop();
     gateway::radio::ReceivedFrame telemetry{};

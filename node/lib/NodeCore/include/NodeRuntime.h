@@ -261,6 +261,7 @@ private:
             radio_.send(gatewayId, ready,static_cast<uint8_t>(readySize));
             const uint8_t size = radio_.receiveFrame(
                 kSessionWindowMs, gatewayId, frame, sizeof(frame));
+            if (!size) continue;
             const auto transport = radio_.receivedTransport();
             if (transport.control == 0x80) {
                 security::Ack ack;

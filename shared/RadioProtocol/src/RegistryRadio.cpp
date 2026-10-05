@@ -12,12 +12,30 @@ namespace f = s::frames;
 
 void RadioAdapter::restart() {
     for (auto& history : histories_) history.frames.reset();
+    allocatedHistories_ = 0;
+}
+
+void RadioAdapter::retainActiveSlots(const NodeRegistry& nodes) {
+    bool active[replay::kNodeSlots]{};
+    for (size_t index = 0; index < nodes.size(); ++index) {
+        const auto& node = nodes.records()[index];
+        if (node.state == NodeState::Active && node.replaySlot < replay::kNodeSlots)
+            active[node.replaySlot] = true;
+    }
+    for (size_t slot = 0; slot < replay::kNodeSlots; ++slot) {
+        if (!active[slot] && histories_[slot].frames) {
+            histories_[slot].frames.reset();
+            memset(histories_[slot].salt, 0, sizeof(histories_[slot].salt));
+            --allocatedHistories_;
+        }
+    }
 }
 
 ReceiveStatus RadioAdapter::receive(s::Transport transport, uint8_t* wire, size_t size,
                                     uint64_t now, bool telemetrySpace, bool sessionSpace,
                                     OpenedFrame& frame) {
     frame.payloadSize = frame.replySize = 0;
+    frame.retryCommandReady = false;
     if (!wire || size == 0 || size > s::kMaxWireSize || transport.target != 100 ||
         transport.sender < kFirstNodeId || transport.sender > kLastNodeId ||
         (transport.control != 0 && transport.control != 0x40)) return ReceiveStatus::InvalidFrame;
@@ -42,19 +60,24 @@ ReceiveStatus RadioAdapter::receive(s::Transport transport, uint8_t* wire, size_
         if (!f::decodeCommandResult(payload, payloadSize, result)) return ReceiveStatus::InvalidFrame;
     } else return ReceiveStatus::InvalidFrame;
 
-    // A full consumer queue must not consume a fresh counter. A cached reply
-    // needs no queue entry and can still answer a repeated Command ready.
+    // Reports/results already accepted need only an ACK. An uncached Command
+    // ready still needs a consumer, including when it retries that consumer.
     size_t cachedSize = 0;
     const bool cached = header == f::kCommandReadyHeader &&
         guard_.cachedReply(slot, counter, frame.reply, sizeof(frame.reply), cachedSize);
-    if (!(telemetry ? telemetrySpace : sessionSpace) && !cached) return ReceiveStatus::Busy;
+    const bool needsQueue = header == f::kCommandReadyHeader
+        ? !cached : !guard_.isDuplicate(slot, counter);
+    if (needsQueue && !(telemetry ? telemetrySpace : sessionSpace)) return ReceiveStatus::Busy;
     auto& history = histories_[slot];
     // Obtain the public salt from the transaction, not from untrusted radio data.
     // PairingAdapter exposes it alongside the keys to bind queued work to them.
     if (!pairing_.activeSalt(transport.sender, frame.salt)) return ReceiveStatus::UnknownNode;
     if (!history.frames || memcmp(history.salt, frame.salt, sizeof(history.salt)) != 0) {
-        history.frames.reset(new (std::nothrow) replay::AcceptanceHistory);
-        if (!history.frames) return ReceiveStatus::StorageError;
+        if (!history.frames) {
+            history.frames.reset(new (std::nothrow) replay::AcceptanceHistory);
+            if (!history.frames) return ReceiveStatus::StorageError;
+            ++allocatedHistories_;
+        }
         memcpy(history.salt, frame.salt, sizeof(history.salt));
         history.frames->begin(now);
     }
@@ -68,6 +91,8 @@ ReceiveStatus RadioAdapter::receive(s::Transport transport, uint8_t* wire, size_
     } else if (frame.decision.action == replay::Action::Duplicate && cached) {
         frame.replySize = cachedSize;
     }
+    frame.retryCommandReady = frame.decision.action == replay::Action::Duplicate &&
+        header == f::kCommandReadyHeader && !cached;
     return ReceiveStatus::Ok;
 }
 

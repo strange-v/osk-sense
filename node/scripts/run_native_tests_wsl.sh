@@ -37,6 +37,7 @@ if wanted test_security_service; then
 output="/tmp/radiosensors_test_security_service"
 g++ "${flags[@]}" -Itest/test_security_service/fakes -Ilib/Drivers/include \
     -DNODE_RADIO_MAX_POWER_LEVEL=15 -DNODE_RFM69_FREQUENCY=RF69_868MHZ \
+    -DNODE_TICK_MS=250 -DNODE_MIN_TRANSMIT_MILLIVOLTS=2000 \
     test/test_security_service/test_main.cpp \
     lib/NodeCore/src/CommissioningService.cpp lib/NodeCore/src/NodeRadio.cpp \
     ../shared/RadioProtocol/src/RadioCrypto.cpp \

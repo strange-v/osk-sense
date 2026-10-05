@@ -16,13 +16,14 @@ const state = vi.hoisted(() => ({
   tokens: [] as ApiToken[],
   role: 'admin' as 'admin' | 'viewer',
   tokensFail: false,
+  registryReady: true,
   radioCounters: { failed_tags: 0, replay_frames: 0, activation_challenges: 0 },
 }))
 const health = () => ({
   status: 'ok', firmware: '2.1.0',
   ethernet: { has_ip: true, ip: '192.168.1.10', state: 'connected' },
   radio: { present: true, frequency_hz: 868_000_000, network_id: 137, counters: { ...state.radioCounters } },
-  storage: { ready: true }, registry: { records: 1, generation: 4 },
+  storage: { ready: true }, registry: { ready: state.registryReady, records: 1, generation: 4 },
   telemetry: { nodes_seen: 1, updates: 3 },
   time: { state: 'synchronized', unix_ms: 1_700_000_000_000, last_sync_ms: 1_700_000_000_000 },
   websocket: { clients: state.clients, connections: 2, messages_sent: 512, messages_dropped: 0 },
@@ -67,6 +68,7 @@ beforeEach(() => {
   state.tokens = []
   state.role = 'admin'
   state.tokensFail = false
+  state.registryReady = true
   state.radioCounters = { failed_tags: 0, replay_frames: 0, activation_challenges: 0 }
   vi.clearAllMocks()
   gatewayApi.poll.status.mockImplementation(async () => health())
@@ -78,6 +80,13 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('StatusView clients card', () => {
+  it('marks radio storage unavailable even when configuration storage is ready', async () => {
+    state.registryReady = false
+    const wrapper = await mountView()
+    const storage = wrapper.findAll('.health-list > div').find((row) => row.get('dt').text() === en.status.storage)
+    expect(storage?.get('strong').text()).toBe(en.common.attention)
+    wrapper.unmount()
+  })
   it('shows radio security counts, including zero, without treating past events as a current failure', async () => {
     state.radioCounters = { failed_tags: 7, replay_frames: 0, activation_challenges: 12 }
     const wrapper = await mountView()

@@ -1,4 +1,4 @@
-param([ValidateSet('counter_reed','binary','binary_sht40','climate_tmp112')][string]$Environment = 'counter_reed')
+param([ValidateSet('counter_reed','binary','binary_sht40','climate_tmp112','counter_reed_debug','binary_debug','binary_sht40_debug','climate_tmp112_debug')][string]$Environment = 'counter_reed')
 $ErrorActionPreference = 'Stop'
 $nodeRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 Push-Location $nodeRoot

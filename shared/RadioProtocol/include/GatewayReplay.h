@@ -69,13 +69,20 @@ public:
     void accepted(uint64_t now);
 private:
     void expire(uint64_t now);
-    uint32_t times_[kMaxWindow]{};
+    uint32_t timeAt(uint16_t index) const;
+    void setTime(uint16_t index, uint32_t time);
+    // A timestamp modulus greater than two days preserves exact expiry when
+    // consecutive observations are less than a day apart.
+    static constexpr uint8_t kTimeBits = 18;
+    static constexpr uint32_t kTimeMask = (1UL << kTimeBits) - 1;
+    uint8_t times_[kMaxWindow * kTimeBits / 8]{};
     uint64_t startedAt_ = 0;
     uint64_t lastAt_ = 0;
     uint16_t head_ = 0;
     uint16_t count_ = 0;
     bool initialized_ = false;
 };
+static_assert(sizeof(AcceptanceHistory) <= 600, "acceptance history RAM budget");
 
 enum class Action : uint8_t {
     Accept, Duplicate, CounterFloor, Challenge, Exhausted, StorageError, InvalidSlot
@@ -95,6 +102,9 @@ public:
     // A present record cannot be reset; key replacement first forgets its slot.
     bool initializeFreshKeys(size_t slot);
     bool forget(size_t slot);
+    // Non-mutating check for a repeat that inspect() would classify Duplicate.
+    // Call only after authenticating the frame and selecting its key slot.
+    bool isDuplicate(size_t slot, uint32_t counter) const;
     // Call only after authenticating the complete frame and selecting its key slot.
     // An activation supplies the clear challenge covered by that frame's tag.
     // Publish only on Accept; Duplicate may only re-ACK or send a cached reply.

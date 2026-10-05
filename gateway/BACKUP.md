@@ -10,10 +10,10 @@
 | Included | Excluded |
 | --- | --- |
 | Hostname, mDNS, NTP, setup/pairing durations | Users, password hashes, API tokens, sessions |
-| Node UID/ID, profile, firmware metadata, state, nonce, name, power policy, V3 pairing transaction and per-node keys | Command book, telemetry and replay bounds |
+| Active/disabled node UID/ID, profile, firmware metadata, state, nonce, name, power policy, V3 pairing transaction and per-node keys | Pending nodes, command book, telemetry and replay bounds |
 | Radio network ID, device secret | Firmware, Web UI, OTA password, MAC, DHCP lease |
 
-Restoring the radio credentials and registry avoids re-pairing nodes present in the backup. The device secret preserves `gateway_id`. A backup cannot recover later changes; a node whose credentials changed after export may need pairing again. Lost backup passwords cannot be recovered.
+Restoring the radio credentials and registry avoids re-pairing nodes present in the backup. Pending nodes are excluded and need pairing again after restore, even if they completed pairing after export. The device secret preserves `gateway_id`. A backup cannot recover later changes; a node whose credentials changed after export may need pairing again. Lost backup passwords cannot be recovered.
 
 ## Factory reset
 
@@ -65,10 +65,10 @@ Maximum file size: **34,876 bytes**. Multibyte header integers are little-endian
 
 Each export uses hardware randomness for salt and nonce. The KDF runs through the password-hash worker; parsing happens only after GCM authentication succeeds. On Waveshare it dominates each request: export takes about 6.4 s, preview 5.8 s and restore 7.3 s, which adds the new admin's password hash. The web server answers nothing else meanwhile. No plaintext backup is written to flash. This protects the backup file, not HTTP traffic: use the gateway only on the trusted private LAN described in [API.md](API.md#security-and-backup).
 
-Payload keys are `version` (`3`), `created_at_ms` (UTC milliseconds, zero if unavailable), `settings`, `network_id`, `device_secret`, `nodes`. Keys and UIDs are lowercase hexadecimal. Settings contain `hostname`, `mdns`, `ntp`, `pairing_seconds`, `setup_seconds`, `servers`. Each node contains `uid`, `id`, `profile`, `firmware` (three integers), `state` (1 pending, 2 active, 3 disabled), `nonce`, `name`, `max_power`, `power_policy`, `replay_slot`, `pairing` (123-byte transaction snapshot, including per-node keys, as hexadecimal). Values obey [storage limits](STORAGE.md); unknown nonzero profile IDs are preserved. Different container/payload versions are rejected.
+Payload keys are `version` (`3`), `created_at_ms` (UTC milliseconds, zero if unavailable), `settings`, `network_id`, `device_secret`, `nodes`. Keys and UIDs are lowercase hexadecimal. Settings contain `hostname`, `mdns`, `ntp`, `pairing_seconds`, `setup_seconds`, `servers`. Each node contains `uid`, `id`, `profile`, `firmware` (three integers), `state` (2 active, 3 disabled), `nonce`, `name`, `max_power`, `power_policy`, `replay_slot`, `pairing` (123-byte transaction snapshot, including per-node keys, as hexadecimal). Values obey [storage limits](STORAGE.md); unknown nonzero profile IDs are preserved. Pending records and different container/payload versions are rejected.
 
-Restoring excludes replay bounds. Once gateway V3 radio integration is complete,
-each active V3 node must receive a fresh challenge and return an Activation report;
+Restoring excludes replay bounds. Each active V3 node must receive a fresh
+challenge and return an Activation report;
 it needs a working reverse link before its telemetry can be published.
 
 ## Interrupted operations

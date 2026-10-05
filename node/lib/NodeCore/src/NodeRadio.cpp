@@ -90,13 +90,20 @@ bool NodeRadio::sendAcknowledged(
             }
             synced = sync;
             if (!radio_.ACKReceived(gatewayId)) continue;
-            // The acknowledgement stays in DATA until the radio receives
-            // again.
-            if (radio_.TARGETID != address_ || radio_.control != 0x80 ||
-                !security::openAck(mac,receivedTransport(),counter,
-                                   radio_.DATA,radio_.DATALEN,ack)) continue;
-            downlinkRssi = rssi;
+            const security::Transport transport = receivedTransport();
+            const uint8_t ackSize = radio_.DATALEN;
+            uint8_t encoded[security::kMaxAckPayloadSize + security::kGatewayTagSize];
+            if (transport.target != address_ || transport.control != 0x80 ||
+                ackSize > sizeof(encoded)) continue;
+            memcpy(encoded, radio_.DATA, ackSize);
+            // Tag verification must not keep the radio in standby.
             radio_.sleep();
+            if (!security::openAck(mac, transport, counter, encoded, ackSize, ack)) {
+                synced = false;
+                rssi = protocol::kNoDownlinkRssi;
+                continue;
+            }
+            downlinkRssi = rssi;
             return true;
         }
     }

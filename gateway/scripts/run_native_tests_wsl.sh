@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds and runs the native backup/recovery, gzip and release manifest tests. Pinned Mbed TLS and
+# Builds and runs registry/radio, backup/recovery, gzip and release manifest tests. Pinned Mbed TLS and
 # ArduinoJson are downloaded once into a cache on the Linux filesystem, where
 # compiling Mbed TLS is much faster than on a /mnt/c checkout.
 set -euo pipefail
@@ -8,9 +8,12 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 gateway_dir="$(cd "${script_dir}/.." && pwd)"
 cd "${gateway_dir}"
 
-if (( $# > 1 )) || [[ "${1:-}" != "" && "${1:-}" != "--backup" ]]; then
-    echo "Usage: $0 [--backup]" >&2
+if (( $# > 1 )) || [[ "${1:-}" != "" && "${1:-}" != "--backup" && "${1:-}" != "--registry-radio" ]]; then
+    echo "Usage: $0 [--backup|--registry-radio]" >&2
     exit 2
+fi
+if [[ "${1:-}" == "--registry-radio" ]]; then
+    exec bash "${script_dir}/run_registry_radio_tests_wsl.sh"
 fi
 
 mbedtls_version=3.6.3
@@ -88,6 +91,8 @@ if [[ -z "${node_command}" ]]; then
 fi
 "${node_command}" test/native/check_interop.mjs "${fixture}"
 if [[ "${1:-}" == "--backup" ]]; then exit 0; fi
+
+bash "${script_dir}/run_registry_radio_tests_wsl.sh"
 
 # The gateway uses the miniz inflater in the ESP32 ROM; the native build uses
 # the miniz release.

@@ -210,7 +210,7 @@ Node                                          Gateway
 | --- | --- |
 | The gateway has no frame counter of its own: every gateway frame answers a node frame and uses that frame's counter with direction 1 | No gateway counter state per node |
 | Command ready, Command, and No command lose `session_nonce` | c1 binds the session; a reply from an older session fails its tag |
-| A repeated Command ready (same c1, same bytes) gets the cached reply bytes, never a newly built reply. The cache holds one reply per node in RAM until the gateway accepts that node's next frame. | A changed queue would otherwise put new content under the same nonce |
+| A repeated Command ready (same c1, same bytes) gets the cached reply bytes. If no reply has been cached yet, it retries the session handler. The cache holds one reply per node in RAM until the gateway accepts that node's next frame. | A changed queue cannot replace a reply already sealed under the same nonce; storage contention before sealing does not strand the session |
 | After a restart the gateway answers a repeated c1 with `counter_floor`, not with a reply | Its floor is then above every counter it answered before the restart ([Gateway bound](#gateway-bound)), so a second reply under the same c1 cannot exist; the node moves on and sends a new Command ready |
 | An unactivated node after a [backup restore](#backup-restore) gets no reply to Command ready | Its counters are not yet known to be fresh |
 | Command result uses the node's next counter c2 and carries `command_id` | An old result fails the counter check |
@@ -344,6 +344,10 @@ policy. `Guard::inspect()` runs after tag verification: only `Accept` permits
 publication, while `Duplicate` permits re-ACK or a cached command reply.
 `AcceptanceHistory` counts accepted frames in the trailing 24 hours using
 monotonic uptime; M is 256 until a full day has been observed, then 1..256.
+Its 256 timestamps use packed 18-bit seconds, with exact 24-hour expiry across
+wraps; a history occupies at most 600 bytes. Histories are allocated for nodes
+that receive authenticated traffic and released when their slots stop being
+active. The 64-node history budget is at most 38,400 bytes plus allocator overhead.
 
 The blob must validate at load. Missing or invalid bounds make every node with
 existing keys unactivated. A replacement is committed and read back before
@@ -354,7 +358,7 @@ refuses to reset a present record.
 
 ### Backup restore
 
-A backup keeps node keys and metadata, so restoring needs no re-pairing. It does not keep the bound records: a stored bound would let frames accepted after the backup, or after an earlier restore of the same backup, look fresh again. A restored node therefore has valid keys and no bound record, which makes it unactivated; the state survives any number of gateway restarts until activation stores H.
+A backup keeps active/disabled node keys and metadata, so restoring those nodes needs no re-pairing. Pending nodes are excluded and import rejects Pending records: their keys may already have been used after export, so restoring an unfinished pairing transaction cannot safely initialize fresh replay state. Those nodes need pairing again. A backup does not keep the bound records: a stored bound would let frames accepted after the backup, or after an earlier restore of the same backup, look fresh again. A restored node therefore has valid keys and no bound record, which makes it unactivated; the state survives any number of gateway restarts until activation stores H.
 
 The Activation report is a frame kind that carries its challenge in clear, so the gateway can check it whether or not it still remembers the challenge:
 
@@ -415,18 +419,18 @@ megaTinyCore 2.6.7 and the 4 MHz internal clock.
 
 | V3 profile | Flash | Free Flash | Static RAM |
 | --- | ---: | ---: | ---: |
-| `counter_reed` | 20 831 | 11 937 | 764 |
-| `climate_tmp112` | 20 822 | 11 946 | 815 |
-| `binary_sht40` | 20 685 | 12 083 | 799 |
-| `binary` | 18 809 | 13 959 | 710 |
-| `counter_reed_debug` | 22 850 | 9918 | 915 |
-| `climate_tmp112_debug` | 22 718 | 10 050 | 966 |
-| `binary_sht40_debug` | 23 050 | 9718 | 950 |
-| `binary_debug` | 20 812 | 11 956 | 861 |
+| `counter_reed` | 20 881 | 11 887 | 764 |
+| `climate_tmp112` | 20 860 | 11 908 | 815 |
+| `binary_sht40` | 20 723 | 12 045 | 799 |
+| `binary` | 18 847 | 13 921 | 710 |
+| `counter_reed_debug` | 22 900 | 9868 | 915 |
+| `climate_tmp112_debug` | 22 756 | 10 012 | 966 |
+| `binary_sht40_debug` | 23 088 | 9680 | 950 |
+| `binary_debug` | 20 850 | 11 918 | 861 |
 
 Run `node/scripts/probe_v3_size.ps1 -Environment counter_reed` from PowerShell;
-the other release environment names select their own composition roots.
-The script builds the actual release environment, including RTC entropy
+the other release and debug environment names select their composition roots.
+The script builds the selected environment, including RTC entropy
 collection, and inspects its ELF without uploading. The MCU's memory limits
 apply unchanged. Flash includes `.text`, `.rodata` and `.data`.
 
