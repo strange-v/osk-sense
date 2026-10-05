@@ -45,6 +45,10 @@ pio run -e climate_tmp112 -t fuses
 
 ## Runtime composition
 
+Node radio traffic uses V3 software CTR/CMAC and persistent frame counters.
+Gateway V3 integration is pending. All release profiles exceed ATtiny1614 Flash;
+sizes and the inspection command are in [V3-SECURITY.md](../protocol/V3-SECURITY.md#flash).
+
 Each environment compiles exactly one composition root from `src/` through `build_src_filter`. `NodeRuntime<Profile>` owns commissioning, the provisioning button, radio retry backoff, supply-voltage measurement, and sleep. The profile class in `include/Profiles/` owns acquisition, report scheduling, and payload encoding; the contract is documented in `NodeRuntime.h`. Profiles are template parameters, not virtual interfaces, because avr-gcc keeps vtables in RAM.
 
 `NODE_TICK_MS` selects the RTC PIT wake period: 32 s for periodic images, 250 ms for polled inputs.
@@ -118,7 +122,7 @@ The solar climate image has no finite charge to spare: a drained supercapacitor 
 
 ## Command sessions
 
-An active node opens a command session when its button is short-pressed, or when a telemetry acknowledgement carries the command-pending flag ([PROTOCOL.md](../protocol/PROTOCOL.md)). It sends Command ready, listens 250 ms for the answer, and repeats up to three times with the same nonce. Input polling pauses meanwhile, as during a commissioning window.
+An active node opens a command session when its button is short-pressed, or when an authenticated telemetry acknowledgement carries the command-pending flag. It sends Command ready, listens 250 ms for the answer, and repeats the exact frame up to three times with the same counter. Replies must authenticate against that counter before a command runs. Input polling pauses meanwhile, as during a commissioning window.
 
 | Command | Handled by | Effect |
 | --- | --- | --- |
@@ -134,7 +138,7 @@ Sessions started by the flag are limited to one per five minutes, and after one 
 | I2C sensor read fails | The TWI0 bus is freed (up to nine SCL clocks, then STOP), the sensor is put back into its sleep state or reset, and the read is repeated once. A report whose read fails twice carries the invalid-value sentinel. |
 | Radio or sensor work hangs | A watchdog armed only around startup, reports, command sessions, and commissioning attempts resets the MCU after 8 s. It is off in sleep and on radio-free ticks, which keeps the idle current unchanged. |
 | RFM69 fails to initialize | Software restart 5 minutes after boot. A node without network configuration or factory credentials does not restart. |
-| RFM69 loses its registers while the MCU runs | Before each report, command session, and commissioning attempt the node reads back the frequency, the AES flag, and the network sync byte. On a mismatch it reinitializes the module and reapplies its key and power level; if that fails too, the exchange is skipped and counts as unacknowledged. |
+| RFM69 loses its registers while the MCU runs | Before each report, command session, and commissioning attempt the node reads back the frequency, the AES flag, and the network sync byte. On a mismatch it reinitializes the module, disables hardware AES and reapplies its power level; if that fails too, the exchange is skipped and counts as unacknowledged. |
 
 Debug builds log `tmp fail`, `rst wdt` after a watchdog reset, `rst rf` before a radio restart, and `rf lost` before a register repair.
 
@@ -142,7 +146,7 @@ Debug builds log `tmp fail`, `rst wdt` after a watchdog reset, `rst rf` before a
 
 Network configuration uses two CRC-protected generation slots. Counter state uses a separate wear-levelled journal, and accepted `SET_COUNT` results have recoverable slots. Exact layouts are in [EEPROM.md](EEPROM.md).
 
-Radio frame and telemetry payload bytes are defined only in [../protocol/PROTOCOL.md](../protocol/PROTOCOL.md). Profile IDs describe measurements, not installation labels.
+V3 radio frames are defined in [V3-SECURITY.md](../protocol/V3-SECURITY.md); telemetry payloads are defined in [PROTOCOL.md](../protocol/PROTOCOL.md). Profile IDs describe measurements, not installation labels.
 
 ## Native tests
 

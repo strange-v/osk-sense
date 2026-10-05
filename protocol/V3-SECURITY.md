@@ -12,16 +12,18 @@ Implementation status:
 | V3 crypto vectors | `protocol-vectors.json`, checked independently with Node.js AES |
 | Pairing and command wire codecs | Implemented in `RadioSecurityFrames`; authenticated join codecs, nonce-free command payloads, counter-bound reply decoding and independent wire vectors |
 | Immutable command reply cache | Implemented in `GatewayReplay`; exact bytes per node/counter, discarded on the next accepted frame or restart |
-| Release Flash flags and RFM69 fork | Configured; all four release images build |
-| Pairing entropy | [Hardware capture measurements](../node/crypto_bench/ENTROPY.md); source qualification and runtime health checks pending |
+| Release Flash flags and RFM69 fork | Configured; all four pure V3 profiles exceed the ATtiny1614 Flash limit; see [Flash](#flash) |
+| Pairing entropy | RTC/TCB0 hardware collection integrated; extractor, health guards and CMAC conditioning tested on [captured and synthetic data](../node/crypto_bench/ENTROPY.md); source qualification pending |
 | Pairing transactions | Gateway `PairingTransaction` persists replies and derived keys before sending; node `RadioSecurityPairing` pins salt in EEPROM before confirm; native restart, corruption and write-interruption tests; registry adapter pending |
-| Node and gateway radio integration and command sessions | Pending |
-| EEPROM configuration and node counter reservations | Implemented in `node/lib/NodeCore/include/RadioSecurityStorage.h`; native interruption/overflow tests and AVR build; runtime integration pending |
+| Node radio integration and command sessions | V3 pairing, telemetry, activation, authenticated ACKs and counter-bound command sessions integrated; native service tests cover retries, restart and failures |
+| Gateway radio integration and command sessions | Pending |
+| EEPROM configuration and node counter reservations | Integrated in the node runtime; native interruption, overflow and service tests |
 | Gateway bounds and backup activation | Implemented in `shared/RadioProtocol/GatewayReplay`, with `gateway/ReplayBoundStorage` NVS adapter and recovery erasure; native replay/activation/interruption tests; radio integration pending |
 | Failed-tag UI counters | Pending |
 
-The operational radio protocol is version 2. The shared V3 security module is
-not connected to the node or gateway radio services.
+The node radio service uses V3. The gateway radio service uses V2 and cannot
+communicate with these node images. Gateway integration and the node Flash
+budget remain blockers for a working V3 system.
 
 | Area | Change |
 | --- | --- |
@@ -396,25 +398,30 @@ the bench and Arduino core. It does not write EEPROM with its default zero sink.
 
 `lib_deps` points to the `no-readallregs` branch of the strange-v/RFM69 fork, and release environments define `RF69_NO_READALLREGS`. Without it `readAllRegs()` links `Serial`, UART0, and its interrupt vectors into images that never use them.
 
-| Image | Today | `RF69_NO_READALLREGS` and `-mcall-prologues` |
-| --- | ---: | ---: |
-| `counter_reed` | 14 832 | 13 538 |
-| `climate_tmp112` | 14 529 | 13 425 |
-| `binary_sht40` | 14 476 | 13 332 |
-| `binary` | 12 592 | 11 510 |
+| Pure V3 release profile | Flash | Excess over 16 384 | Static RAM |
+| --- | ---: | ---: | ---: |
+| `counter_reed` | 20 971 | 4587 | 770 |
+| `climate_tmp112` | 20 918 | 4534 | 821 |
+| `binary_sht40` | 20 779 | 4395 | 805 |
+| `binary` | 18 949 | 2565 | 716 |
 
-`counter_reed` keeps about 1.1 KB after the crypto and its glue. RAM is checked on the complete image, with its stack headroom. Debug images use `Serial` themselves and do not fit; see [open decisions](#open-decisions).
+Run `node/scripts/probe_v3_size.ps1 -Environment counter_reed` from PowerShell;
+the other release environment names select their own composition roots.
+The probe links the actual release sources, including RTC entropy collection,
+and produces an ELF and map for inspection. Only the linker region expands;
+PlatformIO retains the MCU's 16 KiB check and rejects every profile above.
+No image is uploaded. Flash includes `.text`, `.rodata` and `.data`.
+
+Static RAM leaves 1227–1332 bytes for stack and dynamic state. Peak stack usage
+is unverified: this AVR toolchain produces empty `-fstack-usage` reports with
+LTO. A final fitting image still needs a stack high-water measurement.
 
 ## Open decisions
 
 ### Debug images
 
-| Image | Today | Free | With crypto (estimate) |
-| --- | ---: | ---: | ---: |
-| `binary_sht40_debug` | 16 209 | 175 | about 17.5 KB |
-| `counter_reed_debug` | 16 121 | 263 | about 17.4 KB |
-| `climate_tmp112_debug` | 15 773 | 611 | about 17.1 KB |
-| `binary_debug` | 13 883 | 2 501 | about 15.2 KB |
+Debug images include `Serial` and require their own complete V3 size checks
+after the release profiles fit.
 
 | Option | Cost |
 | --- | --- |

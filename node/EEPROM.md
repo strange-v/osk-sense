@@ -19,12 +19,14 @@ The chip UID is never duplicated in writable memory; firmware and the provisioni
 
 ## Common nodes
 
-All node profiles reserve two independently validated 32-byte network configuration slots:
+All node profiles reserve two configuration slots and two frame-counter reserves:
 
 | Address | Size | Purpose |
 | --- | ---: | --- |
-| `0x00..0x1F` | 32 | Network configuration slot A |
-| `0x20..0x3F` | 32 | Network configuration slot B |
+| `0x00..0x19` | 26 | Network configuration slot A |
+| `0x1A..0x1F` | 6 | Frame-counter reserve A |
+| `0x20..0x39` | 26 | Network configuration slot B |
+| `0x3A..0x3F` | 6 | Frame-counter reserve B |
 | `0x40..0xFF` | 192 | Profile-owned or unused |
 
 Each network configuration slot has this exact format:
@@ -32,20 +34,28 @@ Each network configuration slot has this exact format:
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 2 | Magic `RN` |
-| 2 | 1 | Storage schema version (`2`) |
+| 2 | 1 | Storage schema version (`3`) |
 | 3 | 1 | Wrapping generation |
 | 4 | 1 | Provisioning state: `1` provisional, `2` active |
 | 5 | 1 | Node ID |
 | 6 | 1 | Gateway ID |
 | 7 | 1 | Network ID |
-| 8 | 16 | Installation key |
-| 24 | 4 | Request nonce, little-endian |
-| 28 | 2 | Reserved, zero |
-| 30 | 2 | CRC16-CCITT over bytes 0..29, little-endian |
+| 8 | 8 | Per-node derivation salt |
+| 16 | 8 | Request nonce, little-endian |
+| 24 | 2 | CRC16-CCITT over bytes 0..23, little-endian |
 
 Profile ID, firmware version, sensor selection, pins, reporting intervals, and the transmit power ceiling are compile-time values and are not stored here. The radio power level and fallback flag are held only in RAM, so adapting the level never writes EEPROM ([README.md](README.md#radio-power)).
 
 Saving always targets the older/inactive slot. Its magic is invalidated first, the payload and CRC are written next, and the two magic bytes are committed last. On boot, both slots are validated and the newest generation is selected, including across the 8-bit generation wrap.
+
+Configuration commits and resets are read back before success. The factory key
+and stored salt derive the session keys at boot.
+
+Each reserve stores a four-byte little-endian bound followed by CRC16-CCITT.
+The node reserves 1024 counters before transmission and skips the reserved
+range after restart. Retries retain the same counter and bytes. If both reserves
+are invalid with a configuration present, the node discards the configuration
+and pairs again. See [counter persistence](../protocol/V3-SECURITY.md#counter-persistence).
 
 Network factory reset invalidates only the two common configuration slots. It does not modify USERROW or profile-owned EEPROM.
 
