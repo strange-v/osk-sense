@@ -10,6 +10,8 @@ Implementation status:
 | --- | --- |
 | Shared AES, key derivation, CTR/CMAC frame, ACK and join authentication | Implemented in `shared/RadioProtocol`; native known answers and bit-tampering tests |
 | V3 crypto vectors | `protocol-vectors.json`, checked independently with Node.js AES |
+| Pairing and command wire codecs | Implemented in `RadioSecurityFrames`; authenticated join codecs, nonce-free command payloads, counter-bound reply decoding and independent wire vectors |
+| Immutable command reply cache | Implemented in `GatewayReplay`; exact bytes per node/counter, discarded on the next accepted frame or restart |
 | Release Flash flags and RFM69 fork | Configured; all four release images build |
 | Pairing entropy | [Hardware capture measurements](../node/crypto_bench/ENTROPY.md); source qualification and runtime health checks pending |
 | Node and gateway radio integration, pairing transactions and command sessions | Pending |
@@ -42,6 +44,11 @@ for key derivation, report sealing, ACK verification, join authentication and
 gateway reply decryption. Its image is 2755 bytes of Flash and 472 bytes of
 static RAM; `size_empty` is 492 bytes of Flash. The difference is 2263 bytes,
 including the exercised frame glue; complete firmware still needs a size check.
+
+`size_security_frames` exercises the node-side pairing and command codecs,
+including counter-bound reply verification and shared crypto: 3726 bytes of
+Flash and 456 bytes of static RAM with the Arduino core. It does not include
+the complete radio, ACK, storage or profile paths.
 
 | Cost on ATtiny1614 at 4 MHz | Value |
 | --- | ---: |
@@ -161,6 +168,22 @@ A replayed ACK can only repeat an earlier ACK for the same counter, which happen
 
 ## Commands
 
+`RadioSecurityFrames` encodes command payloads without `session_nonce`.
+`openCommandReply()` requires the current Command ready counter before decoding
+an authenticated Command or No command. The gateway's `Guard` caches one sealed
+reply per node: caching different bytes under the same counter fails; a new
+accepted frame or restart discards the cache.
+
+| Payload | Layout | Bytes |
+| --- | --- | ---: |
+| Command ready, No command | Empty | 0 |
+| Command | `command_id` LE16, type, arguments | 3..11 |
+| Command result | `command_id` LE16, status, result data | 3..11 |
+
+Command ID is nonzero. Unknown command types remain representable for an
+Unsupported result; status values are 0..3. Arguments and result data each
+have an 8-byte limit.
+
 ```text
 Node                                          Gateway
   |-- report (c0) ----------------------------->|
@@ -183,6 +206,20 @@ Node                                          Gateway
 | Redelivery stays as today | A `command_id` equal to the recorded one returns the stored result without applying again |
 
 ## Pairing
+
+`RadioSecurityFrames` seals and verifies the complete join messages. Decoders
+authenticate before assigning output fields. UID is 10 bytes and
+`request_nonce` is unsigned LE64; profile ID is LE16.
+
+| Frame | Body after header | On-air bytes, including tag |
+| --- | --- | ---: |
+| Join request | UID, nonce, profile ID, firmware major/minor/patch, power ceiling | 33 |
+| Join accept | UID, nonce, salt, assigned node ID, network ID | 35 |
+| Join confirm | UID, nonce | 27 |
+| Join complete | UID, nonce | 25 |
+
+The gateway ID comes from the authenticated transport sender. Assigned node IDs
+are 1..99, network ID is nonzero, and transmit power ceiling is 0..31.
 
 Join frames are not encrypted: nothing in them is secret, so pairing uses no CTR and cannot reuse a keystream. Every join frame carries a tag.
 

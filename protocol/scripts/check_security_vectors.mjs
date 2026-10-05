@@ -55,6 +55,20 @@ const replyTransport = Buffer.from([7, 100, 0])
 const command = ciphertext(0x64, 1)
 const confirm = bytes('630102030405060708090a7876541200010203')
 const confirmTag = cmac(mac, Buffer.concat([confirm.subarray(0, 1), Buffer.from([100,7,0]), confirm.subarray(1), salt]))
+const join = (rawHex, key, transport, tagSize, implicitSalt = Buffer.alloc(0)) => {
+  const raw = bytes(rawHex)
+  const auth = cmac(key, Buffer.concat([raw.subarray(0, 1), transport, raw.subarray(1), implicitSalt]))
+  return Buffer.concat([raw, auth.subarray(0, tagSize)]).toString('hex')
+}
+const joinUp = Buffer.from([100, 0, 0])
+const joinDown = Buffer.from([0, 100, 0])
+const identity = '000102030405060708097856341201020304'
+const applicationReply = (header, payloadHex, direction, transport, tagSize) => {
+  const payload = bytes(payloadHex)
+  const encrypted = xor(payload, encrypt(enc, nonce(header, direction)).subarray(0, payload.length))
+  return Buffer.concat([Buffer.from([header]), counter, encrypted,
+    tag(header, transport, encrypted).subarray(0, tagSize)]).toString('hex')
+}
 const result = {
   factory_key: factory.toString('hex'), salt: salt.toString('hex'),
   encryption_key: enc.toString('hex'), authentication_key: mac.toString('hex'),
@@ -64,7 +78,27 @@ const result = {
   ack_floor: Buffer.concat([ack, tag(0x7f, downlink, ack).subarray(0, 6)]).toString('hex'),
   command: Buffer.concat([Buffer.from([0x64]), counter, command, tag(0x64, replyTransport, command).subarray(0, 6)]).toString('hex'),
   join_confirm: Buffer.concat([confirm, confirmTag.subarray(0, 8)]).toString('hex'),
+  pairing_request: join('61' + identity + '06000102031f', factory, joinUp, 8),
+  pairing_accept: join('62' + identity + salt.toString('hex') + '077b', factory, joinDown, 6),
+  pairing_confirm: join('63' + identity, mac, joinUp, 8, salt),
+  pairing_complete: join('67' + identity, mac, joinDown, 6, salt),
+  session_command: applicationReply(0x64, '34120144332211', 1, replyTransport, 6),
+  session_result: applicationReply(0x65, '3412004433221188776655', 0, transport, 8),
+  session_ready: applicationReply(0x68, '', 0, transport, 8),
+  session_no_command: applicationReply(0x69, '', 1, replyTransport, 6),
+}
+if (process.argv.includes('--print')) {
+  console.log(JSON.stringify(result, null, 2))
+  process.exit(0)
 }
 const vectors = JSON.parse(readFileSync(new URL('../protocol-vectors.json', import.meta.url), 'utf8'))
 assert.deepEqual(result, vectors.crypto_v3)
-console.log('Validated V3 KDF, telemetry, activation, ACK, command and Join confirm against independent AES/CMAC.')
+const manifest = JSON.parse(readFileSync(new URL('../protocol-manifest.json', import.meta.url), 'utf8'))
+assert.deepEqual(manifest.security_v3, {
+  protocol_major: 3, node_tag_bytes: 8, gateway_tag_bytes: 6, counter_bytes: 4,
+  counter_encoding: 'uint32_le', activation_header: 106, ack_logical_header: 127,
+  max_wire_bytes: 61, max_ack_payload_bytes: 10, salt_bytes: 8, request_nonce_bytes: 8,
+  join_wire_sizes: { request: 33, accept: 35, confirm: 27, complete: 25 },
+  command_payload: { envelope_bytes: 3, max_bytes: 11, ready_bytes: 0, no_command_bytes: 0 },
+})
+console.log('Validated V3 manifest, KDF, secure frames, pairing and command sessions against independent AES/CMAC.')

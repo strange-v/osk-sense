@@ -19,9 +19,12 @@
         "ack_logical_header": { "const": 127 },
         "max_wire_bytes": { "const": 61 },
         "max_ack_payload_bytes": { "const": 10 },
-        "salt_bytes": { "const": 8 }
+        "salt_bytes": { "const": 8 },
+        "request_nonce_bytes": { "const": 8 },
+        "join_wire_sizes": { "const": { "request": 33, "accept": 35, "confirm": 27, "complete": 25 } },
+        "command_payload": { "const": { "envelope_bytes": 3, "max_bytes": 11, "ready_bytes": 0, "no_command_bytes": 0 } }
       },
-      "required": ["protocol_major", "node_tag_bytes", "gateway_tag_bytes", "counter_bytes", "counter_encoding", "activation_header", "ack_logical_header", "max_wire_bytes", "max_ack_payload_bytes", "salt_bytes"],
+      "required": ["protocol_major", "node_tag_bytes", "gateway_tag_bytes", "counter_bytes", "counter_encoding", "activation_header", "ack_logical_header", "max_wire_bytes", "max_ack_payload_bytes", "salt_bytes", "request_nonce_bytes", "join_wire_sizes", "command_payload"],
       "additionalProperties": false
     },
     "crypto_v3": {
@@ -39,9 +42,17 @@
         "activation": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
         "ack_floor": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
         "command": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
-        "join_confirm": { "type": "string", "pattern": "^([0-9a-f]{2})+$" }
+        "join_confirm": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
+        "pairing_request": { "type": "string", "pattern": "^[0-9a-f]{66}$" },
+        "pairing_accept": { "type": "string", "pattern": "^[0-9a-f]{70}$" },
+        "pairing_confirm": { "type": "string", "pattern": "^[0-9a-f]{54}$" },
+        "pairing_complete": { "type": "string", "pattern": "^[0-9a-f]{50}$" },
+        "session_command": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
+        "session_result": { "type": "string", "pattern": "^([0-9a-f]{2})+$" },
+        "session_ready": { "type": "string", "pattern": "^[0-9a-f]{26}$" },
+        "session_no_command": { "type": "string", "pattern": "^[0-9a-f]{22}$" }
       },
-      "required": ["factory_key", "salt", "encryption_key", "authentication_key", "counter", "node_id", "gateway_id", "plaintext", "telemetry", "activation", "ack_floor", "command", "join_confirm"],
+      "required": ["factory_key", "salt", "encryption_key", "authentication_key", "counter", "node_id", "gateway_id", "plaintext", "telemetry", "activation", "ack_floor", "command", "join_confirm", "pairing_request", "pairing_accept", "pairing_confirm", "pairing_complete", "session_command", "session_result", "session_ready", "session_no_command"],
       "additionalProperties": false
     },
     "artifact_header": {

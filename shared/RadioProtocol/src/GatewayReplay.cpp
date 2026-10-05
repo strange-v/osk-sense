@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include "JoinRequest.h"
+#include "RadioSecurityFrames.h"
 
 namespace radiosensors {
 namespace replay {
@@ -13,6 +14,8 @@ constexpr size_t kBoundFlagsOffset = 20;
 constexpr size_t kBoundsOffset = 28;
 constexpr size_t kCrcOffset = kSnapshotSize - 4;
 static_assert(kBoundsOffset + kNodeSlots * 4 == kCrcOffset, "bound layout");
+static_assert(kMaxReplySize == 5 + security::frames::kMaxCommandPayloadSize + security::kGatewayTagSize,
+              "command reply cache size");
 
 uint32_t crc32(const uint8_t* data, size_t size) {
     uint32_t crc = UINT32_MAX;
@@ -220,11 +223,39 @@ Decision Guard::inspect(size_t slot, uint32_t counter, uint16_t window,
         if (!store_.save(candidate)) return Decision{Action::StorageError};
     }
     runtime.last = counter;
+    runtime.replySize = 0;
     runtime.hasLast = true;
     runtime.exhausted = counter == UINT32_MAX;
     if (!runtime.exhausted) runtime.floor = counter + 1;
     runtime.hasChallenge = false;
     return Decision{Action::Accept};
+}
+
+bool Guard::cacheReply(size_t slot, uint32_t counter, const uint8_t* wire, size_t size) {
+    if (!store_.writable() || slot >= kNodeSlots || !wire || size < 11 || size > kMaxReplySize ||
+        !((wire[0] == security::frames::kCommandHeader && size >= 14) ||
+          (wire[0] == security::frames::kNoCommandHeader && size == 11)) ||
+        protocol::readUint32Le(wire + 1) != counter)
+        return false;
+    Runtime& runtime = runtime_[slot];
+    if (!runtime.hasLast || runtime.last != counter) return false;
+    if (runtime.replySize)
+        return runtime.replySize == size && memcmp(runtime.reply, wire, size) == 0;
+    memcpy(runtime.reply, wire, size);
+    runtime.replySize = static_cast<uint8_t>(size);
+    return true;
+}
+
+bool Guard::cachedReply(size_t slot, uint32_t counter, uint8_t* output,
+                        size_t capacity, size_t& size) const {
+    size = 0;
+    if (!store_.writable() || slot >= kNodeSlots || !output) return false;
+    const Runtime& runtime = runtime_[slot];
+    if (!runtime.hasLast || runtime.last != counter || !runtime.replySize ||
+        capacity < runtime.replySize) return false;
+    memcpy(output, runtime.reply, runtime.replySize);
+    size = runtime.replySize;
+    return true;
 }
 
 }  // namespace replay

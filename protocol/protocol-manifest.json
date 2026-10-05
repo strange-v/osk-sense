@@ -12,7 +12,10 @@
     "ack_logical_header": 127,
     "max_wire_bytes": 61,
     "max_ack_payload_bytes": 10,
-    "salt_bytes": 8
+    "salt_bytes": 8,
+    "request_nonce_bytes": 8,
+    "join_wire_sizes": { "request": 33, "accept": 35, "confirm": 27, "complete": 25 },
+    "command_payload": { "envelope_bytes": 3, "max_bytes": 11, "ready_bytes": 0, "no_command_bytes": 0 }
   },
   "radio": {
     "protocol_major": 2,

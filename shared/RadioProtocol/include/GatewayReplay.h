@@ -10,6 +10,7 @@ constexpr size_t kNodeSlots = 64;
 constexpr size_t kSnapshotSize = 288;
 constexpr uint16_t kMaxWindow = 256;
 constexpr size_t kChallengeSize = 8;
+constexpr size_t kMaxReplySize = 22;
 
 enum class RecordState : uint8_t { Absent, Paired, Bound };
 struct Record {
@@ -99,6 +100,11 @@ public:
     // Publish only on Accept; Duplicate may only re-ACK or send a cached reply.
     Decision inspect(size_t slot, uint32_t counter, uint16_t window = kMaxWindow,
                      const uint8_t* activationChallenge = nullptr);
+    // Cache a sealed Command/No command after accepting Command ready.
+    // The same counter can never acquire different reply bytes.
+    bool cacheReply(size_t slot, uint32_t counter, const uint8_t* wire, size_t size);
+    bool cachedReply(size_t slot, uint32_t counter, uint8_t* output,
+                     size_t capacity, size_t& size) const;
 private:
     struct Runtime {
         uint32_t floor = 0;
@@ -107,6 +113,8 @@ private:
         bool exhausted = false;
         bool hasChallenge = false;
         uint8_t challenge[kChallengeSize]{};
+        uint8_t reply[kMaxReplySize]{};
+        uint8_t replySize = 0;
     };
     Store& store_;
     RandomSource& random_;
