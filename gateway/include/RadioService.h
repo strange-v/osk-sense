@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Arduino.h>
+#include <RadioSecurity.h>
+#include <RadioProtocol.h>
 
 namespace gateway::radio {
 
@@ -18,6 +20,11 @@ struct ReceivedFrame {
     int16_t rssi;
     bool ackRequested;
     uint32_t receivedAtMs;
+    uint16_t targetId;
+    uint8_t control;
+    radiosensors::protocol::FrameKind kind;
+    uint32_t counter;
+    uint8_t salt[radiosensors::security::kSaltSize];
 };
 
 enum class State {
@@ -26,7 +33,7 @@ enum class State {
     SpiInitializationFailed,
     InitializationFailed,
     VersionMismatch,
-    EncryptionKeyMissing,
+    NetworkMissing,
     TaskFailed,
     Receiving,
 };
@@ -51,8 +58,11 @@ struct Snapshot {
     uint32_t telemetryRejectedInactive;
     uint32_t telemetryFramesQueued;
     uint32_t telemetryFramesDropped;
-    uint32_t v2Frames;
-    uint32_t v2TelemetryFrames;
+    uint32_t v3Frames;
+    uint32_t v3TelemetryFrames;
+    uint32_t failedTags;
+    uint32_t replayFrames;
+    uint32_t activationChallenges;
     uint32_t emptyApplicationFrames;
     uint32_t unsupportedProtocolVersions;
     uint32_t unsupportedFrameKinds;
@@ -74,19 +84,18 @@ struct Snapshot {
     int16_t lastRssi;
 };
 
-// Returns true once the radio task runs. Without an installation key the radio
-// sleeps in EncryptionKeyMissing until applyInstallation() provides one.
+// Returns true once the radio task runs. Initial setup supplies its network.
 bool begin();
 bool receive(ReceivedFrame& frame, TickType_t waitTicks = 0);
 bool receiveTelemetry(ReceivedFrame& frame, TickType_t waitTicks = 0);
 // Command ready and Command result frames from active nodes.
 bool receiveSessionFrame(ReceivedFrame& frame, TickType_t waitTicks = 0);
 bool requestProfile(Profile profile);
-bool beginCommissioning(const uint8_t key[16]);
-// Switches the radio to this operational network and key and starts receiving;
-// initial setup uses it to hand over the first installation key.
-bool applyInstallation(uint8_t networkId, const uint8_t key[16]);
+bool beginCommissioning();
+// Switches to the operational network with hardware AES disabled.
+bool applyInstallation(uint8_t networkId);
 bool send(uint16_t targetId, const uint8_t* data, size_t size, bool requestAck = false);
+bool sendCommandReply(const ReceivedFrame& ready, uint8_t header, const uint8_t* payload, size_t size);
 bool sendThenSwitchProfile(
     uint16_t targetId,
     const uint8_t* data,

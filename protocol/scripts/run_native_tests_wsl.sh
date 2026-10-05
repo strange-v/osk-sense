@@ -19,6 +19,7 @@ common_sources=(
     ../shared/RadioProtocol/src/RadioSecurityFrames.cpp
     ../shared/RadioProtocol/src/PairingTransaction.cpp
     ../shared/RadioProtocol/src/RegistryPairing.cpp
+    ../shared/RadioProtocol/src/RegistryRadio.cpp
     ../shared/RadioProtocol/src/GatewayReplay.cpp
     "${unity_dir}/unity.c"
 )
@@ -63,3 +64,4 @@ run_suite test_gateway_replay
 run_suite test_security_frames
 run_suite test_pairing_transaction
 run_suite test_registry_pairing
+run_suite test_registry_radio

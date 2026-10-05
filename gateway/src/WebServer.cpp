@@ -399,11 +399,10 @@ void handleInitialSetup(AsyncWebServerRequest* request, JsonVariant& json) {
         sendError(request, 500, "setup_storage_failed");
         return;
     }
-    // A gateway set up for the first time booted without an installation key,
-    // so its radio sleeps until it receives the key just saved.
+    // Initial setup enables the operational network after its settings commit.
     if (!radio::applyInstallation(
-            secrets.operationalNetworkId, secrets.installationKey)) {
-        Serial.println("Initial setup: radio did not take the installation key");
+            secrets.operationalNetworkId)) {
+        Serial.println("Initial setup: radio did not take the operational network");
     }
 
     status::closeSetup();
@@ -1708,7 +1707,8 @@ void handleOpenPairing(AsyncWebServerRequest* request, JsonVariant& json) {
         return;
     }
     for (size_t index = 0; index < registry->count; ++index) {
-        if (memcmp(registry->records[index].deviceUid, deviceUid, sizeof(deviceUid)) == 0) {
+        if (registry->records[index].state != radiosensors::registry::NodeState::Pending &&
+            memcmp(registry->records[index].deviceUid, deviceUid, sizeof(deviceUid)) == 0) {
             memset(factoryKey, 0, sizeof(factoryKey));
             sendError(request, 409, "node_already_exists");
             return;
@@ -2050,7 +2050,8 @@ void handleStatus(AsyncWebServerRequest* request) {
         "\"empty_wakeups\":%lu,\"ack_requests_ignored\":%lu,"
         "\"telemetry_acks_sent\":%lu,\"telemetry_rejected_inactive\":%lu,"
         "\"telemetry_frames_queued\":%lu,\"telemetry_frames_dropped\":%lu,"
-        "\"v2_frames\":%lu,\"v2_telemetry_frames\":%lu,"
+        "\"v3_frames\":%lu,\"v3_telemetry_frames\":%lu,"
+        "\"failed_tags\":%lu,\"replay_frames\":%lu,\"activation_challenges\":%lu,"
         "\"empty_application_frames\":%lu,"
         "\"unsupported_protocol_versions\":%lu,"
         "\"unsupported_frame_kinds\":%lu,"
@@ -2162,8 +2163,11 @@ void handleStatus(AsyncWebServerRequest* request) {
         radioSnapshot.telemetryRejectedInactive,
         radioSnapshot.telemetryFramesQueued,
         radioSnapshot.telemetryFramesDropped,
-        radioSnapshot.v2Frames,
-        radioSnapshot.v2TelemetryFrames,
+        radioSnapshot.v3Frames,
+        radioSnapshot.v3TelemetryFrames,
+        radioSnapshot.failedTags,
+        radioSnapshot.replayFrames,
+        radioSnapshot.activationChallenges,
         radioSnapshot.emptyApplicationFrames,
         radioSnapshot.unsupportedProtocolVersions,
         radioSnapshot.unsupportedFrameKinds,

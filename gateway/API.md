@@ -135,7 +135,7 @@ Success creates the first browser session and returns the same body and cookie a
 
 Secrets and settings commit before authentication. The first enabled admin record is the final commit that changes the gateway to configured.
 
-A gateway that has never been set up boots without an installation key, so its radio sleeps and `/ui/status` reports radio state `encryption_key_missing`. Setup hands the saved key and network ID to the running radio, which starts receiving at once: pairing needs no restart.
+A gateway that has never been set up keeps its radio asleep; `/ui/status` reports `network_missing`. Setup applies the saved network ID to the running radio, so pairing needs no restart. V3 traffic uses the keys in each node's pairing transaction.
 
 `500 setup_storage_failed` while `setup_required` is true usually means the gateway's storage did not load. NVS holds data that no store can decode, so the gateway runs on defaults, which report no admin, and refuses every write. Recover it by erasing NVS; see the README.
 
@@ -279,7 +279,7 @@ An applied `set_count` also carries `"result":{"previous_count":1200,"count":123
 
 The response is `201` with the queued command in the listing shape. Errors: `400 invalid_request`, `404 node_not_found` when no active node has the ID, `409 command_pending`, `409 command_capacity_reached`, `422 invalid_command_values`, `422 unsupported_command` for an unknown type or one the node's profile lacks, `422 invalid_command_arguments`, `500 command_storage_failed`, or `503 commands_unavailable`.
 
-The node fetches the command when its button is short-pressed or with its next acknowledged telemetry, whichever comes first. The Web UI polls the listing meanwhile. While a pairing window is open the radio listens on the commissioning network, so no session completes.
+The node fetches the command when its button is short-pressed or with its next acknowledged telemetry, whichever comes first. The Web UI polls the listing meanwhile. The commissioning network suspends ordinary sessions. After Join accept the gateway switches to the operational network for confirm; a confirm timeout returns it to commissioning while the window remains open.
 
 `DELETE /ui/commands` accepts `{"node_id":7}`, requires an admin session plus CSRF, removes the node's pending command, and returns `204`, or `404 command_not_found` when none is pending. A delivered command may already be applied on the node; cancelling it only discards its result.
 
@@ -301,7 +301,7 @@ Settings contain hostname, mDNS enabled state, NTP enabled state, up to three NT
 
 The UID is exactly 10 bytes and the factory key exactly 16 bytes, both encoded as hexadecimal. The gateway switches the radio to commissioning network `0`, keeps the key only in RAM, and accepts a `JOIN_REQUEST` only for the supplied UID. The registry holds at most 64 nodes. The key is wiped when pairing succeeds, is closed, or expires. It is never written to settings, secrets, registry, diagnostics, or logs. `POST /ui/pairing/close` ends the window early. Both endpoints require an admin session and CSRF and return the current pairing state and remaining seconds.
 
-An existing UID in any registry state returns `409 node_already_exists` without opening the pairing window.
+An active or disabled UID returns `409 node_already_exists`. A pending UID may reopen its pairing window to continue the persisted transaction after a restart or lost reply.
 
 ## Radio network
 
@@ -406,7 +406,7 @@ An empty name is a client that sent no header; it is reported as unidentified ra
 
 It exists so something on the network can tell the gateway is up without a credential, and so the Web UI can watch for a reboot after a radio network reset has killed every session. `boot_id` is the one detail worth publishing here: it changes on every boot, which is what distinguishes "it came back" from "it never went down", and mDNS broadcasts it anyway. Nothing else belongs in this response, and a client must not read it — see "External client contract".
 
-`GET /ui/status` requires a session and returns everything the gateway knows about itself: ethernet, radio, storage, time, registry, telemetry, setup and pairing windows, WebSocket counters, OTA, Web UI state, uptime, free heap, reset reason, and the radio pinout and counters. `storage.nvs` reports `used_entries`, `free_entries`, `available_entries`, `total_entries`, and `namespace_count`; the counts are valid when `stats_available` is true. Those are diagnostics for whoever runs the gateway, not facts for the network, which is why they are not in `/health`.
+`GET /ui/status` requires a session and returns everything the gateway knows about itself: ethernet, radio, storage, time, registry, telemetry, setup and pairing windows, WebSocket counters, OTA, Web UI state, uptime, free heap, reset reason, and the radio pinout and counters. `storage.nvs` reports `used_entries`, `free_entries`, `available_entries`, `total_entries`, and `namespace_count`; the counts are valid when `stats_available` is true. Radio counters include `v3_frames`, `v3_telemetry_frames`, `failed_tags`, `replay_frames` and `activation_challenges`.
 
 ## Development diagnostics
 

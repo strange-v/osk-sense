@@ -130,7 +130,44 @@ describe('pairing window outcome', () => {
     expect(wrapper.get('.modal-actions .button.primary').attributes('disabled')).toBeDefined()
   })
 
-  it.each(['active', 'pending', 'disabled'])('blocks an existing %s UID after a scan, regardless of case', async (nodeState) => {
+  it('reports timeout when a transaction is pending even after the registry changes', async () => {
+    const wrapper = await mountView()
+    await startPairing(wrapper)
+    state.registry = { registry_generation: 2, nodes: [node({ state: 'pending' })] }
+    state.pairing = { active: false, remaining_seconds: 0 }
+    await pollOnce()
+
+    expect(wrapper.get('.notice.error').text()).toBe(en.error.pairing_timeout)
+    expect(wrapper.find('node-detail-stub').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('opens the node when a resumed pending transaction becomes active', async () => {
+    state.registry = { registry_generation: 5, nodes: [node({ state: 'pending', device_uid: UID.toLowerCase() })] }
+    const wrapper = await mountView()
+    await startPairing(wrapper)
+    state.registry = { registry_generation: 6, nodes: [node({ state: 'active', device_uid: UID.toLowerCase() })] }
+    state.pairing = { active: false, remaining_seconds: 0 }
+    await pollOnce()
+
+    const card = wrapper.findComponent({ name: 'NodeDetail' })
+    expect(card.exists()).toBe(true)
+    expect(card.props('node')).toMatchObject({ state: 'active', node_id: 7 })
+    wrapper.unmount()
+  })
+
+  it('resumes an existing pending UID after a scan', async () => {
+    state.registry = { registry_generation: 5, nodes: [node({ state: 'pending', device_uid: UID.toLowerCase() })] }
+    const wrapper = await mountView()
+    await startPairing(wrapper)
+
+    expect(gatewayApi.openPairing).toHaveBeenCalledWith(UID, KEY)
+    expect(wrapper.find('.notice.error').exists()).toBe(false)
+    expect(wrapper.get('.physical-status').text()).toContain(en.pairing.waiting)
+    wrapper.unmount()
+  })
+
+  it.each(['active', 'disabled'])('blocks an existing %s UID after a scan, regardless of case', async (nodeState) => {
     state.registry = { registry_generation: 5, nodes: [node({ state: nodeState, device_uid: UID.toLowerCase() })] }
     const wrapper = await mountView()
     await startPairing(wrapper)

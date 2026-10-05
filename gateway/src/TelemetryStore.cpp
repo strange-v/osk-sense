@@ -37,8 +37,8 @@ bool accept(const radio::ReceivedFrame& frame) {
     }
 
     uint16_t profileId = 0;
-    if (!registry_store::activeProfileId(
-            static_cast<uint8_t>(frame.senderId), profileId)) {
+    if (!registry_store::activeFrameIdentity(
+            static_cast<uint8_t>(frame.senderId), frame.salt, nullptr, profileId)) {
         return false;
     }
 

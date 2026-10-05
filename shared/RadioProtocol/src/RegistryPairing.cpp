@@ -143,6 +143,17 @@ bool PairingAdapter::activeKeys(uint8_t nodeId, security::Keys& keys, uint8_t& r
     return true;
 }
 
+bool PairingAdapter::activeSalt(uint8_t nodeId, uint8_t* salt) const {
+    if (!store_.writable() || !salt) return false;
+    const auto* node = nodes_.findByNodeId(nodeId);
+    if (!node || node->state != NodeState::Active || node->replaySlot == 255) return false;
+    t::Record pairing; uint32_t generation = 0;
+    if (!t::decode(node->pairing, sizeof(node->pairing), pairing, generation) ||
+        pairing.state != t::State::Active) return false;
+    memcpy(salt, pairing.accept + 19, security::kSaltSize);
+    return true;
+}
+
 }  // namespace registry
 }  // namespace radiosensors
 #endif

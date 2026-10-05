@@ -1,13 +1,16 @@
 #include "CommissioningService.h"
 
-#include <CommissioningFrames.h>
+#include <RadioSecurityFrames.h>
 #include <JoinRequest.h>
+
+#include <atomic>
 
 #include "GatewayStatus.h"
 #include "ConfigurationStore.h"
 #include "NodeRegistryStore.h"
 #include "RadioConfig.h"
 #include "RadioService.h"
+#include "RecoveryService.h"
 
 namespace gateway::commissioning {
 namespace {
@@ -21,10 +24,11 @@ constexpr uint32_t kConfirmTimeoutMs = 5000;
 
 Snapshot counters{};
 portMUX_TYPE countersMux = portMUX_INITIALIZER_UNLOCKED;
-bool awaitingConfirm = false;
-uint32_t confirmDeadline = 0;
+std::atomic<bool> awaitingConfirm{false};
+std::atomic<uint32_t> confirmDeadline{0};
 uint8_t expectedDeviceUid[radiosensors::protocol::kDeviceUidSize]{};
 bool expectedDeviceUidPresent = false;
+osk::crypto::Cmac factoryMac;
 portMUX_TYPE transactionMux = portMUX_INITIALIZER_UNLOCKED;
 
 bool matchesExpectedDevice(const uint8_t* deviceUid) {
@@ -35,17 +39,25 @@ bool matchesExpectedDevice(const uint8_t* deviceUid) {
     return matches;
 }
 
-void setExpectedDevice(const uint8_t* deviceUid) {
+void setExpectedDevice(const uint8_t* deviceUid, const uint8_t* key) {
+    osk::crypto::Cmac mac; osk::crypto::cmacInit(mac, key);
     portENTER_CRITICAL(&transactionMux);
     memcpy(expectedDeviceUid, deviceUid, sizeof(expectedDeviceUid));
     expectedDeviceUidPresent = true;
+    factoryMac = mac;
     portEXIT_CRITICAL(&transactionMux);
+    memset(&mac, 0, sizeof(mac));
 }
 
-void clearExpectedDevice() {
+void clearExpectedDevice(bool onlyExpired = false) {
     portENTER_CRITICAL(&transactionMux);
+    if (onlyExpired && status::pairingActive()) {
+        portEXIT_CRITICAL(&transactionMux);
+        return;
+    }
     memset(expectedDeviceUid, 0, sizeof(expectedDeviceUid));
     expectedDeviceUidPresent = false;
+    memset(&factoryMac, 0, sizeof(factoryMac));
     portEXIT_CRITICAL(&transactionMux);
 }
 
@@ -69,78 +81,43 @@ void returnToPairingIfOpen() {
 }
 
 void handleJoinRequest(const radio::ReceivedFrame& frame) {
+    namespace s = radiosensors::security;
+    namespace t = s::pairing;
+    recovery::Guard windowGuard;
+    if (!windowGuard || recovery::blocked()) return;
     increment(&Snapshot::joinRequests);
     if (!status::pairingActive() || frame.senderId != 0 || awaitingConfirm) {
         increment(&Snapshot::rejectedFrames);
         return;
     }
-
-    radiosensors::protocol::JoinRequest request{};
-    if (radiosensors::protocol::decodeJoinRequest(
-            frame.data, frame.size, request) !=
-        radiosensors::protocol::JoinRequestStatus::Ok) {
-        increment(&Snapshot::rejectedFrames);
-        status::indicate(status::Indication::Error, 3000);
-        return;
+    osk::crypto::Cmac mac; uint8_t expectedUid[radiosensors::protocol::kDeviceUidSize];
+    portENTER_CRITICAL(&transactionMux);
+    const bool present = expectedDeviceUidPresent;
+    if (present) {
+        mac = factoryMac;
+        memcpy(expectedUid, expectedDeviceUid, sizeof(expectedUid));
     }
-    if (!matchesExpectedDevice(request.deviceUid)) {
-        increment(&Snapshot::rejectedFrames);
-        return;
-    }
-
+    portEXIT_CRITICAL(&transactionMux);
+    if (!present) { increment(&Snapshot::rejectedFrames); return; }
+    const auto secrets = configuration_store::secrets();
+    uint8_t encoded[s::frames::kJoinAcceptSize];
     status::indicate(status::Indication::PersistingNode);
-    radiosensors::registry::ReserveResult reserveResult{};
-    const RegistryCommitStatus commit =
-        registry_store::reserveAndSave(request, reserveResult);
-    if (commit == RegistryCommitStatus::StorageError ||
-        commit == RegistryCommitStatus::NotInitialized) {
-        increment(&Snapshot::storageErrors);
+    const auto result = registry_store::pairingRequestAndSave(
+        mac, expectedUid,
+        {static_cast<uint8_t>(frame.targetId),0,frame.control},
+        frame.data, frame.size, secrets.operationalNetworkId, {0,100,0},
+        encoded, sizeof(encoded));
+    memset(&mac, 0, sizeof(mac));
+    if (result != t::Status::Accept && result != t::Status::RepeatedAccept) {
+        increment(result == t::Status::StorageError ? &Snapshot::storageErrors : &Snapshot::rejectedFrames);
         status::indicate(status::Indication::Error, 3000);
         return;
     }
-    if (reserveResult.status != radiosensors::registry::ReserveStatus::Created &&
-        reserveResult.status !=
-            radiosensors::registry::ReserveStatus::ExistingPendingUpdated) {
+    if (!status::pairingActive() || !matchesExpectedDevice(expectedUid) ||
+        !radio::sendThenSwitchProfile(0, encoded, sizeof(encoded), radio::Profile::Operational)) {
         increment(&Snapshot::rejectedFrames);
-        status::indicate(
-            reserveResult.status == radiosensors::registry::ReserveStatus::ProfileConflict
-                ? status::Indication::ProfileConflict
-                : status::Indication::Error,
-            3000);
         return;
     }
-
-    const radiosensors::gateway_storage::InstallationSecrets secrets =
-        configuration_store::secrets();
-    if (!secrets.installationKeyPresent) {
-        increment(&Snapshot::rejectedFrames);
-        status::indicate(status::Indication::Error, 3000);
-        return;
-    }
-    radiosensors::protocol::JoinAccept accept{};
-    for (size_t i = 0; i < radiosensors::protocol::kDeviceUidSize; ++i) {
-        accept.deviceUid[i] = request.deviceUid[i];
-    }
-    accept.requestNonce = request.requestNonce;
-    accept.assignedNodeId = reserveResult.nodeId;
-    accept.gatewayNodeId = static_cast<uint8_t>(radio::config::nodeId);
-    accept.networkId = secrets.operationalNetworkId;
-    for (size_t i = 0; i < radiosensors::protocol::kInstallationKeySize; ++i) {
-        accept.installationKey[i] =
-            secrets.installationKey[i];
-    }
-
-    uint8_t encoded[radiosensors::protocol::kJoinAcceptSize];
-    if (radiosensors::protocol::encodeJoinAccept(
-            accept, encoded, sizeof(encoded)) !=
-            radiosensors::protocol::CommissioningCodecStatus::Ok ||
-        !radio::sendThenSwitchProfile(
-            0, encoded, sizeof(encoded), radio::Profile::Operational)) {
-        increment(&Snapshot::rejectedFrames);
-        status::indicate(status::Indication::Error, 3000);
-        return;
-    }
-
     increment(&Snapshot::joinAcceptsQueued);
     awaitingConfirm = true;
     confirmDeadline = millis() + kConfirmTimeoutMs;
@@ -148,58 +125,32 @@ void handleJoinRequest(const radio::ReceivedFrame& frame) {
 }
 
 void handleJoinConfirm(const radio::ReceivedFrame& frame) {
+    namespace t = radiosensors::security::pairing;
+    recovery::Guard windowGuard;
+    if (!windowGuard || recovery::blocked()) return;
     increment(&Snapshot::joinConfirms);
-    radiosensors::protocol::JoinConfirm confirm{};
-    if (radiosensors::protocol::decodeJoinConfirm(
-            frame.data, frame.size, confirm) !=
-            radiosensors::protocol::CommissioningCodecStatus::Ok) {
-        increment(&Snapshot::rejectedFrames);
-        return;
-    }
-
-    radiosensors::registry::ConfirmStatus result{};
-    const RegistryCommitStatus commit = registry_store::confirmAndSave(
-        confirm.deviceUid, static_cast<uint8_t>(frame.senderId),
-        confirm.requestNonce, result);
-    const bool newlyConfirmed =
-        commit == RegistryCommitStatus::Ok &&
-        result == radiosensors::registry::ConfirmStatus::Confirmed;
-    const bool alreadyConfirmed =
-        commit == RegistryCommitStatus::NoChange &&
-        result == radiosensors::registry::ConfirmStatus::AlreadyActive;
-    if (!newlyConfirmed && !alreadyConfirmed) {
-        if (commit == RegistryCommitStatus::StorageError) {
-            increment(&Snapshot::storageErrors);
-        } else {
-            increment(&Snapshot::rejectedFrames);
-        }
+    uint8_t encoded[radiosensors::security::frames::kJoinCompleteSize];
+    const auto result = registry_store::pairingConfirmAndSave(
+        static_cast<uint8_t>(frame.senderId),
+        {static_cast<uint8_t>(frame.targetId),static_cast<uint8_t>(frame.senderId),frame.control},
+        frame.data, frame.size, encoded, sizeof(encoded));
+    const bool newlyConfirmed = result == t::Status::Complete;
+    if (!newlyConfirmed && result != t::Status::RepeatedComplete) {
+        increment(result == t::Status::StorageError ? &Snapshot::storageErrors : &Snapshot::rejectedFrames);
         status::indicate(status::Indication::Error, 3000);
         return;
     }
-
-    radiosensors::protocol::JoinComplete complete{};
-    complete = confirm;
-    uint8_t encoded[radiosensors::protocol::kJoinCompleteSize];
-    if (radiosensors::protocol::encodeJoinComplete(
-            complete, encoded, sizeof(encoded)) !=
-            radiosensors::protocol::CommissioningCodecStatus::Ok ||
-        !radio::send(static_cast<uint8_t>(frame.senderId), encoded,
-                     sizeof(encoded))) {
+    if (!radio::send(static_cast<uint8_t>(frame.senderId), encoded, sizeof(encoded))) {
         increment(&Snapshot::rejectedFrames);
-        status::indicate(status::Indication::Error, 3000);
         return;
     }
-
     increment(&Snapshot::joinCompletesQueued);
     if (newlyConfirmed) increment(&Snapshot::nodesActivated);
-    awaitingConfirm = false;
-    confirmDeadline = 0;
-    if (newlyConfirmed) {
+    if (matchesExpectedDevice(encoded + 1)) {
+        awaitingConfirm = false; confirmDeadline = 0;
         if (status::closePairing()) {
             clearExpectedDevice();
             status::indicate(status::Indication::PairingSucceeded, 1000);
-        } else {
-            increment(&Snapshot::rejectedFrames);
         }
     }
 }
@@ -208,17 +159,13 @@ void task(void*) {
     for (;;) {
         radio::ReceivedFrame received{};
         if (radio::receive(received, pdMS_TO_TICKS(100))) {
-            radiosensors::protocol::FrameView frame{};
-            if (radiosensors::protocol::decodeFrame(
-                    received.data, received.size, frame) ==
-                radiosensors::protocol::DecodeStatus::Ok) {
-                if (frame.kind == radiosensors::protocol::FrameKind::JoinRequest) {
-                    handleJoinRequest(received);
-                } else if (frame.kind == radiosensors::protocol::FrameKind::JoinConfirm) {
-                    handleJoinConfirm(received);
-                }
+            if (received.kind == radiosensors::protocol::FrameKind::JoinRequest) {
+                handleJoinRequest(received);
+            } else if (received.kind == radiosensors::protocol::FrameKind::JoinConfirm) {
+                handleJoinConfirm(received);
             }
         }
+        clearExpectedDevice(true);
         if (awaitingConfirm &&
             static_cast<int32_t>(millis() - confirmDeadline) >= 0) {
             increment(&Snapshot::confirmTimeouts);
@@ -244,13 +191,12 @@ bool open(
     const uint8_t deviceUid[radiosensors::protocol::kDeviceUidSize],
     const uint8_t factoryKey[radiosensors::gateway_storage::kRadioKeySize]) {
     if (deviceUid == nullptr || factoryKey == nullptr) return false;
-    setExpectedDevice(deviceUid);
-    if (!radio::beginCommissioning(factoryKey)) {
-        clearExpectedDevice();
-        return false;
-    }
-    if (!status::openPairing()) {
-        radio::requestProfile(radio::Profile::Operational);
+    awaitingConfirm = false;
+    confirmDeadline = 0;
+    if (!status::openPairing()) return false;
+    setExpectedDevice(deviceUid, factoryKey);
+    if (!radio::beginCommissioning()) {
+        status::closePairing();
         clearExpectedDevice();
         return false;
     }

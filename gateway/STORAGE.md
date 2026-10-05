@@ -141,7 +141,7 @@ NVS namespace: `gateway-secrets`; slot keys: `secret_a`, `secret_b`; magic: `RSG
 | 0 | 12 | Common snapshot header |
 | 12 | 2 | Presence flags |
 | 14 | 1 | Operational RFM69 network ID, `1..255` |
-| 15 | 16 | Installation AES key |
+| 15 | 16 | Installation key material; unused by V3 radio |
 | 31 | 32 | Gateway device secret |
 | 63 | 4 | CRC32 |
 
@@ -213,9 +213,9 @@ the exact encoded bytes before publication. A failed commit or read-back blocks
 mutations and key lookup until reload. Invalid data blocks initialization and
 requires explicit reset or repair; no older transaction is selected.
 
-NVS work never runs in the radio-owner task. Commissioning persists a reservation before queuing `JOIN_ACCEPT`; synchronized store APIs own all registry access.
+Commissioning persists its registry transaction before queuing `JOIN_ACCEPT`. The radio-owner task persists a replay reservation before acknowledging or publishing a fresh counter outside its bound. Both paths serialize through the registry and recovery locks.
 
-A registry commit holds its mutex through the NVS write and read-back validation. The radio-owner task queues telemetry through its lock-free active-node view. V3 registry commit timing requires hardware measurement.
+A registry commit holds its mutex through NVS write and read-back. Radio reception takes the registry lock without waiting; a competing mutation drops the frame for the node to retry. Replay reservation latency within the ACK window requires hardware measurement.
 
 ## Command book snapshot
 

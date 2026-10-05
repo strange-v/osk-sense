@@ -1,115 +1,48 @@
 # OSK Sense Protocol
 
-[`protocol-manifest.json`](protocol-manifest.json) is the canonical machine-readable source for client-visible numeric IDs, byte layouts, encodings, ranges, scales, and no-value sentinels. This document defines the surrounding behaviour and security semantics. [`protocol-vectors.json`](protocol-vectors.json) provides cross-language known answers. All three must change together before a wire-format change is merged.
+[`protocol-manifest.json`](protocol-manifest.json) defines client-visible IDs, telemetry layouts, encodings, ranges and sentinels. [`protocol-vectors.json`](protocol-vectors.json) provides cross-language known answers. [V3-SECURITY.md](V3-SECURITY.md) defines authenticated radio frames, pairing, acknowledgements and counter persistence.
 
 ## Protocol layers
 
-```text
-RFM69 / LowPowerLab frame
-+------------+-----------+---------+------------------------------+
-| target ID  | sender ID | control | DATA[] application frame     |
-+------------+-----------+---------+------------------------------+
-                                      |
-                                      +-- DATA[0]: v2 frame header
-                                      +-- DATA[1..N]: kind payload
-```
+| Layer | Representation |
+| --- | --- |
+| RFM69 transport | Target, sender and control bytes, covered by the authentication tag |
+| Radio traffic | V3 header, counter and encrypted payload with a CMAC tag; join frames are clear and authenticated |
+| Gateway telemetry and WebSocket | Application header `0x40`, common prefix and opaque profile payload |
 
-Target ID, sender ID, ACK flags, length, and RSSI are transport metadata exposed by the RFM69 driver. They are not repeated in `DATA[]`.
-
-## Common application header
-
-Every v2 application frame starts with exactly one byte.
-
-```text
-DATA[0]
-bit      7       6       5       4       3       2       1       0
-     +-------+-------+-------+-------+-------+-------+-------+-------+
-     |       protocol_major |               frame_kind              |
-     +-------+-------+-------+-------+-------+-------+-------+-------+
-             3 bits (2)                     5 bits
-```
-
-| Bits | Mask | Field | Meaning |
-| --- | --- | --- | --- |
-| 7..5 | `0xE0` | `protocol_major` | Current value is `2` |
-| 4..0 | `0x1F` | `frame_kind` | Message layout selector |
-
-Unknown versions and reserved kinds are rejected. Payload length and field validation belong to the codec for the selected kind.
+The gateway authenticates and checks replay state before forwarding telemetry. It removes the radio envelope and prepends `0x40` for the application codec. The profile examples below describe this client representation. The manifest's `security_v3` object describes the radio envelope; its `radio` object describes application codec IDs.
 
 ## Frame kinds
 
-| Value | Header | Name | Payload ownership |
-| ---: | ---: | --- | --- |
-| 0 | `0x40` | Telemetry | Opaque; decoded by a consumer using the registry profile |
-| 1 | `0x41` | Join request | Gateway commissioning codec |
-| 2 | `0x42` | Join accept | Node commissioning codec |
-| 3 | `0x43` | Join confirm | Gateway commissioning codec |
-| 4 | `0x44` | Command | Generic command envelope plus command-specific data |
-| 5 | `0x45` | Command result | Generic result envelope plus command-specific data |
-| 6 | `0x46` | Error | Common control-plane error |
-| 7 | `0x47` | Join complete | Node commissioning codec |
-| 8 | `0x48` | Command ready | Node opens an explicit command session |
-| 9 | `0x49` | No command | Gateway closes an empty command session |
-| 10..31 | — | Reserved | Must not be transmitted in protocol major 2 |
+V3 headers use bits 7..5 for protocol major `3` and bits 4..0 for the kind. Unknown versions and kinds are rejected.
 
-The commissioning and command-session kinds are frozen below. The Error payload layout remains unassigned; reserving its kind value does not freeze an incomplete payload design.
+| Kind | Header | Name |
+| ---: | ---: | --- |
+| 0 | `0x60` | Telemetry |
+| 1 | `0x61` | Join request |
+| 2 | `0x62` | Join accept |
+| 3 | `0x63` | Join confirm |
+| 4 | `0x64` | Command |
+| 5 | `0x65` | Command result |
+| 7 | `0x67` | Join complete |
+| 8 | `0x68` | Command ready |
+| 9 | `0x69` | No command |
+| 10 | `0x6A` | Activation report |
 
 ## Sleeping-node command session
 
-Normal telemetry opens only the short RFM69 acknowledgement period. A gateway never pushes an application command to a sleeping node; the node pulls it in an explicit session. The user queues one persistent state-changing command for a selected node in the gateway UI. The node opens a session when its button is short-pressed or when a telemetry acknowledgement announces a pending command.
+A sleeping node pulls one pending command when its button is short-pressed or a telemetry ACK carries `command_pending`. Command ready has an empty payload. The gateway replies with Command or an empty No command under that ready's counter. Repeating a ready returns the same sealed reply bytes; after a gateway restart a counter-floor ACK requires a fresh ready. See [command wire layouts](V3-SECURITY.md#commands).
 
-```text
-node                                   gateway
-  |-- Command ready (nonce) ------------->|
-  |<----------- Command (nonce, id) ------|   or No command (nonce)
-  |   apply durably                       |
-  |-- Command result (nonce, id) -------->|   RFM69 ACK requested
-  |<------------------------------ ACK ---|   record durably
-```
-
-### Command ready and No command
-
-The node sends Command ready from its operational node ID and radio profile, then listens for a bounded command window. The frame is exactly five bytes:
-
-| Offset | Bytes | Field | Encoding |
-| ---: | ---: | --- | --- |
-| 0 | 1 | Common header | `0x48` |
-| 1 | 4 | `session_nonce` | Node-generated unsigned little-endian value |
-
-The gateway uses the RFM69 sender ID to select that node's pending command. A delivered Command must echo the session nonce so a delayed response from an old session cannot be accepted. Only one state-changing command may be pending for a node and only one is delivered per session.
-
-If no command is pending, the gateway immediately sends No command. Its layout is identical except for header `0x49`; it echoes the same session nonce. This lets the node close its receive window without waiting for timeout.
-
-### Command
-
-| Offset | Bytes | Field | Encoding |
-| ---: | ---: | --- | --- |
-| 0 | 1 | Common header | `0x44` |
-| 1 | 4 | `session_nonce` | Echoed from Command ready |
-| 5 | 2 | `command_id` | Unsigned little-endian; zero is invalid |
-| 7 | 1 | `command_type` | See command types |
-| 8 | 0..8 | Arguments | Layout fixed by the command type |
-
-The frame length is the envelope plus the argument length of its type. A node answers a type it does not implement with `unsupported`, so it decodes any type whose arguments fit.
-
-### Command result
-
-| Offset | Bytes | Field | Encoding |
-| ---: | ---: | --- | --- |
-| 0 | 1 | Common header | `0x45` |
-| 1 | 4 | `session_nonce` | Echoed from the Command |
-| 5 | 2 | `command_id` | Echoed from the Command |
-| 7 | 1 | `status` | See below |
-| 8 | 0..8 | Result data | Only for `applied`; layout fixed by the command type |
+Command and result payloads begin with a nonzero uint16 little-endian command ID and a one-byte type or status, followed by up to eight argument or result bytes. A result carries a fresh node counter greater than the ready's counter. The gateway requires the command ID and pairing salt of its latest delivery to match.
 
 | Status | Name | Meaning |
 | ---: | --- | --- |
-| 0 | `applied` | The command's effect is durable |
-| 1 | `unsupported` | This node's firmware does not implement the type |
-| 2 | `invalid_argument` | Wrong argument length or a value out of range |
-| 3 | `storage_failure` | Nothing was applied; the same command may be delivered again |
+| 0 | `applied` | The effect is durable |
+| 1 | `unsupported` | The firmware does not implement the type |
+| 2 | `invalid_argument` | Wrong argument length or value |
+| 3 | `storage_failure` | Nothing applied; retry in a later session |
 
-Every status except `storage_failure` completes the command. The node sends Command result with an RFM69 ACK request; the gateway acknowledges it once the frame is queued for recording. The gateway accepts a result only from the node the command is queued for, with the command ID and session nonce of the latest delivery.
+Every status except `storage_failure` completes the command. The authenticated ACK confirms queuing; the pending command remains until its result is durably recorded.
 
 ### Command types
 
@@ -126,7 +59,7 @@ Commands are one-shot actions. Configuration the gateway maintains, such as radi
 
 ### Command IDs and redelivery
 
-The gateway allocates command IDs from one wrapping 16-bit sequence per installation and never issues zero. The node records the ID of the last applied command of each type that changes its state in the same atomic write as its effect ([EEPROM.md](../node/EEPROM.md)). A command whose ID equals the recorded one is a redelivery: the node does not apply it again and resends the stored result with the new session nonce. Commissioning clears the recorded IDs, so a reinstalled gateway's sequence cannot collide with them.
+The gateway allocates command IDs from one wrapping 16-bit sequence per installation and never issues zero. The node records the ID of the last applied command of each type that changes its state in the same atomic write as its effect ([EEPROM.md](../node/EEPROM.md)). A command whose ID equals the recorded one is a redelivery: the node does not apply it again and resends the stored result under a fresh frame counter. Commissioning clears the recorded IDs, so a reinstalled gateway's sequence cannot collide with them.
 
 The gateway marks the pending command complete only after a matching result is durably recorded. If the result is lost, a later session delivers the same command ID and payload.
 
@@ -159,26 +92,13 @@ The link fields come first and supply voltage last, next to the measurements. A 
 
 The node reports its actual radio state in every frame, so each RSSI the gateway measures is paired with the level the frame was sent at ([Radio power](#radio-power)). The gateway may decode the common prefix without knowing the profile. It treats bytes from offset 5 onward as opaque and forwards the complete frame together with the stored profile ID, sender ID, RSSI, and receive time in its WebSocket envelope. Telemetry from an unknown or inactive sender cannot be decoded safely and must be rejected and counted.
 
-A frame of at most 13 bytes keeps the encrypted RFM69 message, which adds three transport bytes, within one 16-byte AES block; every current profile fits, so all cost the same airtime. The examples below use radio state `02` (level 2) and downlink RSSI `BA` (−70 dBm).
+Radio frames add a counter and authentication tag to these payloads; see [V3 frame costs](V3-SECURITY.md#frames). The examples below use radio state `02` (level 2) and downlink RSSI `BA` (−70 dBm).
 
 ## Telemetry acknowledgement
 
-The RFM69 ACK that answers telemetry carries zero, one, or two payload bytes. It acknowledges the report whatever it carries.
+A telemetry ACK is authenticated under the node's MAC key and transmitted frame counter. It can carry `command_pending`, a power target, a counter floor or an activation challenge. Only accepted frames and immediate duplicates receive a normal ACK; duplicate frames are never published again. See [ACK format](V3-SECURITY.md#frames) and [gateway replay rules](V3-SECURITY.md#gateway-bound).
 
-| Offset | Field | Meaning |
-| ---: | --- | --- |
-| 0 | flags | Bit 0 `command_pending`: a command is queued for this node. Bit 1 `power_target`: byte 1 follows. Bits 2..7 are zero when sent and ignored when received. |
-| 1 | `power_target` | Transmit power level `0..31` the gateway wants; present only with bit 1 |
-
-An empty payload has nothing to add. A node ignores a target above `31`. RFM69 AES pads every form to one 16-byte block, so the payload costs no airtime.
-
-A node that sees `command_pending` opens a command session in the same wake-up. It limits sessions that the flag starts but that do not end cleanly; the node README specifies the back-off.
-
-## Replay resistance
-
-Telemetry and its acknowledgement carry no frame counter or message authentication code, and RFM69 AES encrypts each 16-byte block alone. A recorded frame is accepted when transmitted again, and equal content produces equal ciphertext. Command sessions and joins are bound to a fresh nonce and are not affected.
-
-This is accepted for every current profile: a counter and authentication code would take a frame past one AES block and add persistent counter state, which costs every node charge and airtime. Nodes whose reports must not be forged, such as intrusion sensors or buttons that switch something, get an authenticated telemetry frame kind from the reserved range. Only images that need it send that kind; every other image keeps kind `0`.
+A node that sees `command_pending` opens a command session in the same wake-up. The node README specifies its back-off after failed sessions.
 
 ## Radio power
 
@@ -196,77 +116,11 @@ Radio power is desired state, not a command. The node owns its level and reports
 
 Registration stores one stable numeric profile ID; `read_info` replaces it after a reflash. The profile defines the complete node contract: telemetry layout, logical category, supported commands, and Home Assistant entities. A wire-incompatible telemetry layout or different command set requires a new profile ID. The profile ID is not repeated in normal telemetry.
 
-## Join request
+## Pairing
 
-An unprovisioned node transmits a join request with RFM69 sender ID `0` while the gateway's explicit pairing window is open. Protocol major 2 supports tinyAVR devices with the fixed 10-byte factory serial number in `SIGROW.SERNUM[9:0]`.
+An unprovisioned node uses sender ID and network ID `0`. The gateway's explicit pairing window selects its 10-byte factory UID and unique 16-byte factory key. Join request and accept authenticate with that key; confirm and complete use the MAC key derived from the transaction's salt. The gateway stores the exact transaction before replying and prepares the replay slot before committing Active. Matching repeated confirm returns the same complete without a write.
 
-```text
-DATA offset
-  0       +-----------+  0x41: protocol major 2 / JoinRequest
-  1..10   | UID       |  factory device UID, 10 bytes in SIGROW order
- 11..12   | profile   |  profile_id, uint16 little-endian
- 13       | fw major  |  firmware semantic-version major
- 14       | fw minor  |  firmware semantic-version minor
- 15       | fw patch  |  firmware semantic-version patch
- 16..19   | nonce     |  request_nonce, uint32 little-endian
- 20       | power     |  max_power_level, 0..31
-          +-----------+
-```
-
-| Offset | Bytes | Field | Encoding |
-| ---: | ---: | --- | --- |
-| 0 | 1 | Common header | Must be `0x41` |
-| 1 | 10 | `device_uid` | Opaque bytes, fixed length |
-| 11 | 2 | `profile_id` | Unsigned little-endian; zero is reserved and invalid |
-| 13 | 1 | `firmware.major` | Unsigned byte |
-| 14 | 1 | `firmware.minor` | Unsigned byte |
-| 15 | 1 | `firmware.patch` | Unsigned byte |
-| 16 | 4 | `request_nonce` | Unsigned little-endian |
-| 20 | 1 | `max_power_level` | Transmit power ceiling of the node, `0..31` |
-
-The application frame length must be exactly 21 bytes. The nonce correlates a future join accept with the current request; all 32-bit values, including zero, are valid. Authentication and replay resistance depend on the commissioning security profile and are not provided by the public UID.
-
-Known vector:
-
-```text
-41 10 21 32 43 54 65 76 87 98 A9 34 12 01 02 03 EF CD AB 89 02
-|  |--------------------------| |---| |------| |-----------| |
-H            UID               1234   1.2.3     89ABCDEF   max 2
-```
-
-## Join accept
-
-The gateway sends Join accept to transport address `0` under the commissioning radio profile. UID and nonce select the intended unprovisioned node. The frame is sent only after the pending registry reservation is durable.
-
-| Offset | Bytes | Field | Encoding |
-| ---: | ---: | --- | --- |
-| 0 | 1 | Common header | `0x42` |
-| 1 | 10 | `device_uid` | Echoed from Join request |
-| 11 | 4 | `request_nonce` | Echoed, uint32 little-endian |
-| 15 | 1 | `assigned_node_id` | Persistent address; not 0, gateway, or 255 |
-| 16 | 1 | `gateway_node_id` | Operational gateway address |
-| 17 | 1 | `network_id` | Operational RFM69 network ID |
-| 18 | 16 | `installation_key` | Raw operational RFM69 AES key |
-
-The exact application frame length is 34 bytes. Frequency, bitrate, and default node transmit power are profile/firmware constants and are not repeated here. The installation key is generated randomly during initial gateway setup. It is the operational RFM69 AES network key for one gateway installation and is therefore shared by the nodes joined to that gateway; it is not a product-wide, build-time, or public commissioning key. It is protected on air only by the commissioning radio profile. Each node has a unique factory key supplied together with its UID; the gateway loads it into the radio only for that UID's pairing transaction and wipes it afterwards. RFM69 AES encryption is not an authenticated key-exchange protocol, which is an explicitly accepted limitation of this design.
-
-## Join confirm
-
-After atomically storing the operational configuration, the node switches to its assigned transport address and operational profile, then sends:
-
-| Offset | Bytes | Field | Encoding |
-| ---: | ---: | --- | --- |
-| 0 | 1 | Common header | `0x43` |
-| 1 | 10 | `device_uid` | Factory UID |
-| 11 | 4 | `request_nonce` | Accepted request nonce, uint32 little-endian |
-
-The exact application frame length is 15 bytes. The gateway requires the transport sender ID, UID, and latest persisted nonce to match before changing the registry record from pending to active.
-
-## Join complete
-
-After the active registry state is durably stored, the gateway sends a 15-byte Join complete frame to the node's assigned operational address. Its layout is identical to Join confirm except that the header is `0x47`. UID and nonce therefore acknowledge the exact commissioning transaction.
-
-The node must not consider commissioning complete until it receives this frame. It may repeat Join confirm while waiting. The gateway retains the last successful nonce and responds to a duplicate matching confirm without changing or rewriting the registry. A wrong nonce is rejected.
+See [pairing layouts and persistence](V3-SECURITY.md#pairing) for the 64-bit request nonce, salt, assigned address and network ID. The factory key stays in gateway RAM only during the pairing window.
 
 ## Telemetry profile template
 
@@ -285,7 +139,7 @@ Each profile added to the manifest and described below must define all of the fo
 
 ### Production profile numbering
 
-V2 profile IDs are stable opaque keys allocated sequentially. Their numeric values do not encode a capability family, hardware type, or Home Assistant presentation. IDs are never reused after release. Profile 0 remains invalid.
+Profile IDs are stable opaque keys allocated sequentially. Their numeric values do not encode a capability family, hardware type, or Home Assistant presentation. IDs are never reused after release. Profile 0 remains invalid.
 
 All eight initial profiles are frozen below. The generated map is the compact byte-layout reference; each profile section adds its meaning, constraints, and a hexadecimal example mirrored by a native known-answer test.
 
@@ -300,8 +154,6 @@ Profile ID `1` carries only the common prefix. The application frame is exactly 
 ### Profile 2: temperature test node
 
 The application frame is exactly seven bytes: the common prefix followed by signed little-endian temperature in degrees C x 100, valid from `-8000` through `12500`; `INT16_MIN` means unavailable. Example for 3300 mV and 23.50 degrees C: `40 02 BA E4 0C 2E 09`.
-
-The legacy type byte in v1 payload structs is not copied into v2 telemetry.
 
 ### Profile 3: temperature and humidity
 

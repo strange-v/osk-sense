@@ -1,6 +1,7 @@
 #pragma once
 
 #include <NodeRegistry.h>
+#include <RegistryRadio.h>
 
 enum class RegistryCommitStatus {
     Ok,
@@ -37,6 +38,13 @@ radiosensors::security::pairing::Status pairingConfirmAndSave(
     uint8_t nodeId, radiosensors::security::Transport transport,
     const uint8_t* wire, size_t size, uint8_t* output, size_t capacity);
 bool activeSecurity(uint8_t nodeId, radiosensors::security::Keys& keys, uint8_t& replaySlot);
+bool activeFrameIdentity(uint8_t nodeId, const uint8_t* salt, uint8_t* uid, uint16_t& profileId);
+radiosensors::registry::ReceiveStatus receiveSecure(
+    radiosensors::security::Transport transport, uint8_t* wire, size_t size,
+    bool telemetrySpace, bool sessionSpace, radiosensors::registry::OpenedFrame& frame);
+bool commandReply(uint8_t nodeId, const uint8_t* salt, uint32_t counter,
+    uint8_t header, const uint8_t* payload, size_t size,
+    uint8_t* output, size_t capacity, size_t& outputSize);
 RegistryCommitStatus reserveAndSave(
     const radiosensors::protocol::JoinRequest& request,
     radiosensors::registry::ReserveResult& result);

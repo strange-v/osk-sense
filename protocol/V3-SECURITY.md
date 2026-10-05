@@ -14,16 +14,17 @@ Implementation status:
 | Immutable command reply cache | Implemented in `GatewayReplay`; exact bytes per node/counter, discarded on the next accepted frame or restart |
 | Node target and Flash | ATtiny3224 at 4 MHz; all four release and debug profiles fit; see [Flash](#flash) |
 | Pairing entropy | RTC/TCB0 hardware collection integrated; extractor, health guards and CMAC conditioning tested on [captured and synthetic data](../node/crypto_bench/ENTROPY.md); source qualification pending |
-| Pairing transactions | Gateway `RegistryPairing` embeds `PairingTransaction` in the atomic registry, with stable replay slots and prepared-bound recovery; node `RadioSecurityPairing` pins salt in EEPROM before confirm; native restart, corruption and write-interruption tests; gateway radio hookup pending |
+| Pairing transactions | Gateway `RegistryPairing` embeds `PairingTransaction` in the atomic registry, with stable replay slots and prepared-bound recovery; node `RadioSecurityPairing` pins salt in EEPROM before confirm; native restart, corruption and write-interruption tests; hooked into gateway commissioning |
 | Node radio integration and command sessions | V3 pairing, telemetry, activation, authenticated ACKs and counter-bound command sessions integrated; native service tests cover retries, restart and failures |
-| Gateway radio integration and command sessions | Pending |
+| Gateway radio integration and command sessions | Integrated through `RegistryRadio`, `RadioService`, commissioning and command services; native tests cover tag tampering, replay, queue backpressure, restart, restore activation and immutable replies; both gateway targets build |
 | EEPROM configuration and node counter reservations | Integrated in the node runtime; native interruption, overflow and service tests |
-| Gateway bounds and backup activation | Implemented in `shared/RadioProtocol/GatewayReplay`, with `gateway/ReplayBoundStorage` NVS adapter and recovery erasure; native replay/activation/interruption tests; radio integration pending |
-| Failed-tag UI counters | Pending |
+| Gateway bounds and backup activation | Implemented in `shared/RadioProtocol/GatewayReplay`, with `gateway/ReplayBoundStorage` NVS adapter and recovery erasure; native replay/activation/interruption tests; integrated into gateway radio reception |
+| Failed-tag UI counters | Backend publishes `failed_tags`, `replay_frames` and `activation_challenges`; dedicated UI presentation pending |
+| Gateway network secrets | Setup and backup store an unused installation key; storage cleanup pending |
 
-The node radio service uses V3. The gateway radio service uses V2 and cannot
-communicate with these node images. Gateway integration and ATtiny3224 hardware
-verification remain blockers for a working V3 system.
+Node and gateway radio services use V3. ATtiny3224 entropy qualification,
+real-radio interoperability, ACK timing during NVS reservations and stack
+measurements remain hardware checks.
 
 | Area | Change |
 | --- | --- |
@@ -292,7 +293,7 @@ its salt, assignment and nonce across restarts. It authenticates complete with
 that salt and saves Active before allowing operational use. A failed EEPROM
 readback blocks confirm and complete until reload. The caller allocates the
 request counter, qualifies entropy and derives the session MAC from the saved
-salt. Gateway radio integration remains pending.
+salt.
 
 ## Counter persistence
 

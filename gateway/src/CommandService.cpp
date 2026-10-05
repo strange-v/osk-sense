@@ -2,6 +2,7 @@
 
 #include <CommandBook.h>
 #include <NodeRegistry.h>
+#include <RadioSecurityFrames.h>
 #include <Preferences.h>
 #include <esp_random.h>
 
@@ -20,6 +21,7 @@ namespace {
 using namespace radiosensors::gateway_storage;
 namespace command_book = radiosensors::command_book;
 namespace protocol = radiosensors::protocol;
+namespace frames = radiosensors::security::frames;
 
 // As large as the commissioning task's: a read_info result commits the node
 // registry here, and that NVS blob write overflows 6 KiB.
@@ -63,11 +65,11 @@ private:
     Preferences preferences_;
 };
 
-// The session in which a node's command was last delivered. A result must
-// carry this nonce and command ID. It lives in RAM only: after a reboot the
-// next session simply delivers the command again.
+// Results must follow the authenticated ready counter under the same keys.
+// Delivery state stays in RAM; a restarted gateway delivers pending commands again.
 struct Delivery {
-    uint32_t sessionNonce;
+    uint32_t readyCounter;
+    uint8_t salt[radiosensors::security::kSaltSize];
     uint16_t commandId;
 };
 
@@ -143,33 +145,26 @@ uint16_t randomCommandId() {
     return value;
 }
 
-void sendNoCommand(const uint8_t nodeId, const uint32_t sessionNonce) {
-    uint8_t frame[protocol::kNoCommandSize]{};
-    protocol::encodeNoCommand(sessionNonce, frame, sizeof(frame));
-    radio::send(nodeId, frame, sizeof(frame), false);
-    count(&Counters::noCommandReplies);
+void sendNoCommand(const radio::ReceivedFrame& ready) {
+    if (radio::sendCommandReply(ready, frames::kNoCommandHeader, nullptr, 0))
+        count(&Counters::noCommandReplies);
 }
 
 void handleCommandReady(const radio::ReceivedFrame& received) {
-    uint32_t sessionNonce = 0;
-    if (protocol::decodeCommandReady(received.data, received.size, sessionNonce) !=
-        protocol::CommandSessionCodecStatus::Ok) {
-        count(&Counters::rejectedFrames);
-        return;
-    }
+    if (received.size != 0) { count(&Counters::rejectedFrames); return; }
     count(&Counters::sessions);
     const uint8_t nodeId = static_cast<uint8_t>(received.senderId);
     // The node is listening: answer an empty session without taking a lock.
     if (!hasPending(nodeId)) {
-        sendNoCommand(nodeId, sessionNonce);
+        sendNoCommand(received);
         return;
     }
 
     uint8_t deviceUid[protocol::kDeviceUidSize]{};
     uint16_t profileId = 0;
     const bool registered =
-        registry_store::activeIdentity(nodeId, deviceUid, profileId);
-    protocol::Command command{};
+        registry_store::activeFrameIdentity(nodeId, received.salt, deviceUid, profileId);
+    frames::Command command;
     bool deliver = false;
     if (lock()) {
         const CommandRecord* const record = command_book::find(book, nodeId);
@@ -177,23 +172,22 @@ void handleCommandReady(const radio::ReceivedFrame& received) {
             record->state == CommandState::Pending &&
             memcmp(record->deviceUid, deviceUid, sizeof(deviceUid)) == 0;
         if (deliver) {
-            command.sessionNonce = sessionNonce;
             command.commandId = record->commandId;
             command.type = record->type;
             command.argumentSize = record->argumentSize;
             memcpy(command.arguments, record->arguments, sizeof(command.arguments));
-            deliveries[nodeId] = Delivery{sessionNonce, record->commandId};
+            deliveries[nodeId].readyCounter = received.counter;
+            memcpy(deliveries[nodeId].salt, received.salt, sizeof(received.salt));
+            deliveries[nodeId].commandId = record->commandId;
         }
         unlock();
     }
-    uint8_t frame[protocol::kMaxCommandSize]{};
-    if (!deliver ||
-        protocol::encodeCommand(command, frame, sizeof(frame)) !=
-            protocol::CommandSessionCodecStatus::Ok) {
-        sendNoCommand(nodeId, sessionNonce);
+    uint8_t payload[frames::kMaxCommandPayloadSize]; size_t size = 0;
+    if (!deliver || !frames::encodeCommand(command, payload, sizeof(payload), size)) {
+        sendNoCommand(received);
         return;
     }
-    radio::send(nodeId, frame, protocol::commandFrameSize(command), false);
+    if (!radio::sendCommandReply(received, frames::kCommandHeader, payload, size)) return;
     count(&Counters::delivered);
     Serial.printf(
         "Command delivered: node=%u id=%u type=%u\n",
@@ -205,7 +199,7 @@ void handleCommandReady(const radio::ReceivedFrame& received) {
 // the command pending and the node answers it again in a later session.
 bool applyReadInfo(
     const uint8_t nodeId, const uint8_t* const deviceUid,
-    const protocol::CommandResult& result, bool& profileChanged) {
+    const frames::CommandResult& result, bool& profileChanged) {
     const CommandRecord* const record = command_book::find(book, nodeId);
     if (record == nullptr || record->state != CommandState::Pending ||
         record->commandId != result.commandId ||
@@ -231,9 +225,8 @@ bool applyReadInfo(
 }
 
 void handleCommandResult(const radio::ReceivedFrame& received) {
-    protocol::CommandResult result{};
-    if (protocol::decodeCommandResult(received.data, received.size, result) !=
-        protocol::CommandSessionCodecStatus::Ok) {
+    frames::CommandResult result;
+    if (!frames::decodeCommandResult(received.data, received.size, result)) {
         count(&Counters::rejectedFrames);
         return;
     }
@@ -242,13 +235,14 @@ void handleCommandResult(const radio::ReceivedFrame& received) {
     uint16_t profileId = 0;
     recovery::Guard guard;
     if (!guard || recovery::blocked() ||
-        !registry_store::activeIdentity(nodeId, deviceUid, profileId) || !lock()) {
+        !registry_store::activeFrameIdentity(nodeId, received.salt, deviceUid, profileId) || !lock()) {
         count(&Counters::rejectedFrames);
         return;
     }
     const Delivery delivery = deliveries[nodeId];
     if (delivery.commandId != result.commandId ||
-        delivery.sessionNonce != result.sessionNonce) {
+        received.counter <= delivery.readyCounter ||
+        memcmp(delivery.salt, received.salt, sizeof(received.salt)) != 0) {
         unlock();
         count(&Counters::rejectedFrames);
         return;
@@ -290,14 +284,9 @@ void task(void*) {
     for (;;) {
         radio::ReceivedFrame received{};
         if (!radio::receiveSessionFrame(received, portMAX_DELAY)) continue;
-        protocol::FrameView frame{};
-        if (protocol::decodeFrame(received.data, received.size, frame) !=
-            protocol::DecodeStatus::Ok) {
-            continue;
-        }
-        if (frame.kind == protocol::FrameKind::CommandReady) {
+        if (received.kind == protocol::FrameKind::CommandReady) {
             handleCommandReady(received);
-        } else if (frame.kind == protocol::FrameKind::CommandResult) {
+        } else if (received.kind == protocol::FrameKind::CommandResult) {
             handleCommandResult(received);
         }
     }

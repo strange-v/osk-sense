@@ -73,6 +73,7 @@ radiosensors::replay::Store bounds(boundStorage);
 RandomSource random;
 radiosensors::replay::Guard replayGuard(bounds, random);
 radiosensors::registry::PairingAdapter pairing(nodes, store, bounds, replayGuard, random);
+radiosensors::registry::RadioAdapter secureRadio(pairing, replayGuard);
 bool initialized = false;
 SemaphoreHandle_t mutex = nullptr;
 std::atomic<uint32_t> activeNodeIds[4]{};
@@ -178,6 +179,7 @@ bool begin() {
     }
     bounds.load();
     replayGuard.restart();
+    secureRadio.restart();
     publishLockFreeView();
     initialized = true;
     Serial.printf(
@@ -317,6 +319,47 @@ bool activeSecurity(uint8_t nodeId, radiosensors::security::Keys& keys, uint8_t&
     const bool found = pairing.activeKeys(nodeId, keys, replaySlot);
     xSemaphoreGive(mutex);
     return found;
+}
+
+bool activeFrameIdentity(uint8_t nodeId, const uint8_t* salt, uint8_t* uid, uint16_t& profileId) {
+    if (!initialized || !mutex || !salt || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return false;
+    uint8_t currentSalt[radiosensors::security::kSaltSize];
+    const auto* node = nodes.findByNodeId(nodeId);
+    const bool found = node && pairing.activeSalt(nodeId, currentSalt) &&
+        memcmp(salt, currentSalt, sizeof(currentSalt)) == 0;
+    if (found) {
+        profileId = node->profileId;
+        if (uid) memcpy(uid, node->deviceUid, sizeof(node->deviceUid));
+    }
+    xSemaphoreGive(mutex);
+    return found;
+}
+
+radiosensors::registry::ReceiveStatus receiveSecure(
+    radiosensors::security::Transport transport, uint8_t* wire, size_t size,
+    bool telemetrySpace, bool sessionSpace, radiosensors::registry::OpenedFrame& frame) {
+    using radiosensors::registry::ReceiveStatus;
+    gateway::recovery::Guard guard(0);
+    if (!guard || gateway::recovery::blocked() || !initialized || !mutex) return ReceiveStatus::StorageError;
+    // A competing registry commit must not consume the node's ACK window.
+    if (xSemaphoreTake(mutex, 0) != pdTRUE) return ReceiveStatus::Busy;
+    const auto result = secureRadio.receive(transport, wire, size,
+        static_cast<uint64_t>(esp_timer_get_time()) / 1000000ULL,
+        telemetrySpace, sessionSpace, frame);
+    xSemaphoreGive(mutex);
+    return result;
+}
+
+bool commandReply(uint8_t nodeId, const uint8_t* salt, uint32_t counter,
+    uint8_t header, const uint8_t* payload, size_t size,
+    uint8_t* output, size_t capacity, size_t& outputSize) {
+    gateway::recovery::Guard guard(0);
+    if (!guard || gateway::recovery::blocked() || !initialized || !mutex ||
+        xSemaphoreTake(mutex, 0) != pdTRUE) return false;
+    const bool result = secureRadio.reply(nodeId, salt, counter, header, payload, size,
+                                         output, capacity, outputSize);
+    xSemaphoreGive(mutex);
+    return result;
 }
 
 RegistryCommitStatus reserveAndSave(

@@ -50,7 +50,7 @@ const scanNotice = computed(() => ({
   error: scanState.value === 'unsupported' || scanState.value === 'unreadable',
 }))
 const invalidCredentials = computed(() => credentials.uid.length !== PAIRING_UID_HEX_LENGTH || credentials.factoryKey.length !== PAIRING_KEY_HEX_LENGTH)
-const duplicateUid = computed(() => nodes.value.some((node) => node.device_uid.toUpperCase() === credentials.uid.toUpperCase()))
+const duplicateUid = computed(() => nodes.value.some((node) => node.state !== 'pending' && node.device_uid.toUpperCase() === credentials.uid.toUpperCase()))
 let pairingTimer: number | undefined
 // Matches the overview, which says "automatically every 10 seconds".
 const LIST_REFRESH_MS = 10_000
@@ -232,7 +232,7 @@ async function finishPairing() {
   const uid = pairingUid.value
   await load()
   const joined = registryGeneration.value !== generationAtOpen
-    ? nodes.value.find((node) => node.device_uid === uid)
+    ? nodes.value.find((node) => node.state === 'active' && node.device_uid.toUpperCase() === uid.toUpperCase())
     : undefined
 
   resetPairingInputs()

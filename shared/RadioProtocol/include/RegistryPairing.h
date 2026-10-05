@@ -21,6 +21,7 @@ public:
         uint8_t nodeId, security::Transport transport, const uint8_t* wire,
         size_t size, uint8_t* output, size_t capacity);
     bool activeKeys(uint8_t nodeId, security::Keys& keys, uint8_t& replaySlot) const;
+    bool activeSalt(uint8_t nodeId, uint8_t* salt) const;
 private:
     NodeRegistry& nodes_;
     AtomicRegistryStore& store_;

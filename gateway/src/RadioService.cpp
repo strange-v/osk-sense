@@ -2,7 +2,7 @@
 
 #include <RFM69.h>
 #include <RFM69registers.h>
-#include <RadioAes.h>
+#include <RadioSecurityFrames.h>
 #include <JoinRequest.h>
 #include <SPI.h>
 #include <TelemetryFrames.h>
@@ -18,14 +18,9 @@
 namespace gateway::radio {
 namespace {
 
-namespace radio_aes = radiosensors::radio_aes;
-static_assert(radio_aes::kStandbyMode == RF69_MODE_STANDBY, "RFM69 mode");
-static_assert(radio_aes::kPacketConfig2Register == REG_PACKETCONFIG2, "RFM69 map");
-static_assert(radio_aes::kAesKey1Register == REG_AESKEY1, "RFM69 map");
-static_assert(radio_aes::kAesOn == RF_PACKET2_AES_ON, "RFM69 map");
 
 constexpr uint8_t kExpectedVersion = 0x24;
-constexpr uint32_t kTaskStackSize = 4096;
+constexpr uint32_t kTaskStackSize = 8192;
 // Radio FIFO service is the gateway's highest-priority application work.
 // Keep it above AsyncTCP (priority 10) while leaving the upper FreeRTOS
 // priorities available to the ESP-IDF system tasks.
@@ -63,8 +58,8 @@ constexpr uint8_t kExpectedFrf[] = {
 
 // Configuration registers only the radio task writes. A module that reset
 // itself or lost a setting keeps DIO0 low and never interrupts, so only
-// reading them back shows it. The AES key registers are write-only; a reset
-// shows in PacketConfig2's AesOn bit and SyncValue2. OpMode is not here: the
+// reading them back shows it. AES remains disabled in every profile.
+// OpMode is not here: the
 // sequencer passes through FS on its way to RX, so it is checked for RX once
 // the module reports ModeReady.
 constexpr uint8_t kCheckedRegisters[] = {
@@ -82,6 +77,9 @@ class GatewayRfm69 : public RFM69 {
 public:
     using RFM69::RFM69;
     void markInterrupt() { _haveData = true; }
+    uint8_t control = 0;
+protected:
+    void interruptHook(uint8_t value) override { control = value; }
 };
 
 SPIClass radioSpi(config::spiHost);
@@ -96,11 +94,9 @@ std::atomic<Profile> currentProfile{Profile::Operational};
 std::atomic<uint8_t> currentNetworkId{0};
 uint8_t operationalNetworkId = 0;
 uint8_t commissioningNetworkId = 0;
-uint8_t operationalKey[radiosensors::gateway_storage::kRadioKeySize]{};
-uint8_t pairingKey[radiosensors::gateway_storage::kRadioKeySize]{};
 // Read by web and service tasks; after begin() only the radio task sets it.
 std::atomic<bool> operationalEnabled{false};
-bool commissioningEnabled = false;
+std::atomic<bool> commissioningEnabled{false};
 TaskHandle_t radioTaskHandle = nullptr;
 QueueHandle_t interruptQueue = nullptr;
 QueueHandle_t receivedFrameQueue = nullptr;
@@ -111,16 +107,16 @@ QueueHandle_t commandCompletionQueue = nullptr;
 SemaphoreHandle_t synchronousCommandMutex = nullptr;
 QueueSetHandle_t radioQueueSet = nullptr;
 
-enum class CommandKind : uint8_t { SetProfile, BeginCommissioning, ApplyInstallation, Send };
+enum class CommandKind : uint8_t { SetProfile, BeginCommissioning, ApplyInstallation, Send, SessionReply };
 
 struct RadioCommand {
     CommandKind kind;
     Profile profile;
     uint16_t targetId;
     uint8_t data[kMaxPayloadSize];
-    // The pairing key for BeginCommissioning, the installation key for
-    // ApplyInstallation.
-    uint8_t key[radiosensors::gateway_storage::kRadioKeySize];
+    uint32_t counter;
+    uint8_t salt[radiosensors::security::kSaltSize];
+    uint8_t header;
     uint8_t networkId;
     uint8_t size;
     bool requestAck;
@@ -145,8 +141,11 @@ struct TaskStats {
     uint32_t telemetryRejectedInactive = 0;
     uint32_t telemetryFramesQueued = 0;
     uint32_t telemetryFramesDropped = 0;
-    uint32_t v2Frames = 0;
-    uint32_t v2TelemetryFrames = 0;
+    uint32_t v3Frames = 0;
+    uint32_t v3TelemetryFrames = 0;
+    uint32_t failedTags = 0;
+    uint32_t replayFrames = 0;
+    uint32_t activationChallenges = 0;
     uint32_t emptyApplicationFrames = 0;
     uint32_t unsupportedProtocolVersions = 0;
     uint32_t unsupportedFrameKinds = 0;
@@ -188,6 +187,136 @@ void IRAM_ATTR onRadioInterrupt() {
     }
 }
 
+void routeReceivedFrame(ReceivedFrame& received) {
+    namespace s = radiosensors::security;
+    namespace f = s::frames;
+    namespace r = radiosensors::replay;
+    namespace n = radiosensors::registry;
+    if (received.size == 0 || received.size > sizeof(received.data)) {
+        portENTER_CRITICAL(&statsMux);
+        ++taskStats.emptyApplicationFrames;
+        portEXIT_CRITICAL(&statsMux);
+        return;
+    }
+    const uint8_t header = received.data[0];
+    if ((header >> 5) != s::kProtocolMajor) {
+        portENTER_CRITICAL(&statsMux);
+        ++taskStats.unsupportedProtocolVersions;
+        portEXIT_CRITICAL(&statsMux);
+        return;
+    }
+    const bool telemetry = header == 0x60 || header == s::kActivationHeader;
+    const bool session = header == f::kCommandReadyHeader || header == f::kCommandResultHeader;
+    const bool join = header == f::kJoinRequestHeader || header == f::kJoinConfirmHeader;
+    portENTER_CRITICAL(&statsMux);
+    ++taskStats.v3Frames;
+    if (telemetry) ++taskStats.v3TelemetryFrames;
+    if (!telemetry && !session && !join) ++taskStats.unsupportedFrameKinds;
+    portEXIT_CRITICAL(&statsMux);
+    if (received.targetId != config::nodeId || received.senderId > UINT8_MAX) return;
+    if (join) {
+        const bool request = header == f::kJoinRequestHeader;
+        if (received.control != 0 ||
+            (request && (currentProfile.load() != Profile::Commissioning || received.senderId != 0)) ||
+            (!request && (currentProfile.load() != Profile::Operational || received.senderId == 0)))
+            return;
+        received.kind = request ? radiosensors::protocol::FrameKind::JoinRequest
+                                : radiosensors::protocol::FrameKind::JoinConfirm;
+        const bool queued = xQueueSendToBack(receivedFrameQueue, &received, 0) == pdPASS;
+        portENTER_CRITICAL(&statsMux);
+        if (queued) ++taskStats.rxFramesQueued;
+        else ++taskStats.rxFramesDropped;
+        portEXIT_CRITICAL(&statsMux);
+        return;
+    }
+    if ((!telemetry && !session) || currentProfile.load() != Profile::Operational) return;
+    n::OpenedFrame opened;
+    const auto status = registry_store::receiveSecure(
+        {static_cast<uint8_t>(received.targetId), static_cast<uint8_t>(received.senderId), received.control},
+        received.data, received.size,
+        uxQueueSpacesAvailable(telemetryFrameQueue) != 0,
+        uxQueueSpacesAvailable(sessionFrameQueue) != 0, opened);
+    if (status != n::ReceiveStatus::Ok) {
+        portENTER_CRITICAL(&statsMux);
+        if (status == n::ReceiveStatus::FailedTag) ++taskStats.failedTags;
+        else if (status == n::ReceiveStatus::Busy) {
+            if (telemetry) ++taskStats.telemetryFramesDropped;
+            else ++taskStats.sessionFramesDropped;
+        } else {
+            if (telemetry) ++taskStats.telemetryRejectedInactive;
+            else ++taskStats.sessionFramesRejected;
+        }
+        if (received.ackRequested) ++taskStats.ackRequestsIgnored;
+        portEXIT_CRITICAL(&statsMux);
+        return;
+    }
+    const auto action = opened.decision.action;
+    const bool accepted = action == r::Action::Accept;
+    const bool duplicate = action == r::Action::Duplicate;
+    s::Ack ack;
+    if (action == r::Action::CounterFloor) {
+        ack.hasCounterFloor = true; ack.counterFloor = opened.decision.floor;
+    } else if (action == r::Action::Challenge) {
+        ack.hasChallenge = true;
+        memcpy(ack.challenge, opened.decision.challenge, sizeof(ack.challenge));
+    } else if ((accepted || duplicate) && telemetry) {
+        ack.commandPending = commands::hasPending(static_cast<uint8_t>(received.senderId));
+        if (opened.payloadSize != 0)
+            ack.hasPowerTarget = power_control::target(static_cast<uint8_t>(received.senderId),
+                                                       opened.payload[0], ack.powerTarget);
+    }
+    const bool recoveryAck = ack.hasCounterFloor || ack.hasChallenge;
+    const bool normalAck = received.ackRequested && (accepted || duplicate) &&
+        (telemetry || header == f::kCommandResultHeader);
+    if (recoveryAck || normalAck) {
+        uint8_t bytes[s::kMaxAckPayloadSize + s::kGatewayTagSize]; size_t size = 0;
+        if (s::sealAck(opened.mac, {static_cast<uint8_t>(received.senderId),100,0x80},
+                       opened.counter, ack, bytes, sizeof(bytes), size)) {
+            rfm69.sendACK(bytes, static_cast<uint8_t>(size));
+            portENTER_CRITICAL(&statsMux);
+            if (telemetry) ++taskStats.telemetryAcksSent;
+            else if (header == f::kCommandResultHeader) ++taskStats.commandResultAcksSent;
+            if (ack.commandPending) ++taskStats.commandHintsSent;
+            if (ack.hasPowerTarget) ++taskStats.powerTargetsSent;
+            portEXIT_CRITICAL(&statsMux);
+        }
+    } else if (duplicate && opened.replySize != 0) {
+        rfm69.send(received.senderId, opened.reply, static_cast<uint8_t>(opened.replySize), false);
+    }
+    portENTER_CRITICAL(&statsMux);
+    if (duplicate || action == r::Action::CounterFloor) ++taskStats.replayFrames;
+    if (ack.hasChallenge) ++taskStats.activationChallenges;
+    portEXIT_CRITICAL(&statsMux);
+    if (!accepted) return;
+    received.counter = opened.counter;
+    memcpy(received.salt, opened.salt, sizeof(received.salt));
+    received.kind = telemetry ? radiosensors::protocol::FrameKind::Telemetry
+        : header == f::kCommandReadyHeader ? radiosensors::protocol::FrameKind::CommandReady
+                                          : radiosensors::protocol::FrameKind::CommandResult;
+    // The application codec consumes its header and unchanged payload layout;
+    // the authenticated radio envelope never enters telemetry storage.
+    if (telemetry) {
+        received.data[0] = radiosensors::protocol::encodeHeader(radiosensors::protocol::FrameKind::Telemetry);
+        memcpy(received.data + 1, opened.payload, opened.payloadSize);
+        received.size = static_cast<uint8_t>(opened.payloadSize + 1);
+    } else {
+        memcpy(received.data, opened.payload, opened.payloadSize);
+        received.size = static_cast<uint8_t>(opened.payloadSize);
+    }
+    // The radio task is the sole producer; capacity was checked before the
+    // counter was accepted, and consumers can only free space meanwhile.
+    const bool queued = xQueueSendToBack(telemetry ? telemetryFrameQueue : sessionFrameQueue, &received, 0) == pdPASS;
+    portENTER_CRITICAL(&statsMux);
+    if (telemetry) {
+        if (queued) ++taskStats.telemetryFramesQueued;
+        else ++taskStats.telemetryFramesDropped;
+    } else {
+        if (queued) ++taskStats.sessionFramesQueued;
+        else ++taskStats.sessionFramesDropped;
+    }
+    portEXIT_CRITICAL(&statsMux);
+}
+
 void drainReceivedFrame() {
     if (!rfm69.receiveDone()) {
         portENTER_CRITICAL(&statsMux);
@@ -195,134 +324,19 @@ void drainReceivedFrame() {
         portEXIT_CRITICAL(&statsMux);
         return;
     }
-
-        const uint8_t dataLength = rfm69.DATALEN;
-        const uint16_t senderId = rfm69.SENDERID;
-        const int16_t rssi = rfm69.RSSI;
-        const bool ackRequested = rfm69.ACKRequested();
-        const uint32_t receivedAtMs = millis();
-        radiosensors::protocol::FrameView frame{};
-        const radiosensors::protocol::DecodeStatus decodeStatus =
-            radiosensors::protocol::decodeFrame(
-                rfm69.DATA,
-                dataLength,
-                frame);
-
-        ReceivedFrame received{};
-        received.size = dataLength;
-        received.senderId = senderId;
-        received.rssi = rssi;
-        received.ackRequested = ackRequested;
-        received.receivedAtMs = receivedAtMs;
-        if (decodeStatus == radiosensors::protocol::DecodeStatus::Ok) {
-            for (uint8_t index = 0; index < dataLength; ++index) {
-                received.data[index] = rfm69.DATA[index];
-            }
-        }
-
-        portENTER_CRITICAL(&statsMux);
-        ++taskStats.packets;
-        taskStats.bytes += dataLength;
-        taskStats.lastPacketMs = receivedAtMs;
-        taskStats.lastSenderId = senderId;
-        taskStats.lastRssi = rssi;
-        switch (decodeStatus) {
-            case radiosensors::protocol::DecodeStatus::Ok:
-                ++taskStats.v2Frames;
-                if (frame.kind == radiosensors::protocol::FrameKind::Telemetry) {
-                    ++taskStats.v2TelemetryFrames;
-                }
-                break;
-            case radiosensors::protocol::DecodeStatus::EmptyFrame:
-                ++taskStats.emptyApplicationFrames;
-                break;
-            case radiosensors::protocol::DecodeStatus::UnsupportedVersion:
-                ++taskStats.unsupportedProtocolVersions;
-                break;
-            case radiosensors::protocol::DecodeStatus::UnsupportedKind:
-                ++taskStats.unsupportedFrameKinds;
-                break;
-        }
-        portEXIT_CRITICAL(&statsMux);
-
-        const bool active = senderId <= UINT8_MAX &&
-            currentProfile.load() == Profile::Operational &&
-            registry_store::isActiveNode(static_cast<uint8_t>(senderId));
-        const bool sessionFrame =
-            decodeStatus == radiosensors::protocol::DecodeStatus::Ok &&
-            (frame.kind == radiosensors::protocol::FrameKind::CommandReady ||
-             frame.kind == radiosensors::protocol::FrameKind::CommandResult);
-        if (decodeStatus == radiosensors::protocol::DecodeStatus::Ok &&
-            frame.kind == radiosensors::protocol::FrameKind::Telemetry) {
-            const bool queued = active &&
-                xQueueSendToBack(telemetryFrameQueue, &received, 0) == pdPASS;
-            portENTER_CRITICAL(&statsMux);
-            if (!active) ++taskStats.telemetryRejectedInactive;
-            else if (queued) ++taskStats.telemetryFramesQueued;
-            else ++taskStats.telemetryFramesDropped;
-            portEXIT_CRITICAL(&statsMux);
-
-            // An ACK means the active node's frame was accepted into the
-            // bounded telemetry queue. If the queue is full, make the node
-            // retry instead of acknowledging data that was discarded. Its
-            // payload tells the node a command is waiting for it.
-            if (queued && ackRequested) {
-                radiosensors::protocol::TelemetryAck ack{};
-                ack.commandPending =
-                    commands::hasPending(static_cast<uint8_t>(senderId));
-                if (dataLength >= radiosensors::protocol::kTelemetryPrefixSize) {
-                    ack.hasPowerTarget = power_control::target(
-                        static_cast<uint8_t>(senderId),
-                        received.data[radiosensors::protocol::kTelemetryRadioStateOffset],
-                        ack.powerTarget);
-                }
-                uint8_t payload[radiosensors::protocol::kMaxTelemetryAckSize];
-                const size_t payloadSize =
-                    radiosensors::protocol::encodeTelemetryAck(
-                        ack, payload, sizeof(payload));
-                rfm69.sendACK(payload, static_cast<uint8_t>(payloadSize));
-                portENTER_CRITICAL(&statsMux);
-                ++taskStats.telemetryAcksSent;
-                if (ack.commandPending) ++taskStats.commandHintsSent;
-                if (ack.hasPowerTarget) ++taskStats.powerTargetsSent;
-                portEXIT_CRITICAL(&statsMux);
-            } else if (ackRequested) {
-                portENTER_CRITICAL(&statsMux);
-                ++taskStats.ackRequestsIgnored;
-                portEXIT_CRITICAL(&statsMux);
-            }
-        } else if (sessionFrame) {
-            const bool queued = active &&
-                xQueueSendToBack(sessionFrameQueue, &received, 0) == pdPASS;
-            // Like telemetry, a result is acknowledged once it is queued: one
-            // lost before it is recorded is redelivered in a later session.
-            const bool acknowledge = queued && ackRequested &&
-                frame.kind == radiosensors::protocol::FrameKind::CommandResult;
-            if (acknowledge) rfm69.sendACK();
-            portENTER_CRITICAL(&statsMux);
-            if (!active) ++taskStats.sessionFramesRejected;
-            else if (queued) ++taskStats.sessionFramesQueued;
-            else ++taskStats.sessionFramesDropped;
-            if (acknowledge) ++taskStats.commandResultAcksSent;
-            else if (ackRequested) ++taskStats.ackRequestsIgnored;
-            portEXIT_CRITICAL(&statsMux);
-        } else if (decodeStatus == radiosensors::protocol::DecodeStatus::Ok) {
-            const bool queued =
-                xQueueSendToBack(receivedFrameQueue, &received, 0) == pdPASS;
-            portENTER_CRITICAL(&statsMux);
-            if (queued) ++taskStats.rxFramesQueued;
-            else ++taskStats.rxFramesDropped;
-            if (ackRequested) ++taskStats.ackRequestsIgnored;
-            portEXIT_CRITICAL(&statsMux);
-        } else if (ackRequested) {
-            portENTER_CRITICAL(&statsMux);
-            ++taskStats.ackRequestsIgnored;
-            portEXIT_CRITICAL(&statsMux);
-        }
-
-        // receiveDone() leaves a completed packet in standby. Calling it again
-        // after consuming the static 66-byte buffer returns the radio to RX.
-        rfm69.receiveDone();
+    ReceivedFrame received{};
+    received.size = rfm69.DATALEN;
+    received.senderId = rfm69.SENDERID; received.targetId = rfm69.TARGETID;
+    received.control = rfm69.control; received.rssi = rfm69.RSSI;
+    received.ackRequested = rfm69.ACKRequested(); received.receivedAtMs = millis();
+    if (received.size <= sizeof(received.data)) memcpy(received.data, rfm69.DATA, received.size);
+    portENTER_CRITICAL(&statsMux);
+    ++taskStats.packets; taskStats.bytes += received.size;
+    taskStats.lastPacketMs = received.receivedAtMs;
+    taskStats.lastSenderId = received.senderId; taskStats.lastRssi = received.rssi;
+    portEXIT_CRITICAL(&statsMux);
+    routeReceivedFrame(received);
+    rfm69.receiveDone();
 }
 
 // The module keeps its state through an ESP32 reset; without the RESET line
@@ -400,9 +414,7 @@ void restoreModule() {
         frequencyConfigured();
     if (restored) {
         configurePower();
-        radio_aes::enable(rfm69, currentProfile.load() == Profile::Commissioning
-            ? pairingKey
-            : operationalKey);
+        rfm69.encrypt(nullptr);
         rfm69.receiveDone();
         rememberRegisters();
     }
@@ -456,20 +468,20 @@ void checkModule() {
 
 void processCommand(const RadioCommand& command) {
     if (command.kind == CommandKind::BeginCommissioning) {
-        memcpy(pairingKey, command.key, sizeof(pairingKey));
+
         commissioningEnabled = true;
         rfm69.setNetwork(commissioningNetworkId);
-        radio_aes::enable(rfm69, pairingKey);
+        rfm69.encrypt(nullptr);
         currentProfile.store(Profile::Commissioning);
         currentNetworkId.store(commissioningNetworkId);
     } else if (command.kind == CommandKind::ApplyInstallation) {
-        memcpy(operationalKey, command.key, sizeof(command.key));
+
         operationalNetworkId = command.networkId;
         rfm69.setNetwork(operationalNetworkId);
-        radio_aes::enable(rfm69, operationalKey);
+        rfm69.encrypt(nullptr);
         currentProfile.store(Profile::Operational);
         currentNetworkId.store(operationalNetworkId);
-        memset(pairingKey, 0, sizeof(pairingKey));
+
         commissioningEnabled = false;
         operationalEnabled.store(true);
         currentState.store(State::Receiving);
@@ -477,18 +489,23 @@ void processCommand(const RadioCommand& command) {
         if (command.profile == Profile::Commissioning) {
             if (commissioningEnabled) {
                 rfm69.setNetwork(commissioningNetworkId);
-                radio_aes::enable(rfm69, pairingKey);
+                rfm69.encrypt(nullptr);
                 currentProfile.store(Profile::Commissioning);
                 currentNetworkId.store(commissioningNetworkId);
             }
         } else {
             rfm69.setNetwork(operationalNetworkId);
-            radio_aes::enable(rfm69, operationalKey);
+            rfm69.encrypt(nullptr);
             currentProfile.store(Profile::Operational);
             currentNetworkId.store(operationalNetworkId);
-            memset(pairingKey, 0, sizeof(pairingKey));
+
             commissioningEnabled = false;
         }
+    } else if (command.kind == CommandKind::SessionReply) {
+        uint8_t sealed[radiosensors::replay::kMaxReplySize]; size_t size = 0;
+        if (registry_store::commandReply(static_cast<uint8_t>(command.targetId), command.salt,
+                command.counter, command.header, command.data, command.size, sealed, sizeof(sealed), size))
+            rfm69.send(command.targetId, sealed, static_cast<uint8_t>(size), false);
     } else {
         rfm69.send(
             command.targetId,
@@ -498,16 +515,16 @@ void processCommand(const RadioCommand& command) {
         if (command.switchAfterSend) {
             if (command.profile == Profile::Commissioning && commissioningEnabled) {
                 rfm69.setNetwork(commissioningNetworkId);
-                radio_aes::enable(rfm69, pairingKey);
+                rfm69.encrypt(nullptr);
                 currentProfile.store(Profile::Commissioning);
                 currentNetworkId.store(commissioningNetworkId);
             } else if (command.profile == Profile::Operational) {
                 rfm69.setNetwork(operationalNetworkId);
-                radio_aes::enable(rfm69, operationalKey);
+                rfm69.encrypt(nullptr);
                 currentProfile.store(Profile::Operational);
                 currentNetworkId.store(operationalNetworkId);
-                memset(pairingKey, 0, sizeof(pairingKey));
-                commissioningEnabled = false;
+
+                // Keep the pairing profile available until confirm or timeout.
             }
         }
     }
@@ -521,8 +538,7 @@ void processCommand(const RadioCommand& command) {
     }
 }
 
-// Operational traffic waits for the installation key: without it the radio
-// would send in the clear.
+// Initial setup supplies the operational network before traffic is enabled.
 bool acceptsCommands() {
     return commandQueue != nullptr && operationalEnabled.load();
 }
@@ -633,8 +649,7 @@ bool begin() {
     commissioningEnabled = false;
     operationalNetworkId = secrets.operationalNetworkId;
     commissioningNetworkId = 0;
-    memcpy(operationalKey, secrets.installationKey,
-           radiosensors::gateway_storage::kRadioKeySize);
+
     currentNetworkId.store(operationalNetworkId);
     pinMode(config::interrupt, INPUT);
     resetModule();
@@ -678,10 +693,8 @@ bool begin() {
     configurePower();
     configuredBitRate = rfm69.getBitRate();
 
-    // Without a key the radio sleeps, so it neither receives nor sends in the
-    // clear, but its task still starts so initial setup can hand the key over.
-    if (operationalEnabled.load()) radio_aes::enable(rfm69, operationalKey);
-    else rfm69.sleep();
+    rfm69.encrypt(nullptr);
+    if (!operationalEnabled.load()) rfm69.sleep();
 
     interruptQueue = xQueueCreate(1, sizeof(uint8_t));
     receivedFrameQueue = xQueueCreate(kRxQueueDepth, sizeof(ReceivedFrame));
@@ -721,8 +734,8 @@ bool begin() {
 
     rfm69.setIsrCallback(onRadioInterrupt);
     if (!operationalEnabled.load()) {
-        currentState.store(State::EncryptionKeyMissing);
-        Serial.println("RFM69 encryption key is missing; waiting for initial setup");
+        currentState.store(State::NetworkMissing);
+        Serial.println("RFM69 operational network is missing; waiting for initial setup");
         return true;
     }
     rfm69.receiveDone();
@@ -781,28 +794,35 @@ bool requestProfile(const Profile profile) {
     return queueAndWaitForCompletion(command);
 }
 
-bool beginCommissioning(
-    const uint8_t key[radiosensors::gateway_storage::kRadioKeySize]) {
-    if (!acceptsCommands() || key == nullptr) return false;
+bool beginCommissioning() {
+    if (!acceptsCommands()) return false;
     RadioCommand command{};
     command.kind = CommandKind::BeginCommissioning;
-    memcpy(command.key, key, sizeof(command.key));
-    const bool result = queueAndWaitForCompletion(command);
-    memset(&command, 0, sizeof(command));
-    return result;
+    return queueAndWaitForCompletion(command);
 }
 
-bool applyInstallation(
-    const uint8_t networkId,
-    const uint8_t key[radiosensors::gateway_storage::kRadioKeySize]) {
-    if (commandQueue == nullptr || networkId == 0 || key == nullptr) return false;
+bool applyInstallation(const uint8_t networkId) {
+    if (commandQueue == nullptr || networkId == 0) return false;
     RadioCommand command{};
-    command.kind = CommandKind::ApplyInstallation;
-    command.networkId = networkId;
-    memcpy(command.key, key, sizeof(command.key));
-    const bool result = queueAndWaitForCompletion(command);
-    memset(&command, 0, sizeof(command));
-    return result;
+    command.kind = CommandKind::ApplyInstallation; command.networkId = networkId;
+    return queueAndWaitForCompletion(command);
+}
+
+bool sendCommandReply(const ReceivedFrame& ready, uint8_t header, const uint8_t* payload, size_t size) {
+    if (!acceptsCommands() || size > radiosensors::security::frames::kMaxCommandPayloadSize ||
+        (size != 0 && !payload)) return false;
+    RadioCommand command{};
+    command.kind = CommandKind::SessionReply;
+    command.targetId = ready.senderId; command.counter = ready.counter; command.header = header;
+    memcpy(command.salt, ready.salt, sizeof(command.salt));
+    if (size != 0) memcpy(command.data, payload, size);
+    command.size = static_cast<uint8_t>(size);
+    const bool queued = xQueueSendToBack(commandQueue, &command, 0) == pdPASS;
+    portENTER_CRITICAL(&statsMux);
+    if (queued) ++taskStats.commandsQueued;
+    else ++taskStats.commandsDropped;
+    portEXIT_CRITICAL(&statsMux);
+    return queued;
 }
 
 bool send(
@@ -862,8 +882,8 @@ const char* stateName() {
             return "initialization_failed";
         case State::VersionMismatch:
             return "version_mismatch";
-        case State::EncryptionKeyMissing:
-            return "encryption_key_missing";
+        case State::NetworkMissing:
+            return "network_missing";
         case State::TaskFailed:
             return "task_failed";
         case State::Receiving:
@@ -933,8 +953,11 @@ Snapshot snapshot() {
     result.telemetryRejectedInactive = taskStats.telemetryRejectedInactive;
     result.telemetryFramesQueued = taskStats.telemetryFramesQueued;
     result.telemetryFramesDropped = taskStats.telemetryFramesDropped;
-    result.v2Frames = taskStats.v2Frames;
-    result.v2TelemetryFrames = taskStats.v2TelemetryFrames;
+    result.v3Frames = taskStats.v3Frames;
+    result.v3TelemetryFrames = taskStats.v3TelemetryFrames;
+    result.failedTags = taskStats.failedTags;
+    result.replayFrames = taskStats.replayFrames;
+    result.activationChallenges = taskStats.activationChallenges;
     result.emptyApplicationFrames = taskStats.emptyApplicationFrames;
     result.unsupportedProtocolVersions = taskStats.unsupportedProtocolVersions;
     result.unsupportedFrameKinds = taskStats.unsupportedFrameKinds;
