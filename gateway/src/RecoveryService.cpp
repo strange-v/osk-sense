@@ -20,6 +20,7 @@ constexpr uint8_t kRestarting = 4;
 constexpr const char* kControl = "gateway-recover";
 constexpr const char* kStores[] = {
     "gateway-config", "gateway-auth", "gateway-secrets", "node-reg", "node-cmd",
+    "radio-bound",
 };
 
 SemaphoreHandle_t mutex = nullptr;

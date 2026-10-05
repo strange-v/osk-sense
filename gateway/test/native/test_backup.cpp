@@ -121,6 +121,7 @@ void assertRestored(const backup::Snapshot& expected) {
     assert(gateway_storage::decodeAuthentication(authBytes.data(), authBytes.size(), auth, generation) == gateway_storage::CodecStatus::Ok);
     assert(auth.userCount == 1 && auth.tokenCount == 0 && auth.users[0].id == 1);
     assert(flash["node-cmd"].empty());
+    assert(flash["radio-bound"].empty());
 }
 void codecAndCrypto() {
     backup::Snapshot s, decoded; fixture(s);
@@ -173,11 +174,11 @@ void codecAndCrypto() {
 }
 void restorePowerCuts() {
     backup::Snapshot s; fixture(s); const auto auth = admin();
-    flash.clear(); recovery::begin(); writes = 0;
+    flash.clear(); flash["radio-bound"]["bounds"] = {1,2,3}; recovery::begin(); writes = 0;
     assert(backup::restore(s, auth)); const int total = writes;
     recovery::begin(); assert(!recovery::blocked()); assertRestored(s);
     for (bool before : {false, true}) for (int point = 1; point <= total; ++point) {
-        flash.clear(); cutAt = -1; recovery::begin();
+        flash.clear(); flash["radio-bound"]["bounds"] = {1,2,3}; cutAt = -1; recovery::begin();
         writes = 0; cutAt = point; cutBefore = before;
         try { backup::restore(s, auth); assert(false); } catch (const PowerCut&) {}
         cutAt = -1; recovery::begin();
@@ -201,7 +202,7 @@ void restorePowerCuts() {
 }
 void resetPowerCuts() {
     Database initial;
-    for (const char* name : {"gateway-config", "gateway-auth", "gateway-secrets", "node-reg", "node-cmd"}) initial[name]["old"] = {1,2,3};
+    for (const char* name : {"gateway-config", "gateway-auth", "gateway-secrets", "node-reg", "node-cmd", "radio-bound"}) initial[name]["old"] = {1,2,3};
     initial["gateway-recover"]["operation"] = {2};
     flash = initial; writes = 0; recovery::begin(); const int total = writes;
     for (bool before : {false, true}) for (int point = 1; point <= total; ++point) {

@@ -14,7 +14,8 @@ Implementation status:
 | Pairing entropy | [Hardware capture measurements](../node/crypto_bench/ENTROPY.md); source qualification and runtime health checks pending |
 | Node and gateway radio integration, pairing transactions and command sessions | Pending |
 | EEPROM configuration and node counter reservations | Implemented in `node/lib/NodeCore/include/RadioSecurityStorage.h`; native interruption/overflow tests and AVR build; runtime integration pending |
-| Gateway bounds, backup activation and failed-tag UI counters | Pending |
+| Gateway bounds and backup activation | Implemented in `shared/RadioProtocol/GatewayReplay`, with `gateway/ReplayBoundStorage` NVS adapter and recovery erasure; native replay/activation/interruption tests; radio integration pending |
+| Failed-tag UI counters | Pending |
 
 The operational radio protocol is version 2. The shared V3 security module is
 not connected to the node or gateway radio services.
@@ -253,7 +254,7 @@ The gateway cannot persist each accepted counter: a registry commit takes 3.5–
 | --- | --- |
 | Bound H | Per node, a counter is accepted only once a successfully stored H covers it. When the counter c to accept is above H, the gateway first writes H = c + M − 1, saturating at 2³² − 1; a large jump needs one write, not a loop. The reserve then covers exactly M values, c included. |
 | M | Per node, the number of frames it accepted from that node in the last 24 hours, between 1 and 256, and 256 while it has no such history: about one write a day per node, at most about six for one reporting every minute |
-| Storage | A separate small store with a presence bit and 4 bytes per registry slot, two slots like the other stores; not the registry |
+| Storage | One small NVS blob with presence/state bitmaps and 4 bytes per registry slot, separate from the registry; NVS journals replacements |
 | Record states | A present record holds H, or marks a node paired but with no frame accepted yet. Valid keys without a present record mean an [unactivated](#backup-restore) node. |
 | Initialization | The gateway writes the "no frame accepted yet" state once, when the node turns active under new keys: under fresh keys every counter is fresh, so the first frame is accepted at any counter. A repeated Join confirm only repeats Join complete, as today ([STORAGE.md](../gateway/STORAGE.md)), and never touches the record, because resetting a stored H would make old counters acceptable again. |
 | Floor | In RAM: the last accepted counter + 1. After a restart it starts at H + 1, because every frame accepted before the restart, and therefore every replay, has a counter at most H. |
@@ -261,6 +262,19 @@ The gateway cannot persist each accepted counter: a registry commit takes 3.5–
 | Catch-up | A frame with a valid tag below the floor is not published. The gateway answers with an ACK carrying `counter_floor`, under the tag bound to that frame's counter. The node, which accepts it only for its current frame and only within 256 of its counter, moves to the floor and sends the report again under the new counter. A genuine floor is at most M above the node's counter: a retransmission of an accepted c after a restart meets the floor c + M. |
 | One-way nodes | A node that cannot hear the floor passes it on its own after at most M new frames; after a lost ACK the node retries every 15 minutes and later hourly, so this gives no calendar bound |
 | Abuse | The floor cannot be forged (tag) or replayed (bound to one frame counter). A floor answered to an attacker's replay reaches no node that is waiting for it. |
+
+`GatewayReplay` provides the bound codec, single-blob store and authenticated-frame
+policy. `Guard::inspect()` runs after tag verification: only `Accept` permits
+publication, while `Duplicate` permits re-ACK or a cached command reply.
+`AcceptanceHistory` counts accepted frames in the trailing 24 hours using
+monotonic uptime; M is 256 until a full day has been observed, then 1..256.
+
+The blob must validate at load. Missing or invalid bounds make every node with
+existing keys unactivated. A replacement is committed and read back before
+acceptance. If power is lost before publication, either the previous committed
+bound or the new bound covers all previously published frames. A write or
+read-back failure blocks acceptance until reload. Fresh-key initialization
+refuses to reset a present record.
 
 ### Backup restore
 

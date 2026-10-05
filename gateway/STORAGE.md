@@ -6,7 +6,7 @@ All multi-byte integers are unsigned little-endian unless stated otherwise. No c
 
 ## Common dual-slot rules
 
-Each store owns two NVS blobs. A save serializes the complete next generation into the inactive slot, reads it back, validates every field and its CRC32, and only then publishes it as current. The previous valid generation remains recoverable after interruption or corruption.
+The settings, authentication, installation-secret, registry and command stores each own two NVS blobs. A save serializes the complete next generation into the inactive slot, reads it back, validates every field and its CRC32, and only then publishes it as current. The previous valid generation remains recoverable after interruption or corruption.
 
 Every snapshot begins with:
 
@@ -20,6 +20,36 @@ Every snapshot begins with:
 The final four bytes are CRC32 over every preceding byte, encoded little-endian. Loading validates both slots and selects the newer valid wrapping generation by the same comparison rule as the node registry. An absent store loads documented defaults at generation zero; it does not write merely because the gateway booted.
 
 Generation advances only after a durable semantic change. Re-saving identical content is a no-op. Readers receive copies or immutable published snapshots and never retain pointers into mutable store memory.
+
+## V3 replay-bound module
+
+`GatewayReplay` and `ReplayBoundStorage` provide the V3 store; the operational
+radio service does not use it yet. NVS namespace: `radio-bound`; key: `bounds`;
+magic: `RSRB`; schema: `3`; exact size: 288 bytes.
+
+| Offset | Bytes | Field |
+| ---: | ---: | --- |
+| 0 | 12 | Common header with schema 3 |
+| 12 | 8 | Presence bitmap for 64 registry slots |
+| 20 | 8 | Bound-present bitmap, a subset of presence |
+| 28 | 256 | 64 upper bounds H, 4 bytes each |
+| 284 | 4 | CRC32 |
+
+Presence without a bound marks fresh keys with no accepted frame. Absent and
+unbounded records have H = 0. The blob must validate before any stored bound
+is trusted. Missing or invalid data loads all records absent; nodes with existing
+keys require fresh activation. An NVS read error blocks writes.
+
+NVS journals replacement of the single blob. Saves commit and verify exact
+read-back before publishing the snapshot or accepting the frame. A failed
+commit or read-back blocks acceptance until reload. A power cut before acceptance
+may leave the previous committed blob or the replacement; both cover every
+frame published before the write. Generation is a revision counter, not a
+selection between copies.
+
+Bounds are excluded from backup. Restore and factory reset erase `radio-bound`.
+Slot ownership must stay tied to its node's keys; deleting or replacing keys
+forgets that slot before fresh-key initialization.
 
 ## Gateway settings snapshot
 

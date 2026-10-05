@@ -74,7 +74,7 @@ QueueStatus queue(
     record.commandId = book.nextCommandId;
     record.type = type;
     record.argumentSize = static_cast<uint8_t>(argumentSize);
-    memcpy(record.arguments, arguments, argumentSize);
+    if (argumentSize != 0) memcpy(record.arguments, arguments, argumentSize);
     record.state = CommandState::Pending;
     record.queuedAtUnixMs = nowUnixMs;
     commandId = record.commandId;
