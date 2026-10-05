@@ -103,7 +103,7 @@ For routine backup, restore and Waveshare button reset, see [Installation backup
 
 Erasing the NVS partition returns a gateway to its first-boot state without touching the firmware, OTA state, or Web UI. Use it when storage no longer loads, for example after a storage layout change: the serial log reports `Gateway storage contains data but no valid snapshot`, the UI asks for initial setup, and setup fails with `setup_storage_failed`.
 
-The erase deletes every store: settings, users and API tokens, the installation key and network ID, the device secret, the node registry, and the command book. `gateway_id` derives from the device secret, so clients see a new gateway, and every paired node must be factory-reset and paired again.
+The erase deletes every store: settings, users and API tokens, the network ID, device secret, node registry, replay bounds and command book. `gateway_id` derives from the device secret, so clients see a new gateway, and every paired node must be factory-reset and paired again.
 
 Both boards use a 64 KiB (`0x10000`) `nvs` partition at the end of their Web UI storage area (see `partitions/`). Erase only the address for the matching board over a cable, with the port `pio device list` shows; `--chip` makes esptool refuse a board of the other type:
 

@@ -92,6 +92,7 @@ CommandBook candidate{};
 Delivery deliveries[kNodeIdSlots]{};
 SemaphoreHandle_t mutex = nullptr;
 bool initialized = false;
+TaskHandle_t taskHandle = nullptr;
 std::atomic<uint32_t> pendingNodeIds[4]{};
 std::atomic<uint32_t> publishedGeneration{0};
 std::atomic<uint8_t> publishedRecords{0};
@@ -320,7 +321,7 @@ bool begin(const bool radioReady) {
     if (!radioReady) return true;
     if (xTaskCreatePinnedToCore(
             task, "commands", kTaskStackSize, nullptr, kTaskPriority,
-            nullptr, kTaskCore) != pdPASS) {
+            &taskHandle, kTaskCore) != pdPASS) {
         Serial.println("Command task creation failed");
         return false;
     }
@@ -427,6 +428,10 @@ bool list(Listing& value) {
     }
     unlock();
     return true;
+}
+
+uint32_t stackFreeBytes() {
+    return taskHandle ? uxTaskGetStackHighWaterMark(taskHandle) : 0;
 }
 
 Snapshot snapshot() {

@@ -19,5 +19,6 @@ bool begin();
 bool open(const uint8_t deviceUid[10], const uint8_t factoryKey[16]);
 bool close();
 Snapshot snapshot();
+uint32_t stackFreeBytes();
 
 }  // namespace gateway::commissioning

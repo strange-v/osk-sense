@@ -8,6 +8,7 @@
 #include <TelemetryFrames.h>
 
 #include <atomic>
+#include <esp_timer.h>
 
 #include "CommandService.h"
 #include "PowerControlService.h"
@@ -146,6 +147,7 @@ struct TaskStats {
     uint32_t failedTags = 0;
     uint32_t replayFrames = 0;
     uint32_t activationChallenges = 0;
+    uint32_t acksMeasured = 0, lastAckUs = 0, maxAckUs = 0, acksOver40ms = 0;
     uint32_t emptyApplicationFrames = 0;
     uint32_t unsupportedProtocolVersions = 0;
     uint32_t unsupportedFrameKinds = 0;
@@ -178,7 +180,7 @@ uint32_t lastRegisterCheckMs = 0;
 
 void IRAM_ATTR onRadioInterrupt() {
     BaseType_t higherPriorityTaskWoken = pdFALSE;
-    const uint8_t signal = 1;
+    const uint64_t signal = static_cast<uint64_t>(esp_timer_get_time());
     if (interruptQueue != nullptr) {
         xQueueOverwriteFromISR(interruptQueue, &signal, &higherPriorityTaskWoken);
     }
@@ -187,7 +189,7 @@ void IRAM_ATTR onRadioInterrupt() {
     }
 }
 
-void routeReceivedFrame(ReceivedFrame& received) {
+void routeReceivedFrame(ReceivedFrame& received, uint64_t irqAtUs) {
     namespace s = radiosensors::security;
     namespace f = s::frames;
     namespace r = radiosensors::replay;
@@ -274,6 +276,13 @@ void routeReceivedFrame(ReceivedFrame& received) {
                        opened.counter, ack, bytes, sizeof(bytes), size)) {
             rfm69.sendACK(bytes, static_cast<uint8_t>(size));
             portENTER_CRITICAL(&statsMux);
+            if (irqAtUs != 0) {
+                const uint32_t elapsed = static_cast<uint32_t>(esp_timer_get_time() - irqAtUs);
+                ++taskStats.acksMeasured;
+                taskStats.lastAckUs = elapsed;
+                if (elapsed > taskStats.maxAckUs) taskStats.maxAckUs = elapsed;
+                if (elapsed > 40000) ++taskStats.acksOver40ms;
+            }
             if (telemetry) ++taskStats.telemetryAcksSent;
             else if (header == f::kCommandResultHeader) ++taskStats.commandResultAcksSent;
             if (ack.commandPending) ++taskStats.commandHintsSent;
@@ -317,7 +326,7 @@ void routeReceivedFrame(ReceivedFrame& received) {
     portEXIT_CRITICAL(&statsMux);
 }
 
-void drainReceivedFrame() {
+void drainReceivedFrame(uint64_t irqAtUs = 0) {
     if (!rfm69.receiveDone()) {
         portENTER_CRITICAL(&statsMux);
         ++taskStats.emptyWakeups;
@@ -335,7 +344,7 @@ void drainReceivedFrame() {
     taskStats.lastPacketMs = received.receivedAtMs;
     taskStats.lastSenderId = received.senderId; taskStats.lastRssi = received.rssi;
     portEXIT_CRITICAL(&statsMux);
-    routeReceivedFrame(received);
+    routeReceivedFrame(received, irqAtUs);
     rfm69.receiveDone();
 }
 
@@ -587,11 +596,11 @@ bool queueAndWaitForCompletion(RadioCommand& command) {
     return result;
 }
 
-void serviceInterrupt() {
+void serviceInterrupt(uint64_t irqAtUs) {
     portENTER_CRITICAL(&statsMux);
     ++taskStats.interrupts;
     portEXIT_CRITICAL(&statsMux);
-    drainReceivedFrame();
+    drainReceivedFrame(irqAtUs);
 }
 
 // DIO0 signals PayloadReady by a rising edge only. An edge lost to an ESP32
@@ -613,16 +622,16 @@ void radioTask(void*) {
     for (;;) {
         QueueSetMemberHandle_t ready =
             xQueueSelectFromSet(radioQueueSet, kMissedInterruptCheck);
-        uint8_t signal = 0;
+        uint64_t signal = 0;
         if (ready == nullptr) {
             serviceMissedInterrupt();
         } else if (ready == interruptQueue &&
                    xQueueReceive(interruptQueue, &signal, 0) == pdPASS) {
-            serviceInterrupt();
+            serviceInterrupt(signal);
         } else {
             // If RX and a command became ready together, always drain the FIFO first.
             if (xQueueReceive(interruptQueue, &signal, 0) == pdPASS) {
-                serviceInterrupt();
+                serviceInterrupt(signal);
             }
             RadioCommand command{};
             if (xQueueReceive(commandQueue, &command, 0) == pdPASS) {
@@ -645,7 +654,7 @@ bool begin() {
     currentState.store(State::Starting);
     const radiosensors::gateway_storage::InstallationSecrets secrets =
         configuration_store::secrets();
-    operationalEnabled.store(secrets.installationKeyPresent);
+    operationalEnabled.store(secrets.radioConfigured);
     commissioningEnabled = false;
     operationalNetworkId = secrets.operationalNetworkId;
     commissioningNetworkId = 0;
@@ -696,7 +705,7 @@ bool begin() {
     rfm69.encrypt(nullptr);
     if (!operationalEnabled.load()) rfm69.sleep();
 
-    interruptQueue = xQueueCreate(1, sizeof(uint8_t));
+    interruptQueue = xQueueCreate(1, sizeof(uint64_t));
     receivedFrameQueue = xQueueCreate(kRxQueueDepth, sizeof(ReceivedFrame));
     telemetryFrameQueue = xQueueCreate(kRxQueueDepth, sizeof(ReceivedFrame));
     sessionFrameQueue = xQueueCreate(kSessionQueueDepth, sizeof(ReceivedFrame));
@@ -928,6 +937,10 @@ const char* profileName() {
         : "operational";
 }
 
+uint32_t stackFreeBytes() {
+    return radioTaskHandle ? uxTaskGetStackHighWaterMark(radioTaskHandle) : 0;
+}
+
 Snapshot snapshot() {
     Snapshot result{
         state(),
@@ -958,6 +971,8 @@ Snapshot snapshot() {
     result.failedTags = taskStats.failedTags;
     result.replayFrames = taskStats.replayFrames;
     result.activationChallenges = taskStats.activationChallenges;
+    result.acksMeasured = taskStats.acksMeasured; result.lastAckUs = taskStats.lastAckUs;
+    result.maxAckUs = taskStats.maxAckUs; result.acksOver40ms = taskStats.acksOver40ms;
     result.emptyApplicationFrames = taskStats.emptyApplicationFrames;
     result.unsupportedProtocolVersions = taskStats.unsupportedProtocolVersions;
     result.unsupportedFrameKinds = taskStats.unsupportedFrameKinds;

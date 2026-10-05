@@ -17,6 +17,7 @@
 #include "SupplyVoltage.h"
 #include "TelemetrySchedule.h"
 #include "WatchdogWindow.h"
+#include "StackMonitor.h"
 
 #if !defined(NODE_MIN_TRANSMIT_MILLIVOLTS)
 #error "NODE_MIN_TRANSMIT_MILLIVOLTS must be defined by the build environment"
@@ -61,6 +62,7 @@ public:
           radioRetry_(radioRetry) {}
 
     void begin() {
+        stack_monitor::Scope stackScope;
 #if defined(NODE_DEBUG)
         // The core moves the reset flags to GPIOR0 before setup().
         if ((GPIOR0 & RSTCTRL_WDRF_bm) != 0) debugLine(F("rst wdt"));
@@ -78,6 +80,7 @@ public:
     }
 
     void runOnce() {
+        stack_monitor::Scope stackScope;
         const ButtonGesture gesture = button_.takeGesture();
         if (gesture == ButtonGesture::LongPress) resetNetwork();
         const uint32_t now = clock_.nowMs();

@@ -332,11 +332,7 @@ void handleInitialSetup(AsyncWebServerRequest* request, JsonVariant& json) {
     }
 
     auto secrets = configuration_store::secrets();
-    if (!secrets.installationKeyPresent) {
-        secrets.installationKeyPresent = true;
-        esp_fill_random(secrets.installationKey,
-                        radiosensors::gateway_storage::kRadioKeySize);
-    }
+    secrets.radioConfigured = true;
     if (object["operational_network_id"].is<uint8_t>()) {
         const uint8_t requested = object["operational_network_id"].as<uint8_t>();
         if (requested == 0) {
@@ -1116,9 +1112,7 @@ void handleResetRadioNetwork(AsyncWebServerRequest* request, JsonVariant& json) 
     power_control::clear();
 
     auto secrets = configuration_store::secrets();
-    secrets.installationKeyPresent = true;
-    esp_fill_random(secrets.installationKey,
-                    radiosensors::gateway_storage::kRadioKeySize);
+    secrets.radioConfigured = true;
     secrets.operationalNetworkId = requestedNetworkId != 0
         ? requestedNetworkId
         : randomOperationalNetworkId();
@@ -1692,7 +1686,7 @@ void handleOpenPairing(AsyncWebServerRequest* request, JsonVariant& json) {
     const char* keyHex = object["factory_key"].is<const char*>()
         ? object["factory_key"].as<const char*>() : nullptr;
     uint8_t deviceUid[radiosensors::protocol::kDeviceUidSize]{};
-    uint8_t factoryKey[radiosensors::gateway_storage::kRadioKeySize]{};
+    uint8_t factoryKey[radiosensors::gateway_storage::kFactoryKeySize]{};
     if (!decodeHex(uidHex, deviceUid, sizeof(deviceUid)) ||
         !decodeHex(keyHex, factoryKey, sizeof(factoryKey))) {
         memset(factoryKey, 0, sizeof(factoryKey));
@@ -2062,7 +2056,7 @@ void handleStatus(AsyncWebServerRequest* request) {
         "\"power_targets_sent\":%lu,"
         "\"commands_queued\":%lu,\"commands_dropped\":%lu,"
         "\"commands_processed\":%lu},"
-        "\"last_packet\":{\"at_ms\":%lu,\"sender_id\":%u,\"rssi\":%d}}}",
+        "\"last_packet\":{\"at_ms\":%lu,\"sender_id\":%u,\"rssi\":%d}}",
         firmware::version,
         static_cast<unsigned>(api::version),
         board::current.name,
@@ -2185,6 +2179,20 @@ void handleStatus(AsyncWebServerRequest* request) {
         radioSnapshot.lastPacketMs,
         radioSnapshot.lastSenderId,
         radioSnapshot.lastRssi);
+    const auto bench = registry_store::radioDiagnostics();
+    response->printf(
+        ",\"bench\":{\"last_receive_us\":%lu,\"max_receive_us\":%lu,"
+        "\"reservation_writes\":%lu,\"reservation_failures\":%lu,"
+        "\"last_reservation_write_us\":%lu,\"max_reservation_write_us\":%lu,"
+        "\"acks_measured\":%lu,\"last_ack_us\":%lu,\"max_ack_us\":%lu,\"acks_over_40ms\":%lu,"
+        "\"stack_free_bytes\":{\"radio\":%lu,\"commissioning\":%lu,\"commands\":%lu}}}",
+        static_cast<unsigned long>(bench.lastReceiveUs), static_cast<unsigned long>(bench.maxReceiveUs),
+        static_cast<unsigned long>(bench.reservationWrites), static_cast<unsigned long>(bench.reservationFailures),
+        static_cast<unsigned long>(bench.lastReservationWriteUs), static_cast<unsigned long>(bench.maxReservationWriteUs),
+        static_cast<unsigned long>(radioSnapshot.acksMeasured), static_cast<unsigned long>(radioSnapshot.lastAckUs),
+        static_cast<unsigned long>(radioSnapshot.maxAckUs), static_cast<unsigned long>(radioSnapshot.acksOver40ms),
+        static_cast<unsigned long>(radio::stackFreeBytes()), static_cast<unsigned long>(commissioning::stackFreeBytes()),
+        static_cast<unsigned long>(commands::stackFreeBytes()));
     request->send(response);
 }
 

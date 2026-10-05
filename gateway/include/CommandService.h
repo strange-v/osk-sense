@@ -60,5 +60,6 @@ bool removeNode(uint8_t nodeId);
 bool clear();
 bool list(Listing& value);
 Snapshot snapshot();
+uint32_t stackFreeBytes();
 
 }  // namespace gateway::commands

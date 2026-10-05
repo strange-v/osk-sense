@@ -197,9 +197,8 @@ SaveStatus saveSecrets(const InstallationSecrets& value) {
         return SaveStatus::Invalid;
     xSemaphoreTake(mutex, portMAX_DELAY);
     const bool radioProfileChanged =
-        value.installationKeyPresent != currentSecrets.installationKeyPresent ||
-        value.operationalNetworkId != currentSecrets.operationalNetworkId ||
-        memcmp(value.installationKey, currentSecrets.installationKey, kRadioKeySize) != 0;
+        value.radioConfigured != currentSecrets.radioConfigured ||
+        value.operationalNetworkId != currentSecrets.operationalNetworkId;
     if (radioProfileChanged && registry_store::hasActiveNodes()) {
         xSemaphoreGive(mutex);
         return SaveStatus::LockedByActiveNodes;

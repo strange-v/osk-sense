@@ -22,6 +22,7 @@ constexpr UBaseType_t kTaskPriority = 6;
 constexpr BaseType_t kTaskCore = 1;
 constexpr uint32_t kConfirmTimeoutMs = 5000;
 
+TaskHandle_t taskHandle = nullptr;
 Snapshot counters{};
 portMUX_TYPE countersMux = portMUX_INITIALIZER_UNLOCKED;
 std::atomic<bool> awaitingConfirm{false};
@@ -179,7 +180,7 @@ void task(void*) {
 bool begin() {
     if (xTaskCreatePinnedToCore(
             task, "commissioning", kTaskStackSize, nullptr, kTaskPriority,
-            nullptr, kTaskCore) != pdPASS) {
+            &taskHandle, kTaskCore) != pdPASS) {
         Serial.println("Commissioning task creation failed");
         return false;
     }
@@ -189,7 +190,7 @@ bool begin() {
 
 bool open(
     const uint8_t deviceUid[radiosensors::protocol::kDeviceUidSize],
-    const uint8_t factoryKey[radiosensors::gateway_storage::kRadioKeySize]) {
+    const uint8_t factoryKey[radiosensors::gateway_storage::kFactoryKeySize]) {
     if (deviceUid == nullptr || factoryKey == nullptr) return false;
     awaitingConfirm = false;
     confirmDeadline = 0;
@@ -207,6 +208,10 @@ bool close() {
     const bool result = status::closePairing();
     clearExpectedDevice();
     return result;
+}
+
+uint32_t stackFreeBytes() {
+    return taskHandle ? uxTaskGetStackHighWaterMark(taskHandle) : 0;
 }
 
 Snapshot snapshot() {

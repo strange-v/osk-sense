@@ -80,10 +80,9 @@ void fixture(backup::Snapshot& s) {
     s.settings = gateway_storage::defaultSettings();
     memcpy(s.settings.hostname, "greenhouse", 10); s.settings.hostnameLength = 10;
     s.secrets = gateway_storage::defaultSecrets();
-    s.secrets.deviceSecretPresent = s.secrets.installationKeyPresent = true;
+    s.secrets.deviceSecretPresent = s.secrets.radioConfigured = true;
     s.secrets.operationalNetworkId = 123;
     for (size_t i = 0; i < 32; ++i) s.secrets.deviceSecret[i] = i;
-    for (size_t i = 0; i < 16; ++i) s.secrets.installationKey[i] = i * 7;
     s.createdAt = 1700000000000;
     registry::NodeRecord record{};
     record.nodeId = 7; record.deviceUid[0] = 4; record.profileId = 6;
@@ -153,7 +152,7 @@ void codecAndCrypto() {
     assert(!memcmp(s.nodes.records()[0].pairing, decoded.nodes.records()[0].pairing, security::pairing::kSnapshotSize));
     JsonDocument doc; assert(!deserializeJson(doc, json));
     auto rejects = [&]() { std::string text; serializeJson(doc, text); assert(!backup::decode(text.data(), text.size(), decoded)); };
-    doc["version"] = 1; rejects(); doc["version"] = 2;
+    doc["version"] = 1; rejects(); doc["version"] = 2; rejects(); doc["version"] = 3;
     doc["network_id"] = 0; rejects(); doc["network_id"] = 123;
     doc["settings"]["pairing_seconds"] = "120"; rejects(); doc["settings"]["pairing_seconds"] = 120;
     doc["nodes"][0]["power_policy"] = 4; rejects(); doc["nodes"][0]["power_policy"] = 2;

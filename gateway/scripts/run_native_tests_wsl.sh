@@ -8,6 +8,11 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 gateway_dir="$(cd "${script_dir}/.." && pwd)"
 cd "${gateway_dir}"
 
+if (( $# > 1 )) || [[ "${1:-}" != "" && "${1:-}" != "--backup" ]]; then
+    echo "Usage: $0 [--backup]" >&2
+    exit 2
+fi
+
 mbedtls_version=3.6.3
 mbedtls_sha256=64cd73842cdc05e101172f7b437c65e7312e476206e1dbfd644433d11bc56327
 # Must match bblanchon/ArduinoJson in platformio.ini.
@@ -82,6 +87,7 @@ if [[ -z "${node_command}" ]]; then
     exit 1
 fi
 "${node_command}" test/native/check_interop.mjs "${fixture}"
+if [[ "${1:-}" == "--backup" ]]; then exit 0; fi
 
 # The gateway uses the miniz inflater in the ESP32 ROM; the native build uses
 # the miniz release.

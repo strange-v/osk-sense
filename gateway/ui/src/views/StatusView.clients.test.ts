@@ -16,11 +16,12 @@ const state = vi.hoisted(() => ({
   tokens: [] as ApiToken[],
   role: 'admin' as 'admin' | 'viewer',
   tokensFail: false,
+  radioCounters: { failed_tags: 0, replay_frames: 0, activation_challenges: 0 },
 }))
 const health = () => ({
   status: 'ok', firmware: '2.1.0',
   ethernet: { has_ip: true, ip: '192.168.1.10', state: 'connected' },
-  radio: { present: true, frequency_hz: 868_000_000, network_id: 137 },
+  radio: { present: true, frequency_hz: 868_000_000, network_id: 137, counters: { ...state.radioCounters } },
   storage: { ready: true }, registry: { records: 1, generation: 4 },
   telemetry: { nodes_seen: 1, updates: 3 },
   time: { state: 'synchronized', unix_ms: 1_700_000_000_000, last_sync_ms: 1_700_000_000_000 },
@@ -66,6 +67,7 @@ beforeEach(() => {
   state.tokens = []
   state.role = 'admin'
   state.tokensFail = false
+  state.radioCounters = { failed_tags: 0, replay_frames: 0, activation_challenges: 0 }
   vi.clearAllMocks()
   gatewayApi.poll.status.mockImplementation(async () => health())
   gatewayApi.tokens.mockImplementation(async () => {
@@ -76,6 +78,30 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('StatusView clients card', () => {
+  it('shows radio security counts, including zero, without treating past events as a current failure', async () => {
+    state.radioCounters = { failed_tags: 7, replay_frames: 0, activation_challenges: 12 }
+    const wrapper = await mountView()
+    const rows = wrapper.get('.radio-security-card').findAll('dl > div')
+    expect(rows.map((row) => row.get('dt').text())).toEqual([en.status.failedTags, en.status.replayFrames, en.status.activationChallenges])
+    expect(rows.map((row) => row.get('dd').text())).toEqual(['7', '0', '12'])
+    expect(wrapper.find('.attention-banner').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('refreshes radio counts and clears them when the gateway restarts', async () => {
+    const wrapper = await mountView()
+    state.radioCounters = { failed_tags: 2, replay_frames: 5, activation_challenges: 1 }
+    await vi.advanceTimersByTimeAsync(10_000)
+    await flushPromises()
+    const values = () => wrapper.get('.radio-security-card').findAll('dd').map((cell) => cell.text())
+    expect(values()).toEqual(['2', '5', '1'])
+    state.radioCounters = { failed_tags: 0, replay_frames: 0, activation_challenges: 0 }
+    await vi.advanceTimersByTimeAsync(10_000)
+    await flushPromises()
+    expect(values()).toEqual(['0', '0', '0'])
+    wrapper.unmount()
+  })
+
   it('invites setup only when nothing can stream', async () => {
     const wrapper = await mountView()
     expect(card(wrapper).get('.inline-status').text()).toBe(en.clients.state.unconfigured)

@@ -19,8 +19,8 @@ Implementation status:
 | Gateway radio integration and command sessions | Integrated through `RegistryRadio`, `RadioService`, commissioning and command services; native tests cover tag tampering, replay, queue backpressure, restart, restore activation and immutable replies; both gateway targets build |
 | EEPROM configuration and node counter reservations | Integrated in the node runtime; native interruption, overflow and service tests |
 | Gateway bounds and backup activation | Implemented in `shared/RadioProtocol/GatewayReplay`, with `gateway/ReplayBoundStorage` NVS adapter and recovery erasure; native replay/activation/interruption tests; integrated into gateway radio reception |
-| Failed-tag UI counters | Backend publishes `failed_tags`, `replay_frames` and `activation_challenges`; dedicated UI presentation pending |
-| Gateway network secrets | Setup and backup store an unused installation key; storage cleanup pending |
+| Failed-tag UI counters | Status page shows `failed_tags`, `replay_frames` and `activation_challenges` since boot |
+| Gateway network secrets | Configured flag, network ID and device secret; radio keys are per node in the registry |
 
 Node and gateway radio services use V3. ATtiny3224 entropy qualification,
 real-radio interoperability, ACK timing during NVS reservations and stack
@@ -419,10 +419,10 @@ megaTinyCore 2.6.7 and the 4 MHz internal clock.
 | `climate_tmp112` | 20 822 | 11 946 | 815 |
 | `binary_sht40` | 20 685 | 12 083 | 799 |
 | `binary` | 18 809 | 13 959 | 710 |
-| `counter_reed_debug` | 22 730 | 10 038 | 909 |
-| `climate_tmp112_debug` | 22 600 | 10 168 | 960 |
-| `binary_sht40_debug` | 22 932 | 9836 | 944 |
-| `binary_debug` | 20 694 | 12 074 | 855 |
+| `counter_reed_debug` | 22 850 | 9918 | 915 |
+| `climate_tmp112_debug` | 22 718 | 10 050 | 966 |
+| `binary_sht40_debug` | 23 050 | 9718 | 950 |
+| `binary_debug` | 20 812 | 11 956 | 861 |
 
 Run `node/scripts/probe_v3_size.ps1 -Environment counter_reed` from PowerShell;
 the other release environment names select their own composition roots.
@@ -430,9 +430,10 @@ The script builds the actual release environment, including RTC entropy
 collection, and inspects its ELF without uploading. The MCU's memory limits
 apply unchanged. Flash includes `.text`, `.rodata` and `.data`.
 
-Static RAM leaves at least 2112 bytes for stack and dynamic state. Peak stack usage
-is unverified: this AVR toolchain produces empty `-fstack-usage` reports with
-LTO. The integrated image still needs a stack high-water measurement.
+Static RAM leaves at least 2106 bytes for stack and dynamic state. Debug images
+paint unused SRAM during startup and report `stkfree <bytes>` when the minimum
+remaining heap-to-stack gap decreases. The painter is absent from release images.
+Peak stack usage remains unverified until measured on hardware.
 
 ## ATtiny3224 hardware verification
 
@@ -442,7 +443,25 @@ LTO. The integrated image still needs a stack high-water measurement.
 | Sleep and wake | PPK2 current measurements with RTC PIT enabled and ADC disabled, including a radio transmission |
 | Pairing entropy | RTC/TCB0 captures across devices, supply voltages, temperature and power cycles; integrated capture restores PIT operation |
 | Provisioning | SerialUPDI USERROW write/readback, factory key preservation and EEPROM reservations after reset |
-| Stack | High-water measurement during pairing and command sessions |
+| Stack | Record debug UART `stkfree` minimum during pairing, activation, telemetry and command sessions; check gateway task minima in `/ui/status` |
+
+### Radio timing and replay reservations
+
+Read the authenticated `/ui/status` endpoint after pairing, normal reports,
+`READ_INFO`, node reboot, gateway reboot and backup restore. Its `bench` object
+contains receive-processing time, replay NVS write time, IRQ-to-ACK time and
+ESP32 task stack minima; field definitions are in [API.md](../gateway/API.md#liveness-and-status).
+
+Exercise replay reservations with node reboots, which skip the node's reserved
+counter range, and repeat with a full registry. Record `max_receive_us`,
+`max_reservation_write_us`, `max_ack_us`, `acks_over_40ms`, reservation failures
+and node retry/ACK results. Verify activation after gateway reboot and restore,
+and rejection of captured stale frames and frames with a damaged tag.
+
+IRQ-to-ACK timing includes scheduling, replay read-back and completed radio
+transmission. Missed-IRQ recovery is excluded from `acks_measured`; node reception
+and tag verification require the actual radio test. Debug UART and stack scanning
+affect the node image; check the 40 ms deadline with release firmware too.
 
 ## Later
 

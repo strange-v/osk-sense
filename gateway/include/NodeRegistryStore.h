@@ -19,6 +19,11 @@ struct Snapshot {
 };
 
 bool begin();
+struct RadioDiagnostics {
+    uint32_t lastReceiveUs, maxReceiveUs;
+    uint32_t reservationWrites, reservationFailures, lastReservationWriteUs, maxReservationWriteUs;
+};
+RadioDiagnostics radioDiagnostics();
 uint32_t generation();
 size_t recordCount();
 bool isActiveNode(uint8_t nodeId);

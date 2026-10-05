@@ -68,7 +68,7 @@ bool capture(Snapshot& snapshot) {
 bool cleanGateway() {
     return !recovery::blocked() && configuration_store::ready() &&
         configuration_store::authentication().userCount == 0 &&
-        !configuration_store::secrets().installationKeyPresent &&
+        !configuration_store::secrets().radioConfigured &&
         registry_store::recordCount() == 0;
 }
 
@@ -85,7 +85,7 @@ bool restore(
 
     // Validate each durable encoding before the marker or any installation write.
     size_t registrySize = 0;
-    bool ok = snapshot.secrets.installationKeyPresent &&
+    bool ok = snapshot.secrets.radioConfigured &&
         snapshot.secrets.deviceSecretPresent &&
         gateway_storage::encodeSettings(snapshot.settings, 1, bytes, kBufferSize) ==
             gateway_storage::CodecStatus::Ok &&

@@ -305,7 +305,7 @@ An active or disabled UID returns `409 node_already_exists`. A pending UID may r
 
 ## Radio network
 
-`POST /ui/radio/reset` regenerates the installation key and the operational network ID, and requires an admin session plus CSRF. The body is optional:
+`POST /ui/radio/reset` clears paired nodes and sets the operational network ID. It requires an admin session plus CSRF. The body is optional:
 
 ```json
 {"operational_network_id":42}
@@ -313,7 +313,7 @@ An active or disabled UID returns `409 node_already_exists`. A pending UID may r
 
 A value from 1 to 255 is applied as given; omit the field to have the gateway generate one. Zero or a non-integer returns `422 invalid_operational_network_id`.
 
-The operation clears the node registry, the command book, and cached telemetry before writing the new secrets, because every registered node is bound to the previous network and key. It answers `202` with the applied ID and the number of removed records, then restarts. Only initial setup hands a profile to the running radio, because before setup it has none.
+The operation clears the node registry, replay bounds, command book and cached telemetry before saving the network ID. It answers `202` with the applied ID and number of removed records, then restarts. Only initial setup applies the profile to the running radio, because before setup it has none.
 
 ```json
 {"operational_network_id":42,"removed_nodes":6,"restarting":true}
@@ -408,6 +408,18 @@ It exists so something on the network can tell the gateway is up without a crede
 
 `GET /ui/status` requires a session and returns everything the gateway knows about itself: ethernet, radio, storage, time, registry, telemetry, setup and pairing windows, WebSocket counters, OTA, Web UI state, uptime, free heap, reset reason, and the radio pinout and counters. `storage.nvs` reports `used_entries`, `free_entries`, `available_entries`, `total_entries`, and `namespace_count`; the counts are valid when `stats_available` is true. Radio counters include `v3_frames`, `v3_telemetry_frames`, `failed_tags`, `replay_frames` and `activation_challenges`.
 
+The status page shows the three security counters since boot. The root `bench` object exposes hardware measurements; durations are microseconds and counters reset at boot:
+
+| Fields | Measurement |
+| --- | --- |
+| `last_receive_us`, `max_receive_us` | V3 engine receive processing, including authentication and replay reservation/read-back |
+| `reservation_writes`, `reservation_failures` | Attempted and failed replay-bound writes |
+| `last_reservation_write_us`, `max_reservation_write_us` | NVS `putBytes` duration; excludes read-back |
+| `acks_measured`, `last_ack_us`, `max_ack_us`, `acks_over_40ms` | IRQ to completed ACK transmission, including scheduling, processing and radio transmit; missed-IRQ recovery frames are excluded |
+| `stack_free_bytes.radio`, `.commissioning`, `.commands` | ESP32 task minimum free stack in bytes; zero when the task is unavailable |
+
+ACK measurements do not include node reception or verification. The node's 40 ms receive deadline still requires an on-air test. No timing logs run before the ACK.
+
 ## Development diagnostics
 
 `GET /ui/telemetry/last` returns the most recently accepted telemetry record with its payload as hexadecimal, for looking at frames on the bench without a WebSocket client. It requires a browser session and does not accept a bearer token: it returns decoded node telemetry, which is what `telemetry:read` protects, and it is not part of the external client contract. Before the first frame it answers `404 no_telemetry`.
@@ -418,4 +430,4 @@ It exists so something on the network can tell the gateway is up without a crede
 
 ## Security and backup
 
-The gateway serves HTTP and WebSocket only and is intended exclusively for a trusted private LAN. It does not provide TLS/WSS and must not be exposed directly to the Internet or an untrusted network. LAN traffic capture, DNS/mDNS spoofing, and a compromised LAN client are outside the accepted threat model. Diagnostic export excludes password hashes, token hashes, radio keys, and device secrets. [Installation backup](BACKUP.md) provides authenticated encryption for settings, nodes and installation keys, with restore restricted to a clean gateway in its physical setup window.
+The gateway serves HTTP and WebSocket only and is intended exclusively for a trusted private LAN. It does not provide TLS/WSS and must not be exposed directly to the Internet or an untrusted network. LAN traffic capture, DNS/mDNS spoofing, and a compromised LAN client are outside the accepted threat model. Diagnostic export excludes password hashes, token hashes, radio keys, and device secrets. [Installation backup](BACKUP.md) provides authenticated encryption for settings, nodes and their keys, with restore restricted to a clean gateway in its physical setup window.

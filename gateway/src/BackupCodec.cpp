@@ -9,8 +9,8 @@ namespace {
 
 using namespace radiosensors;
 
-constexpr uint8_t kPayloadVersion = 2;
-constexpr size_t kRootFields = 7;
+constexpr uint8_t kPayloadVersion = 3;
+constexpr size_t kRootFields = 6;
 constexpr size_t kSettingsFields = 6;
 constexpr size_t kNodeFields = 11;
 
@@ -85,7 +85,7 @@ bool stringField(
 bool valid(const Snapshot& snapshot) {
     uint8_t settings[gateway_storage::kSettingsSnapshotSize]{};
     uint8_t secrets[gateway_storage::kSecretsSnapshotSize]{};
-    const bool ok = snapshot.secrets.installationKeyPresent &&
+    const bool ok = snapshot.secrets.radioConfigured &&
         snapshot.secrets.deviceSecretPresent &&
         gateway_storage::encodeSettings(snapshot.settings, 0, settings, sizeof(settings)) ==
             gateway_storage::CodecStatus::Ok &&
@@ -156,13 +156,9 @@ bool encode(const Snapshot& snapshot, std::string& output) {
     }
 
     document["network_id"] = snapshot.secrets.operationalNetworkId;
-    std::string key =
-        hex(snapshot.secrets.installationKey, sizeof(snapshot.secrets.installationKey));
     std::string secret =
         hex(snapshot.secrets.deviceSecret, sizeof(snapshot.secrets.deviceSecret));
-    document["installation_key"] = key;
     document["device_secret"] = secret;
-    wipe(key.data(), key.size());
     wipe(secret.data(), secret.size());
 
     JsonArray nodes = document["nodes"].to<JsonArray>();
@@ -210,12 +206,10 @@ bool decode(const char* json, const size_t size, Snapshot& snapshot) {
 
     auto& secrets = snapshot.secrets;
     secrets = {};
-    secrets.installationKeyPresent = true;
+    secrets.radioConfigured = true;
     secrets.deviceSecretPresent = true;
     secrets.operationalNetworkId = root["network_id"].as<uint8_t>();
-    if (!unhex(root["installation_key"], secrets.installationKey,
-               sizeof(secrets.installationKey)) ||
-        !unhex(root["device_secret"], secrets.deviceSecret,
+    if (!unhex(root["device_secret"], secrets.deviceSecret,
                sizeof(secrets.deviceSecret))) {
         return false;
     }

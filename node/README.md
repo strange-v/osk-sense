@@ -46,7 +46,7 @@ pio run -e climate_tmp112 -t fuses
 ## Runtime composition
 
 Node radio traffic uses V3 software CTR/CMAC and persistent frame counters.
-Gateway V3 integration is pending. Release and debug profiles fit the 32 KiB Flash;
+The gateway authenticates V3 traffic with per-node keys. Release and debug profiles fit the 32 KiB Flash;
 sizes and the inspection command are in [V3-SECURITY.md](../protocol/V3-SECURITY.md#flash).
 
 The SOIC-14 pin assignments are PA4 radio CS, PA7 radio IRQ, PA1/PA2/PA3
@@ -85,6 +85,8 @@ Every image supports per-node-key UID commissioning, recovery of provisional com
 The solar/supercapacitor climate policy schedules nominal 60 seconds above 2500 mV and 300 seconds at or below it, by the voltage each report measured, acknowledged or not. The 32-second RTC step yields about 64/320 seconds. Battery-powered climate builds use one compile-time interval and do not persist it.
 
 `*_debug` environments log at 9600 baud on PB2. They preserve the RTC timebase but never call `sleep_cpu()`; idle iterations use a short delay. Do not use them to measure sleep current.
+
+Debug builds enable `NODE_STACK_DIAGNOSTICS`: `stkfree <bytes>` reports the smallest observed free heap-to-stack gap whenever it decreases. Startup paints unused SRAM; reports scan the remaining marker after runtime operations. Record the minimum during pairing, activation, reports and command sessions. Debug UART and instrumentation consume stack, so this measures the debug image; use release images for power measurements.
 
 ## Event-node policy
 

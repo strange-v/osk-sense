@@ -63,6 +63,7 @@ struct Snapshot {
     uint32_t failedTags;
     uint32_t replayFrames;
     uint32_t activationChallenges;
+    uint32_t acksMeasured, lastAckUs, maxAckUs, acksOver40ms;
     uint32_t emptyApplicationFrames;
     uint32_t unsupportedProtocolVersions;
     uint32_t unsupportedFrameKinds;
@@ -107,5 +108,6 @@ const char* frequencyBandName();
 const char* spiHostName();
 const char* profileName();
 Snapshot snapshot();
+uint32_t stackFreeBytes();
 
 }  // namespace gateway::radio

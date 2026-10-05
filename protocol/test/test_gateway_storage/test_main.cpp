@@ -84,12 +84,9 @@ AuthenticationData populatedAuthentication() {
 
 InstallationSecrets populatedSecrets() {
     InstallationSecrets value{};
-    value.installationKeyPresent = true;
+    value.radioConfigured = true;
     value.deviceSecretPresent = true;
     value.operationalNetworkId = 128;
-    for (size_t index = 0; index < kRadioKeySize; ++index) {
-        value.installationKey[index] = index;
-    }
     for (size_t index = 0; index < kDeviceSecretSize; ++index) value.deviceSecret[index] = index + 32;
     return value;
 }
@@ -189,17 +186,16 @@ void test_secrets_known_layout() {
     const InstallationSecrets source = populatedSecrets();
     uint8_t bytes[kSecretsSnapshotSize]{};
     TEST_ASSERT_EQUAL_INT(static_cast<int>(CodecStatus::Ok), static_cast<int>(encodeSecrets(source, 8, bytes, sizeof(bytes))));
-    TEST_ASSERT_EQUAL_UINT8(67, bytes[10]);
+    TEST_ASSERT_EQUAL_UINT8(51, bytes[10]);
+    TEST_ASSERT_EQUAL_UINT16(kSecretsStorageVersion, radiosensors::protocol::readUint16Le(bytes + 4));
     TEST_ASSERT_EQUAL_UINT8(0, bytes[11]);
     TEST_ASSERT_EQUAL_HEX8(0x03, bytes[12]);
     TEST_ASSERT_EQUAL_HEX8(0x00, bytes[13]);
     TEST_ASSERT_EQUAL_UINT8(128, bytes[14]);
-    TEST_ASSERT_EQUAL_MEMORY(source.installationKey, bytes + 15, kRadioKeySize);
-    TEST_ASSERT_EQUAL_MEMORY(source.deviceSecret, bytes + 31, kDeviceSecretSize);
+    TEST_ASSERT_EQUAL_MEMORY(source.deviceSecret, bytes + 15, kDeviceSecretSize);
 }
 
-// Before setup the gateway holds a network ID but no installation key, and
-// that record must save; network 0 is refused with or without a key.
+// A network ID is stored before setup; operational network 0 is always refused.
 void test_secrets_network_id_is_never_zero() {
     uint8_t bytes[kSecretsSnapshotSize]{};
     InstallationSecrets bootstrap{};

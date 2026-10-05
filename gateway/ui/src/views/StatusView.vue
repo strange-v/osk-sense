@@ -153,6 +153,15 @@ onBeforeUnmount(() => window.clearInterval(timer))
             </dl>
           </section>
 
+          <section class="panel radio-security-card">
+            <header class="panel-heading"><div><h2>{{ $t('status.radioSecurity') }}</h2><p>{{ $t('status.radioSecurityHint') }}</p></div></header>
+            <dl class="simple-details">
+              <div><dt>{{ $t('status.failedTags') }}</dt><dd>{{ fmt(health.radio.counters?.failed_tags) }}</dd></div>
+              <div><dt>{{ $t('status.replayFrames') }}</dt><dd>{{ fmt(health.radio.counters?.replay_frames) }}</dd></div>
+              <div><dt>{{ $t('status.activationChallenges') }}</dt><dd>{{ fmt(health.radio.counters?.activation_challenges) }}</dd></div>
+            </dl>
+          </section>
+
           <!-- This card names nobody. The gateway cannot tell which client is
                on the stream -- see utils/clients.ts -- so it reports whether
                anything is reading it, and invites a key only when nothing

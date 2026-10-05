@@ -78,6 +78,7 @@ bool initialized = false;
 SemaphoreHandle_t mutex = nullptr;
 std::atomic<uint32_t> activeNodeIds[4]{};
 std::atomic<uint32_t> publishedGeneration{0};
+std::atomic<uint32_t> lastReceiveUs{0}, maxReceiveUs{0};
 
 struct CommitTiming {
     bool saved;
@@ -335,6 +336,12 @@ bool activeFrameIdentity(uint8_t nodeId, const uint8_t* salt, uint8_t* uid, uint
     return found;
 }
 
+RadioDiagnostics radioDiagnostics() {
+    const auto nvs = boundStorage.diagnostics();
+    return {lastReceiveUs.load(), maxReceiveUs.load(), nvs.writes, nvs.failures,
+            nvs.lastWriteUs, nvs.maxWriteUs};
+}
+
 radiosensors::registry::ReceiveStatus receiveSecure(
     radiosensors::security::Transport transport, uint8_t* wire, size_t size,
     bool telemetrySpace, bool sessionSpace, radiosensors::registry::OpenedFrame& frame) {
@@ -343,9 +350,13 @@ radiosensors::registry::ReceiveStatus receiveSecure(
     if (!guard || gateway::recovery::blocked() || !initialized || !mutex) return ReceiveStatus::StorageError;
     // A competing registry commit must not consume the node's ACK window.
     if (xSemaphoreTake(mutex, 0) != pdTRUE) return ReceiveStatus::Busy;
+    const int64_t started = esp_timer_get_time();
     const auto result = secureRadio.receive(transport, wire, size,
         static_cast<uint64_t>(esp_timer_get_time()) / 1000000ULL,
         telemetrySpace, sessionSpace, frame);
+    const uint32_t elapsed = static_cast<uint32_t>(esp_timer_get_time() - started);
+    lastReceiveUs.store(elapsed);
+    if (elapsed > maxReceiveUs.load()) maxReceiveUs.store(elapsed);
     xSemaphoreGive(mutex);
     return result;
 }

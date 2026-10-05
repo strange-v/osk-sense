@@ -27,7 +27,7 @@ const health = {
   radio: {
     state: 'ready', present: true, version: 36, frequency_band_mhz: '868', frequency_hz: 868_000_000,
     bit_rate: 55_555, node_id: 1, network_id: 172, variant: 'RFM69HCW', configured_power_dbm: 14,
-    encryption_enabled: true, profile: 'balanced', spi_host: 'VSPI', pins: {}, counters: {},
+    encryption_enabled: true, profile: 'balanced', spi_host: 'VSPI', pins: {}, counters: { failed_tags: 2, replay_frames: 7, activation_challenges: 1 },
     last_packet: { at_ms: now - 40_000, sender_id: 3, rssi: -74 },
   },
 }
@@ -191,7 +191,7 @@ function mockApi(): Plugin {
         if (!signedIn && !publicPath) return json(res, 401, { error: 'authentication_required' })
         if (path === '/ui/backup/export' && req.method === 'POST') {
           readBody(req, body => {
-            const payload = Buffer.from(JSON.stringify({ version: 1, created_at_ms: Date.now(), settings: { hostname: 'osk-restored', mdns: true, ntp: true, pairing_seconds: 120, setup_seconds: 600, servers: ['pool.ntp.org'] }, network_id: 123, installation_key: '01'.repeat(16), device_secret: '02'.repeat(32), nodes: nodes.map(n => ({ uid: n.device_uid.toLowerCase(), id: n.node_id, profile: n.profile_id, firmware: [1, 0, 0], state: n.state === 'active' ? 2 : 1, nonce: 1, name: n.display_name, max_power: n.max_power_level, power_policy: 0 })) }))
+            const payload = Buffer.from(JSON.stringify({ version: 3, created_at_ms: Date.now(), settings: { hostname: 'osk-restored', mdns: true, ntp: true, pairing_seconds: 120, setup_seconds: 600, servers: ['pool.ntp.org'] }, network_id: 123, device_secret: '02'.repeat(32), nodes: nodes.map(n => ({ uid: n.device_uid.toLowerCase(), id: n.node_id, profile: n.profile_id, firmware: [1, 0, 0], state: n.state === 'active' ? 2 : 1, nonce: 1, name: n.display_name, max_power: n.max_power_level, power_policy: 0 })) }))
             const header = Buffer.alloc(44); header.write('OSKB'); header[4] = header[5] = header[6] = 1; header.writeUInt32LE(100_000, 8); header.writeUInt32LE(payload.length, 12); randomBytes(28).copy(header, 16)
             const cipher = createCipheriv('aes-256-gcm', pbkdf2Sync(String(body.password), header.subarray(16, 32), 100_000, 32, 'sha256'), header.subarray(32, 44))
             cipher.setAAD(header)

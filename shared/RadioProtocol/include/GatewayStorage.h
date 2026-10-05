@@ -31,11 +31,12 @@ constexpr size_t kStoredUserSize = 92;
 constexpr size_t kStoredTokenSize = 80;
 constexpr size_t kAuthSnapshotSize = 1036;
 
-constexpr size_t kRadioKeySize = 16;
+constexpr size_t kFactoryKeySize = 16;
+constexpr uint16_t kSecretsStorageVersion = 3;
 constexpr size_t kDeviceSecretSize = 32;
-constexpr size_t kSecretsSnapshotSize = 67;
+constexpr size_t kSecretsSnapshotSize = 51;
 static_assert(kSecretsSnapshotSize ==
-                  15 + kRadioKeySize + kDeviceSecretSize + kSnapshotCrcSize,
+                  15 + kDeviceSecretSize + kSnapshotCrcSize,
               "installation secrets snapshot layout changed");
 
 // The command book shares NVS with the registry and authentication, so it
@@ -112,10 +113,9 @@ struct AuthenticationData {
 };
 
 struct InstallationSecrets {
-    bool installationKeyPresent;
+    bool radioConfigured;
     bool deviceSecretPresent;
     uint8_t operationalNetworkId;
-    uint8_t installationKey[kRadioKeySize];
     uint8_t deviceSecret[kDeviceSecretSize];
 };
 

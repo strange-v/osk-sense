@@ -1,8 +1,8 @@
 # Gateway persistent storage layouts
 
-This document is the byte-level source of truth for gateway settings, authentication, node registry, and installation-secret persistence. The settings, authentication, installation-secret, and command-book snapshots share storage schema version 2; the node registry carries its own schema version. Schema 2 is frozen by the portable codecs in `../shared/RadioProtocol` and their native known-layout, round-trip, validation, corruption-recovery, and interrupted-write tests. ESP32 NVS adapters and runtime ownership are implemented by `ConfigurationStore` and `NodeRegistryStore`.
+This document describes gateway settings, authentication, node registry, and installation-secret persistence. Settings, authentication and command-book snapshots use schema 2; installation secrets use schema 3; the registry uses schema 4. Portable codecs live in `../shared/RadioProtocol`; ESP32 adapters are `ConfigurationStore` and `NodeRegistryStore`.
 
-All multi-byte integers are unsigned little-endian unless stated otherwise. No compiler structs are persisted directly. Reserved bytes and unused fixed records are encoded as zero and must be zero when decoding schema version 2.
+All multi-byte integers are unsigned little-endian unless stated otherwise. No compiler structs are persisted directly. Reserved bytes and unused fixed records must be zero.
 
 ## Common dual-slot rules
 
@@ -13,7 +13,7 @@ Every snapshot begins with:
 | Offset | Bytes | Field |
 | ---: | ---: | --- |
 | 0 | 4 | Store-specific ASCII magic |
-| 4 | 2 | Storage schema version, currently `2` |
+| 4 | 2 | Store-specific schema version |
 | 6 | 4 | Wrapping generation |
 | 10 | 2 | Exact total encoded size including CRC |
 
@@ -23,8 +23,8 @@ Generation advances only after a durable semantic change. Re-saving identical co
 
 ## V3 replay-bound module
 
-`GatewayReplay` and `ReplayBoundStorage` provide the V3 store; the operational
-radio service does not use it yet. NVS namespace: `radio-bound`; key: `bounds`;
+`GatewayReplay` and `ReplayBoundStorage` persist operational V3 replay bounds.
+NVS namespace: `radio-bound`; key: `bounds`;
 magic: `RSRB`; schema: `3`; exact size: 288 bytes.
 
 | Offset | Bytes | Field |
@@ -134,28 +134,25 @@ Flag bit 0 means enabled. Scope bit 0 means `telemetry:read`, the only scope: it
 
 ## Installation secrets snapshot
 
-NVS namespace: `gateway-secrets`; slot keys: `secret_a`, `secret_b`; magic: `RSGS`; exact schema-2 size: 67 bytes.
+NVS namespace: `gateway-secrets`; slot keys: `secret_a`, `secret_b`; magic: `RSGS`; exact schema-3 size: 51 bytes.
 
 | Offset | Bytes | Field |
 | ---: | ---: | --- |
-| 0 | 12 | Common snapshot header |
-| 12 | 2 | Presence flags |
+| 0 | 12 | Common snapshot header with schema 3 |
+| 12 | 2 | Flags |
 | 14 | 1 | Operational RFM69 network ID, `1..255` |
-| 15 | 16 | Installation key material; unused by V3 radio |
-| 31 | 32 | Gateway device secret |
-| 63 | 4 | CRC32 |
+| 15 | 32 | Gateway device secret |
+| 47 | 4 | CRC32 |
 
-Presence bit 0 marks the installation key and bit 1 the device secret; other bits are zero. Bytes for an absent value are zero. The installation key is raw and may contain zeros.
+Flag bit 0 marks a configured radio network and bit 1 a present device secret; other bits are zero. An absent device secret is encoded as zero bytes. Per-node radio keys live in the registry.
 
-The operational network ID is always `1..255`. Zero is never stored, because network 0 is the commissioning network that unprovisioned nodes use. On first boot the gateway stores a random ID; initial setup may replace it with a user-chosen value, generates the installation key, and commits both together in this snapshot. Ordinary edits are rejected while the registry contains an active node. A radio network reset clears the registry first, then generates a new installation key and network ID.
-
-When the installation key is absent, its bytes are zero; the network ID is still nonzero. When the device secret is absent, its bytes are zero.
+The operational network ID is always `1..255`; network 0 is reserved for commissioning. First boot stores a random ID with the radio-configured flag clear. Initial setup commits the chosen ID and sets the flag before creating the admin. Ordinary edits are rejected while the registry contains an active node. Radio network reset clears the registry first, then commits the chosen or generated network ID with the flag set.
 
 The device secret comes from the ESP32 hardware RNG, is not the public stable gateway ID, survives ordinary settings/auth/network reset, and is reserved for local secret derivation and authenticated export.
 
 CRC32 provides neither confidentiality nor authenticity. Physical flash access can recover keys and authentication material; the production threat model accepts that risk and does not require flash encryption or secure boot.
 
-An empty secrets namespace is initialized with a hardware-random device secret and a random operational network ID, without an installation key. Initial setup generates and durably stores the installation key; radio keys are never imported from build-time headers. Existing but invalid slot data is reported as corruption and is never treated as an empty store or automatically overwritten. A gateway whose stores do not all load runs without persistent storage until its NVS partition is erased, as the README describes; that erases every store, not only the damaged one.
+An empty namespace is initialized with a hardware-random device secret and operational network ID, with the radio unconfigured. Existing invalid slot data is reported as corruption and never overwritten automatically. A gateway whose stores do not all load runs without persistent storage until its NVS partition is erased, as the README describes; that erases every store.
 
 This snapshot holds no commissioning profile. Every node has a unique factory commissioning key supplied with its UID, entered by hand or scanned from the node's QR code. The radio task holds the key only in RAM for one pairing transaction; it is never added to this snapshot or the registry. The commissioning network ID is a runtime constant of zero and is not stored either. The gateway wipes the key whenever the radio returns from the commissioning profile to the operational one.
 
@@ -255,7 +252,7 @@ An absent or corrupt store starts empty with a hardware-random next command ID. 
 
 ## Atomic operations and reset boundaries
 
-There is no transaction across namespaces. Settings touch only `gateway-config`; users/tokens touch only `gateway-auth`; commissioning touches only `node-reg`; commands touch only `node-cmd`; installation-key rotation touches only `gateway-secrets` and needs a separate recovery workflow.
+There is no transaction across namespaces. Settings touch `gateway-config`; users/tokens touch `gateway-auth`; commissioning touches `node-reg`; commands touch `node-cmd`. Radio reset clears the registry, replay bounds and commands before committing the network ID in `gateway-secrets`.
 
 - Deleting a node removes its command record after the registry commit.
 - A radio network reset clears the command book but keeps its command ID sequence.

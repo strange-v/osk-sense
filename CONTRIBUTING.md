@@ -12,6 +12,11 @@ wsl bash gateway/scripts/run_native_tests_wsl.sh
 
 Web UI tests and build are in the [gateway README](gateway/README.md#web-ui-filesystem).
 
+Run only the affected checks. Protocol and node scripts accept suite names after
+the optional `--sanitize` flag, for example `--sanitize test_security_service`
+for the node. The gateway script accepts `--backup` for backup, restore and reset
+checks. Omitting selectors runs all tests in that script.
+
 Enable the tracked pre-commit hook once per clone:
 
 ```powershell

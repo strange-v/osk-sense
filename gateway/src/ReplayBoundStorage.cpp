@@ -1,4 +1,5 @@
 #include "ReplayBoundStorage.h"
+#include <esp_timer.h>
 
 namespace gateway {
 namespace {
@@ -26,8 +27,20 @@ radiosensors::replay::ReadStatus ReplayBoundStorage::read(
 }
 
 bool ReplayBoundStorage::write(const uint8_t* data, size_t size) {
-    return initialized_ && data && size == radiosensors::replay::kSnapshotSize &&
+    const int64_t started = esp_timer_get_time();
+    const bool ok = initialized_ && data && size == radiosensors::replay::kSnapshotSize &&
         preferences_.putBytes(kKey, data, size) == size;
+    const uint32_t elapsed = static_cast<uint32_t>(esp_timer_get_time() - started);
+    ++writes_;
+    if (!ok) ++failures_;
+    lastWriteUs_.store(elapsed);
+    // Registry access serializes writers; diagnostics readers use atomics.
+    if (elapsed > maxWriteUs_.load()) maxWriteUs_.store(elapsed);
+    return ok;
+}
+
+ReplayBoundStorage::Diagnostics ReplayBoundStorage::diagnostics() const {
+    return {writes_.load(), failures_.load(), lastWriteUs_.load(), maxWriteUs_.load()};
 }
 
 }  // namespace gateway
