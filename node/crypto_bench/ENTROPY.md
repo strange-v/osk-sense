@@ -57,3 +57,20 @@ static RAM, including the Arduino core and CMAC. It collects no hardware entropy
 Software polling of each RTC tick quantizes the result: in an 8192-sample run,
 7853 samples were 121 cycles and the LSB was constant. Hardware capture avoids
 that polling-loop quantization.
+
+## Optional second source: RFM69 noise RSSI
+
+Not implemented. A `next(uint16_t&)` source over SPI plugs into
+`pairing_entropy::collect` unchanged; its 8 bytes would join the RTC material in
+the CMAC input, and pairing would require both sources to pass their checks.
+
+| Register | Use |
+| --- | --- |
+| RSSI (0x23 `RssiStart`, 0x24) | Candidate: noise-floor LSBs in RX without a signal; trigger each measurement, since back-to-back reads repeat the averaged value |
+| FEI/AFC (0x1E, 0x1F–0x22) | Behaviour on noise without a preamble is undocumented; measure first |
+| Temperature (0x4E, 0x4F) | No entropy at 1 °C resolution; record it as a qualification condition |
+
+A nearby transmitter can push RSSI off the noise floor and bias it, so RSSI is
+not a sole source. Qualification would compare antenna against a 50 Ω load and
+against `radio_flood` at short range. The demodulated data (DIO2) and the crystal
+CLKOUT (DIO5) are not wired to the MCU; only DIO0 is.
