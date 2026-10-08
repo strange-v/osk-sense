@@ -16,16 +16,37 @@ follows the burst at 9600 baud on COM12.
 | Maximum absolute LSB correlation, lags 1–32 | 0.02765 |
 | Von Neumann output | 1028 bits, 512 ones |
 
-This characterizes one device in one operating condition. It does not establish
-a minimum entropy bound across devices, power cycles, supply voltage or
-temperature. Source qualification remains pending.
+ATtiny3224, same bench at room temperature: runs of 4096 samples at 3.3 V and
+1.8 V, each beginning with the first burst after a UPDI reset or a power cycle.
+The 1.8 V run has BOD disabled, since the 1.8 V BOD level holds the chip in
+reset at that supply.
+
+| ATtiny3224 | 3.3 V, UPDI resets, 12 288 samples | 3.3 V, power cycle, 4096 samples | 1.8 V, UPDI reset, 4096 samples |
+| --- | ---: | ---: | ---: |
+| Capture range | 7821–7838 cycles | 7825–7840 cycles | 7861–7876 cycles |
+| Distinct values | 18 | 16 | 16 |
+| Most common value | 14.6 % | 16.0 % | 18.7 % |
+| LSB ones | 6069 (49.39 %) | 2061 (50.32 %) | 1993 (48.66 %) |
+| LSB transitions | 6155 | 2012 | 2067 |
+| Longest LSB run | 12 | 12 | 10 |
+| Maximum absolute LSB correlation, lags 1–32 | 0.0246 (0.028–0.043 per run) | 0.0366 | 0.0243 |
+| Von Neumann output | 3089 bits, 1543 ones | 991 bits, 491 ones | 1033 bits, 537 ones |
+| 512-sample bursts passing the health guards | 24 of 24 | 8 of 8 | 8 of 8 |
+
+The first samples after a power cycle sit 5–7 cycles above the later mean;
+at 1.8 V the mean rises by about 40 cycles (0.5 %). Neither shift affects the
+LSB statistics. Start-up sequences differ between runs.
+
+These capture one device per chip type. They do not establish a minimum
+entropy bound across devices or temperature. Source
+qualification remains pending.
 
 The node runtime collects 512 samples through RTC overflow events and TCB0
 frequency capture before each Join request. It pauses PIT ticks during the
 burst, restores the sleep-clock registers, and fails on a bounded capture
 timeout. The integrated driver and bench target ATtiny3224 at 4 MHz, with
-TCB1 providing `millis()`. Hardware verification and source qualification on
-ATtiny3224 remain pending; the ATtiny1614 capture does not qualify that source.
+TCB1 providing `millis()`. PIT recovery after the integrated capture is
+unverified on hardware.
 
 `PairingEntropy.h` processes 512 capture LSBs in non-overlapping pairs,
 discards equal pairs and keeps 64 Von Neumann bits. It validates the entire
