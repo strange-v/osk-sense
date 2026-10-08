@@ -148,6 +148,16 @@ These estimates exclude cell self-discharge, capacity lost to voltage sag under 
 
 Supplied through the supercap connector, the solar climate node needs about 7.3 µA while reporting every 64 s and about 3.9 µA at the 320-second low-charge interval.
 
+## Optimization ideas
+
+Not implemented. Savings are per `binary_sht40` periodic report of 295 µC.
+
+| Idea | Saving | Note |
+| --- | ---: | --- |
+| Sleep in power-down during the SHT40 measurement, woken by an RTC compare after about 9 ms | ~15 µC, ~0.44 mAh per year | `Sht40Sensor` busy-waits `delay(10)`; the high-precision command takes at most 8.3 ms and the sensor NACKs an early read. The RTC counter is free: `LowPowerClock` uses only the PIT. The wait has to be injected into the driver. |
+| Start the SHT40 measurement one 250 ms tick before a periodic report and read it on the next | ~15 µC | Same saving with more state; a contact-change report still waits or sends older data |
+| Enter power-down without waiting for the watchdog disable to synchronize | ~4 µC | Saves 2.7 ms at 1.43 mA. Whether the disable completes in power-down is unverified; `WatchdogWindow` waits so that the watchdog never runs through a sleep tick. |
+
 ## Measuring
 
 - Measure the charge of each event in the PPK2 selection, not the average of an arbitrary window, and combine the charges with the model above.

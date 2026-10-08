@@ -22,9 +22,9 @@ Implementation status:
 | Failed-tag UI counters | Status page shows `failed_tags`, `replay_frames` and `activation_challenges` since boot |
 | Gateway network secrets | Configured flag, network ID and device secret; radio keys are per node in the registry |
 
-Node and gateway radio services use V3. PIT recovery after entropy capture,
-real-radio interoperability, ACK timing during NVS reservations and stack
-measurements remain hardware checks.
+Node and gateway radio services use V3 and work over the air with `binary_sht40`
+on ATtiny3224. The remaining checks are under
+[ATtiny3224 hardware verification](#attiny3224-hardware-verification).
 
 | Area | Change |
 | --- | --- |
@@ -437,7 +437,8 @@ apply unchanged. Flash includes `.text`, `.rodata` and `.data`.
 Static RAM leaves at least 2106 bytes for stack and dynamic state. Debug images
 paint unused SRAM during startup and report `stkfree <bytes>` when the minimum
 remaining heap-to-stack gap decreases. The painter is absent from release images.
-Peak stack usage remains unverified until measured on hardware.
+Debug `binary_sht40` keeps at least 1479 bytes free through pairing, telemetry
+and a command session.
 
 ## ATtiny3224 hardware verification
 
@@ -445,22 +446,34 @@ Peak stack usage remains unverified until measured on hardware.
 | --- | --- |
 | Supply measurement | Verify the 2000 mV transmit gate |
 | Sleep and wake | PPK2 current measurements of the images other than `binary_sht40`, with RTC PIT enabled and ADC disabled, including a radio transmission |
-| Pairing entropy | Integrated capture restores PIT operation |
-| Provisioning | SerialUPDI USERROW write/readback, factory key preservation and EEPROM reservations after reset |
-| Stack | Record debug UART `stkfree` minimum during pairing, activation, telemetry and command sessions; check gateway task minima in `/ui/status` |
+| Stack | Record debug UART `stkfree` minimum during activation |
 
 ### Radio timing and replay reservations
 
-Read the authenticated `/ui/status` endpoint after pairing, normal reports,
-`READ_INFO`, node reboot, gateway reboot and backup restore. Its `bench` object
-contains receive-processing time, replay NVS write time, IRQ-to-ACK time and
-ESP32 task stack minima; field definitions are in [API.md](../gateway/API.md#liveness-and-status).
+The authenticated `/ui/status` endpoint's `bench` object holds receive-processing
+time, replay NVS write time, IRQ-to-ACK time and ESP32 task stack minima; field
+definitions are in [API.md](../gateway/API.md#liveness-and-status).
 
-Exercise replay reservations with node reboots, which skip the node's reserved
-counter range, and repeat with a full registry. Record `max_receive_us`,
-`max_reservation_write_us`, `max_ack_us`, `acks_over_40ms`, reservation failures
-and node retry/ACK results. Verify activation after gateway reboot and restore,
-and rejection of captured stale frames and frames with a damaged tag.
+After pairing, reports, `READ_INFO`, a node reboot and a gateway reboot with one
+debug `binary_sht40` node:
+
+| Field | Value |
+| --- | ---: |
+| `last_ack_us`, typical | 3973 |
+| `max_ack_us`, first frame after a node reboot | 10 677 |
+| `acks_over_40ms` | 0 |
+| `max_receive_us`, including the reservation write | 7070 |
+| `max_reservation_write_us` | 4842 |
+| Minimum free stack: radio, commissioning, commands | 4252, 6964, 7208 bytes |
+
+| Remaining | Evidence |
+| --- | --- |
+| Backup restore | Activation report answers the challenge, node active again |
+| Load | `radio_flood`: `max_ack_us` and `acks_over_40ms` |
+| Lost ACKs | `replay_frames` against packets over 20–30 reports |
+| Full registry | Reservation writes and failures |
+| Stale and damaged frames over the air | Rejected, counted in `replay_frames` and `failed_tags` |
+| Release node firmware | The 40 ms deadline holds |
 
 IRQ-to-ACK timing includes scheduling, replay read-back and completed radio
 transmission. Missed-IRQ recovery is excluded from `acks_measured`; node reception
