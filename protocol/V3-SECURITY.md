@@ -444,7 +444,7 @@ Peak stack usage remains unverified until measured on hardware.
 | Check | Required evidence |
 | --- | --- |
 | Supply measurement | Compare VDD/10 ADC readings with a meter across the battery voltage range; verify the 2000 mV transmit gate |
-| Sleep and wake | PPK2 current measurements with RTC PIT enabled and ADC disabled, including a radio transmission |
+| Sleep and wake | PPK2 current measurements of the images other than `binary_sht40`, with RTC PIT enabled and ADC disabled, including a radio transmission |
 | Pairing entropy | Integrated capture restores PIT operation |
 | Provisioning | SerialUPDI USERROW write/readback, factory key preservation and EEPROM reservations after reset |
 | Stack | Record debug UART `stkfree` minimum during pairing, activation, telemetry and command sessions; check gateway task minima in `/ui/status` |
