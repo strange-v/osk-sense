@@ -51,11 +51,12 @@ sizes and the inspection command are in [V3-SECURITY.md](../protocol/V3-SECURITY
 
 The SOIC-14 pin assignments are PA4 radio CS, PA7 radio IRQ, PA1/PA2/PA3
 SPI, PB0/PB1 I2C, PA5 contact, PA6 button, PA0 UPDI and PB2/PB3 UART.
-Supply measurement uses the ADC's VDD/10 input against its 1.024 V reference;
-the ADC is disabled after measurement. TCB1 provides `millis()`, TCB0 captures
-RTC events for pairing entropy, and the RTC PIT provides sleep ticks.
-Supply accuracy and stack high-water measurements on ATtiny3224 hardware remain
-pending; [POWER.md](POWER.md) measures `binary_sht40` on ATtiny3224 and the other
+Supply measurement accumulates a 16-sample burst of the ADC's VDD/10 input against its
+1.024 V reference in 0.9 ms, then disables the ADC. At 1.81 and 3.28 V on a
+multimeter it reads 39–46 mV high, within the reference's ±2 %, with noise
+below 1 mV. TCB1 provides `millis()`, TCB0 captures RTC events for pairing
+entropy, and the RTC PIT provides sleep ticks. The 2000 mV transmit gate and
+stack high-water measurements on ATtiny3224 hardware remain pending; [POWER.md](POWER.md) measures `binary_sht40` on ATtiny3224 and the other
 images on ATtiny1614.
 
 Each environment compiles exactly one composition root from `src/` through `build_src_filter`. `NodeRuntime<Profile>` owns commissioning, the provisioning button, radio retry backoff, supply-voltage measurement, and sleep. The profile class in `include/Profiles/` owns acquisition, report scheduling, and payload encoding; the contract is documented in `NodeRuntime.h`. Profiles are template parameters, not virtual interfaces, because avr-gcc keeps vtables in RAM.

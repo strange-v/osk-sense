@@ -55,7 +55,7 @@ On the internal board an acknowledged report without input work costs about 215 
 
 - The radio accounts for about 80 % of the report.
 - 32.6 mA at level 0 is above the internal-board sweep below; this board has not been swept.
-- Each Vcc measurement takes 64 ADC samples of 32 sampling clocks at 500 kHz, about 5.8 ms; another precedes the transmission.
+- This capture used Vcc measurements of 64 ADC samples, 5.8 ms each, one before and one after the transmission. The firmware takes 16 samples in 0.9 ms, which shortens the report by about 10 ms and 17 µC; remeasure the report with it.
 - After a restart the node transmits at its ceiling. Its first ACK takes 9.9 ms instead of 3.6 ms, because the gateway first writes the replay reservation to NVS.
 - The command session is awake for 197 ms while it measures the button press; its radio exchange, from Command ready to the result ACK, takes about 38 ms.
 

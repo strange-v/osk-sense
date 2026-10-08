@@ -419,14 +419,14 @@ megaTinyCore 2.6.7 and the 4 MHz internal clock.
 
 | V3 profile | Flash | Free Flash | Static RAM |
 | --- | ---: | ---: | ---: |
-| `counter_reed` | 20 881 | 11 887 | 764 |
-| `climate_tmp112` | 20 860 | 11 908 | 815 |
-| `binary_sht40` | 20 723 | 12 045 | 799 |
-| `binary` | 18 847 | 13 921 | 710 |
-| `counter_reed_debug` | 22 900 | 9868 | 915 |
-| `climate_tmp112_debug` | 22 756 | 10 012 | 966 |
-| `binary_sht40_debug` | 23 088 | 9680 | 950 |
-| `binary_debug` | 20 850 | 11 918 | 861 |
+| `counter_reed` | 20 885 | 11 883 | 764 |
+| `climate_tmp112` | 20 864 | 11 904 | 815 |
+| `binary_sht40` | 20 727 | 12 041 | 799 |
+| `binary` | 18 851 | 13 917 | 710 |
+| `counter_reed_debug` | 22 904 | 9864 | 915 |
+| `climate_tmp112_debug` | 22 760 | 10 008 | 966 |
+| `binary_sht40_debug` | 23 092 | 9676 | 950 |
+| `binary_debug` | 20 854 | 11 914 | 861 |
 
 Run `node/scripts/probe_v3_size.ps1 -Environment counter_reed` from PowerShell;
 the other release and debug environment names select their composition roots.
@@ -443,7 +443,7 @@ Peak stack usage remains unverified until measured on hardware.
 
 | Check | Required evidence |
 | --- | --- |
-| Supply measurement | Compare VDD/10 ADC readings with a meter across the battery voltage range; verify the 2000 mV transmit gate |
+| Supply measurement | Verify the 2000 mV transmit gate |
 | Sleep and wake | PPK2 current measurements of the images other than `binary_sht40`, with RTC PIT enabled and ADC disabled, including a radio transmission |
 | Pairing entropy | Integrated capture restores PIT operation |
 | Provisioning | SerialUPDI USERROW write/readback, factory key preservation and EEPROM reservations after reset |
