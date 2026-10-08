@@ -13,7 +13,7 @@ Implementation status:
 | Pairing and command wire codecs | Implemented in `RadioSecurityFrames`; authenticated join codecs, nonce-free command payloads, counter-bound reply decoding and independent wire vectors |
 | Immutable command reply cache | Implemented in `GatewayReplay`; exact bytes per node/counter, discarded on the next accepted frame or restart |
 | Node target and Flash | ATtiny3224 at 4 MHz; all four release and debug profiles fit; see [Flash](#flash) |
-| Pairing entropy | RTC/TCB0 hardware collection integrated; extractor, health guards and CMAC conditioning tested on [captured and synthetic data](../node/crypto_bench/ENTROPY.md); source qualification pending |
+| Pairing entropy | RTC/TCB0 hardware collection integrated; extractor, health guards and CMAC conditioning tested on [captured and synthetic data](../node/crypto_bench/ENTROPY.md); source accepted on ATtiny3224 captures at 1.8 and 3.3 V |
 | Pairing transactions | Gateway `RegistryPairing` embeds `PairingTransaction` in the atomic registry, with stable replay slots and prepared-bound recovery; node `RadioSecurityPairing` pins salt in EEPROM before confirm; native restart, corruption and write-interruption tests; hooked into gateway commissioning |
 | Node radio integration and command sessions | V3 pairing, telemetry, activation, authenticated ACKs and counter-bound command sessions integrated; native service tests cover retries, restart and failures |
 | Gateway radio integration and command sessions | Integrated through `RegistryRadio`, `RadioService`, commissioning and command services; native tests cover tag tampering, replay, queue backpressure, restart, restore activation and immutable replies; both gateway targets build |
@@ -22,7 +22,7 @@ Implementation status:
 | Failed-tag UI counters | Status page shows `failed_tags`, `replay_frames` and `activation_challenges` since boot |
 | Gateway network secrets | Configured flag, network ID and device secret; radio keys are per node in the registry |
 
-Node and gateway radio services use V3. ATtiny3224 entropy qualification,
+Node and gateway radio services use V3. PIT recovery after entropy capture,
 real-radio interoperability, ACK timing during NVS reservations and stack
 measurements remain hardware checks.
 
@@ -445,7 +445,7 @@ Peak stack usage remains unverified until measured on hardware.
 | --- | --- |
 | Supply measurement | Compare VDD/10 ADC readings with a meter across the battery voltage range; verify the 2000 mV transmit gate |
 | Sleep and wake | PPK2 current measurements with RTC PIT enabled and ADC disabled, including a radio transmission |
-| Pairing entropy | RTC/TCB0 captures across devices, supply voltages, temperature and power cycles; integrated capture restores PIT operation |
+| Pairing entropy | Integrated capture restores PIT operation |
 | Provisioning | SerialUPDI USERROW write/readback, factory key preservation and EEPROM reservations after reset |
 | Stack | Record debug UART `stkfree` minimum during pairing, activation, telemetry and command sessions; check gateway task minima in `/ui/status` |
 

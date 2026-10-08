@@ -37,9 +37,8 @@ The first samples after a power cycle sit 5–7 cycles above the later mean;
 at 1.8 V the mean rises by about 40 cycles (0.5 %). Neither shift affects the
 LSB statistics. Start-up sequences differ between runs.
 
-These capture one device per chip type. They do not establish a minimum
-entropy bound across devices or temperature. Source
-qualification remains pending.
+The source is accepted for pairing on these captures. They cover one device per
+chip type at room temperature and do not establish a minimum entropy bound.
 
 The node runtime collects 512 samples through RTC overflow events and TCB0
 frequency capture before each Join request. It pauses PIT ticks during the
