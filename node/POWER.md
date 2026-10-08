@@ -32,7 +32,7 @@ A counter pulse costs two debounce bursts, one when the contact closes and one w
 | Event | Duration | Mean | Peak | Charge |
 | --- | ---: | ---: | ---: | ---: |
 | `binary` state change and acknowledged report | 22.3 ms | 9.8 mA | 29.8 mA | 218 µC |
-| `binary_sht40` periodic report | 46.4 ms | 6.7 mA | 33.7 mA | 312 µC |
+| `binary_sht40` periodic report | 36.4 ms | 8.1 mA | 33.7 mA | 295 µC |
 | `binary_sht40` power-up to first acknowledged report, level 15 | 124.9 ms | 6.3 mA | 208 mA | 790 µC |
 | `binary_sht40` button press and `READ_INFO` command session, level 12 | 235 ms | 4.6 mA | 61.4 mA | 1084 µC |
 | `counter_reed` accepted pulse and acknowledged report in one wake-up | 34.7 ms | 7.2 mA | 30.4 mA | 251 µC |
@@ -44,18 +44,17 @@ On the internal board an acknowledged report without input work costs about 215 
 
 | Phase | Duration | Mean | Charge |
 | --- | ---: | ---: | ---: |
-| SHT40, Vcc measurement and frame sealing | 24.2 ms | 1.74 mA | 42 µC |
+| SHT40, Vcc measurement and frame sealing | 19.3 ms | 1.73 mA | 33 µC |
 | Channel check before transmission | 0.55 ms | 15.9 mA | 9 µC |
 | Transmission | 5.2 ms | 32.6 mA | 169 µC |
 | Waiting for the ACK | 3.6 ms | 17.1 mA | 61 µC |
 | Receiver on after the ACK | 0.5 ms | 15.9 mA | 8 µC |
 | ACK tag check | 2.0 ms | 1.60 mA | 3 µC |
-| Vcc measurement after transmission | 5.8 ms | 1.76 mA | 10 µC |
-| Watchdog disable synchronization | 2.7 ms | 1.44 mA | 4 µC |
+| Vcc measurement after transmission | 1.0 ms | 1.75 mA | 2 µC |
+| Watchdog disable synchronization | 2.7 ms | 1.43 mA | 4 µC |
 
-- The radio accounts for about 80 % of the report.
+- The radio accounts for about 85 % of the report.
 - 32.6 mA at level 0 is above the internal-board sweep below; this board has not been swept.
-- This capture used Vcc measurements of 64 ADC samples, 5.8 ms each, one before and one after the transmission. The firmware takes 16 samples in 0.9 ms, which shortens the report by about 10 ms and 17 µC; remeasure the report with it.
 - After a restart the node transmits at its ceiling. Its first ACK takes 9.9 ms instead of 3.6 ms, because the gateway first writes the replay reservation to NVS.
 - The command session is awake for 197 ms while it measures the button press; its radio exchange, from Command ready to the result ACK, takes about 38 ms.
 
@@ -125,7 +124,7 @@ Voltage drop during a `radio_power_sweep` transmission, measured at the supply t
 I_avg = I_idle + f_event · Q_event + f_report · Q_report
 ```
 
-The routine reports in the table above cost about 0.06–0.09 µAh; 1 mAh equals 3.6 C.
+The routine reports in the table above cost about 0.06–0.08 µAh; 1 mAh equals 3.6 C.
 
 | Image | Assumption | mAh per year |
 | --- | --- | ---: |
@@ -137,13 +136,13 @@ The routine reports in the table above cost about 0.06–0.09 µAh; 1 mAh equals
 | | 40 state changes per day | 0.9 |
 | | hourly keep-alive, at most | 0.5 |
 | `binary_sht40` | measured idle average 3.08 µA, including 250 ms wake-ups | 27.0 |
-| | one 312 µC report every 5 minutes | 9.1 |
+| | one 295 µC report every 5 minutes | 8.6 |
 
 | CR2032 node | mAh per year | Nominal life at 220 mAh |
 | --- | ---: | ---: |
 | `counter_reed` | 30.4 | 7.2 years |
 | `binary` | 26.8–28.0 | 7.9–8.2 years |
-| `binary_sht40` | 36.1 | 6.1 years |
+| `binary_sht40` | 35.6 | 6.2 years |
 
 These estimates exclude cell self-discharge, capacity lost to voltage sag under transmit load, and failed reports. The `binary_sht40` estimate also excludes input changes; its five-year target needs validation on a real cell.
 
