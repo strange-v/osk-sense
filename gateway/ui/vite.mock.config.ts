@@ -27,7 +27,7 @@ const health = {
   radio: {
     state: 'ready', present: true, version: 36, frequency_band_mhz: '868', frequency_hz: 868_000_000,
     bit_rate: 55_555, node_id: 1, network_id: 172, variant: 'RFM69HCW', configured_power_dbm: 14,
-    encryption_enabled: true, profile: 'balanced', spi_host: 'VSPI', pins: {}, counters: { failed_tags: 2, replay_frames: 7, activation_challenges: 1 },
+    profile: 'balanced', spi_host: 'VSPI', pins: {}, counters: { failed_tags: 2, replay_frames: 7, activation_challenges: 1 },
     last_packet: { at_ms: now - 40_000, sender_id: 3, rssi: -74 },
   },
 }

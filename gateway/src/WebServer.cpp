@@ -2033,7 +2033,7 @@ void handleStatus(AsyncWebServerRequest* request) {
         "\"radio\":{\"state\":\"%s\",\"present\":%s,\"version\":%u,"
         "\"frequency_band_mhz\":\"%s\",\"frequency_hz\":%lu,\"bit_rate\":%lu,"
         "\"node_id\":%u,\"network_id\":%u,\"variant\":\"%s\","
-        "\"configured_power_dbm\":%d,\"encryption_enabled\":%s,"
+        "\"configured_power_dbm\":%d,"
         "\"profile\":\"%s\",\"spi_host\":\"%s\","
         "\"pins\":{\"sck\":%d,\"miso\":%d,\"mosi\":%d,\"cs\":%d,\"irq\":%d,\"reset\":%d},"
         "\"counters\":{\"interrupts\":%lu,\"missed_interrupts\":%lu,"
@@ -2135,7 +2135,6 @@ void handleStatus(AsyncWebServerRequest* request) {
         radioSnapshot.currentNetworkId,
         radio::config::highPower ? "HW" : "W",
         radioSnapshot.configuredPowerDbm,
-        radioSnapshot.encryptionEnabled ? "true" : "false",
         radio::profileName(),
         radio::spiHostName(),
         radio::config::sck,

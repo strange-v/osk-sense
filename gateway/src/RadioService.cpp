@@ -951,7 +951,6 @@ Snapshot snapshot() {
         currentFrequencyHz.load(),
         configuredBitRate,
         config::txPowerDbm,
-        operationalEnabled.load(),
         0,
     };
 

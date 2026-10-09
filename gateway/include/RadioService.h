@@ -45,7 +45,6 @@ struct Snapshot {
     uint32_t frequencyHz;
     uint32_t bitRate;
     int8_t configuredPowerDbm;
-    bool encryptionEnabled;
     uint32_t interrupts;
     uint32_t missedInterrupts;
     uint32_t moduleRestores;

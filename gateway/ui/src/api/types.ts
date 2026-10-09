@@ -96,6 +96,6 @@ export interface Health {
   ethernet: { state: string; has_ip: boolean; ip: string; mac: string }; ota: { enabled: boolean; state: string; progress: number };
   web_ui: { state: string; version: string; required_firmware: string }; telemetry: { nodes_seen: number; updates: number; last_node_id: number; last_received_at_ms: number };
   time: { state: string; unix_ms: number; last_sync_ms: number }; websocket: { clients: number; connections: number; messages_sent: number; messages_dropped: number };
-  radio: { state: string; present: boolean; version: number; frequency_band_mhz: string; frequency_hz: number; bit_rate: number; node_id: number; network_id: number; variant: string; configured_power_dbm: number; encryption_enabled: boolean; profile: string; spi_host: string; pins: Record<string, number>; counters: Record<string, number>; last_packet: { at_ms: number; sender_id: number; rssi: number } };
+  radio: { state: string; present: boolean; version: number; frequency_band_mhz: string; frequency_hz: number; bit_rate: number; node_id: number; network_id: number; variant: string; configured_power_dbm: number; profile: string; spi_host: string; pins: Record<string, number>; counters: Record<string, number>; last_packet: { at_ms: number; sender_id: number; rssi: number } };
   [key: string]: unknown;
 }
