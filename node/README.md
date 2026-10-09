@@ -17,6 +17,7 @@ This PlatformIO project produces one statically composed ATtiny3224 image per st
 | `radio_power_sweep` | diagnostic | supply voltage at power levels 0..31 | 250 ms |
 | `radio_power_sweep_button` | diagnostic | one report every 5 s; PA6 selects the power level | 250 ms |
 | `radio_flood` | 1 | acknowledged voltage reports back to back, for gateway load tests | 250 ms |
+| `radio_replay` | 7 | replayed and tampered reports, for gateway replay and tag checks | 250 ms |
 
 The binary-input image with TMP112 (profile 8) is not implemented yet. An installation decides whether a binary input is a door, a window, or a float switch.
 
@@ -36,6 +37,17 @@ Hardware environments inherit serial UPDI upload on COM11 at 115200 baud and ser
 `radio_power_sweep` is a bench image for an already commissioned node. It sends one acknowledged voltage telemetry frame every 5 seconds, increasing the RFM69 power level from 0 through 31, then sends nothing until reset. `radio_power_sweep_button` sets `NODE_POWER_SWEEP_BUTTON_LEVEL` and sends a frame every 5 seconds at the selected level. It starts at `NODE_POWER_SWEEP_FIRST_LEVEL`; each PA6 press selects the next level, wrapping to the first after `NODE_POWER_SWEEP_LAST_LEVEL`. The frame's radio state contains the level used for that transmission. Keep the gateway close so every level completes in one attempt. Use a current-capable measurement supply and lower `NODE_POWER_SWEEP_LAST_LEVEL` when the board or its supply must not be exposed to all 32 levels.
 
 `radio_flood` is a gateway load-test image. It joins as profile 1 (voltage) on a short PA6 press, like any unconfigured node, and a 10-second hold resets its network configuration. Once active it sends acknowledged voltage reports without sleeping or backing off, `NODE_FLOOD_INTERVAL_MS` (50 ms) apart, at the fixed level `NODE_FLOOD_POWER_LEVEL` (2); power targets from the gateway are counted, not applied, so set the node to a fixed policy at that level. One exchange takes about 18 ms, so a node sends about 14 reports per second. Every 100 reports it prints `sent=… ack=… tgt=… ms=…` on the UART at 9600 baud. It draws tens of milliamperes continuously: supply it from a bench supply, not a coin cell.
+
+<a id="radio_replay"></a>`radio_replay` is a bench image for an already commissioned node. Each short PA6 press sends two valid reports A and B with marker values (open, 20.00 °C, 50.00 %), then repeats and tampers with their bytes and prints the gateway's answer to each step on the UART at 9600 baud. Compare `/ui/status` radio counters and `telemetry.updates` before and after one run.
+
+| Step | Frame | Expected |
+| --- | --- | --- |
+| 1 | A, then B | `ack`; `updates` +2 |
+| 2 | B again | Same `ack`, `replay_frames` +1 |
+| 3 | A again | `ack floor=…`, `replay_frames` +1 |
+| 4–6 | B with one bit flipped in ciphertext, tag or counter | `no ack`, `failed_tags` +1 each |
+| 7 | B without the ACK request in its control byte | No ACK expected, `failed_tags` +1 |
+| 8 | B from node ID + 1 | `no ack`; `failed_tags` or `telemetry_rejected_inactive` +1 |
 
 Upload never writes fuses. Write them once per chip before the first upload; every environment uses the same values (4 MHz from the 16 MHz oscillator, BOD 1.8 V in active mode only, EEPROM preserved on chip erase, UPDI pin kept):
 
@@ -67,7 +79,7 @@ No input may float in sleep. Each composition root disables the digital input bu
 
 Reported supply voltage is the lower of the measurement taken just before transmission and the one taken immediately after the previous transmission, so it reflects battery sag under radio load.
 
-A node transmits only while its resting supply is above `NODE_MIN_TRANSMIT_MILLIVOLTS` (2000 mV); at or below it, reports, joins, and command sessions wait, and the supply is measured again 60 s later. Transmit sag below that level resets the MCU before it returns the radio to standby, and the module then transmits until the supply is exhausted. The bench images `radio_power_sweep` and `radio_flood` have no minimum.
+A node transmits only while its resting supply is above `NODE_MIN_TRANSMIT_MILLIVOLTS` (2000 mV); at or below it, reports, joins, and command sessions wait, and the supply is measured again 60 s later. Transmit sag below that level resets the MCU before it returns the radio to standby, and the module then transmits until the supply is exhausted. The bench images `radio_power_sweep`, `radio_flood` and `radio_replay` have no minimum.
 
 ## Factory provisioning
 
