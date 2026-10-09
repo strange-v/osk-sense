@@ -454,23 +454,27 @@ The authenticated `/ui/status` endpoint's `bench` object holds receive-processin
 time, replay NVS write time, IRQ-to-ACK time and ESP32 task stack minima; field
 definitions are in [API.md](../gateway/API.md#liveness-and-status).
 
-After pairing, reports, `READ_INFO`, a node reboot and a gateway reboot with one
-debug `binary_sht40` node:
+Measured with one `binary_sht40` node: the debug image through pairing, reports,
+`READ_INFO`, a node reboot, a gateway reboot and a backup restore with
+activation; `radio_flood` for 9557 acknowledged reports at about 14 per second.
 
-| Field | Value |
-| --- | ---: |
-| `last_ack_us`, typical | 3973 |
-| `max_ack_us`, first frame after a node reboot | 10 677 |
-| `acks_over_40ms` | 0 |
-| `max_receive_us`, including the reservation write | 7070 |
-| `max_reservation_write_us` | 4842 |
-| Minimum free stack: radio, commissioning, commands | 4252, 6964, 7208 bytes |
+| Field | Debug `binary_sht40` | `radio_flood` |
+| --- | ---: | ---: |
+| `last_ack_us`, typical | 3973 | 3904 |
+| `max_ack_us` | 10 677 | 17 705 |
+| `acks_over_40ms` | 0 | 0 |
+| `max_receive_us`, including the reservation write | 7070 | 7736 |
+| `max_reservation_write_us` | 4842 | 5692 |
+| `reservation_writes`, `reservation_failures` | 1, 0 | 39, 0 |
+| `replay_frames`, `failed_tags` | 1, 0 | 1, 0 |
+| Minimum free stack: radio, commissioning, commands | 4252, 6964, 7208 bytes | 4120, 6956, 7200 bytes |
+
+`max_receive_us` stays below 8 ms; the rest of the worst ACK is task scheduling.
+Each `replay_frames` is a node retransmission after a lost ACK, answered and
+not published again.
 
 | Remaining | Evidence |
 | --- | --- |
-| Backup restore | Activation report answers the challenge, node active again |
-| Load | `radio_flood`: `max_ack_us` and `acks_over_40ms` |
-| Lost ACKs | `replay_frames` against packets over 20–30 reports |
 | Full registry | Reservation writes and failures |
 | Stale and damaged frames over the air | Rejected, counted in `replay_frames` and `failed_tags` |
 | Release node firmware | The 40 ms deadline holds |
