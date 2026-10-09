@@ -477,12 +477,10 @@ not published again.
 | --- | --- |
 | Full registry | Reservation writes and failures |
 | Stale and damaged frames over the air | Rejected, counted in `replay_frames` and `failed_tags` |
-| Release node firmware | The 40 ms deadline holds |
 
 IRQ-to-ACK timing includes scheduling, replay read-back and completed radio
 transmission. Missed-IRQ recovery is excluded from `acks_measured`; node reception
-and tag verification require the actual radio test. Debug UART and stack scanning
-affect the node image; check the 40 ms deadline with release firmware too.
+and tag verification require the actual radio test.
 
 ## Later
 
