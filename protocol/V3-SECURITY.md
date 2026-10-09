@@ -473,10 +473,20 @@ activation; `radio_flood` for 9557 acknowledged reports at about 14 per second.
 Each `replay_frames` is a node retransmission after a lost ACK, answered and
 not published again.
 
+`radio_replay` ([node README](../node/README.md#radio_replay)) sends two valid
+reports, then their exact and tampered bytes over the air. One run published
+only the two valid reports:
+
+| Frame | Gateway |
+| --- | --- |
+| Immediate duplicate | Same ACK, `replay_frames` +1 |
+| Older counter | ACK with `counter_floor` one above the last accepted, `replay_frames` +1 |
+| One bit flipped in ciphertext, tag or counter, or the ACK request cleared | No ACK, `failed_tags` +1 each |
+| Same bytes from an unregistered node ID | No ACK, `telemetry_rejected_inactive` +1 |
+
 | Remaining | Evidence |
 | --- | --- |
 | Full registry | Reservation writes and failures |
-| Stale and damaged frames over the air | Rejected, counted in `replay_frames` and `failed_tags` |
 
 IRQ-to-ACK timing includes scheduling, replay read-back and completed radio
 transmission. Missed-IRQ recovery is excluded from `acks_measured`; node reception
