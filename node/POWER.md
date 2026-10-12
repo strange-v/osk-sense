@@ -117,6 +117,7 @@ Voltage drop during a `radio_power_sweep` transmission, measured at the supply t
 - The supercapacitor behaves as about 0.28 Ω. The new CR2032 falls from about 5 Ω at level 0 to 4.4 Ω at level 23, the used one stays near 11 Ω, the exhausted one is about 38 Ω.
 - The used cell stops delivering reports above level 15. At 11 Ω, levels 20–23 would take it below the 1.8 V BOD.
 - The exhausted cell delivers only the first report after it is connected, then stays near 1.8 V under load and does not recover between reports. No power level helps it.
+- A discharged supercapacitor charging on a window sill sent its first report at 2.00 V, the first reading above the 2000 mV transmit gate.
 
 ## Battery budget
 

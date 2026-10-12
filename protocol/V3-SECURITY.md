@@ -438,15 +438,13 @@ Static RAM leaves at least 2106 bytes for stack and dynamic state. Debug images
 paint unused SRAM during startup and report `stkfree <bytes>` when the minimum
 remaining heap-to-stack gap decreases. The painter is absent from release images.
 Debug `binary_sht40` keeps at least 1479 bytes free through pairing, telemetry
-and a command session.
+and a command session, and 1533 bytes through activation after a backup restore.
 
 ## ATtiny3224 hardware verification
 
-| Check              | Required evidence                                                                                                                        |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Supply measurement | Verify the 2000 mV transmit gate                                                                                                         |
-| Sleep and wake     | PPK2 current measurements of the images other than `binary_sht40`, with RTC PIT enabled and ADC disabled, including a radio transmission |
-| Stack              | Record debug UART `stkfree` minimum during activation                                                                                    |
+| Check          | Required evidence                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Sleep and wake | PPK2 current measurements of the images other than `binary_sht40`, with RTC PIT enabled and ADC disabled, including a radio transmission |
 
 ### Radio timing and replay reservations
 
