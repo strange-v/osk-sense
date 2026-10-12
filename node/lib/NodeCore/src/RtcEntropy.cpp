@@ -22,9 +22,10 @@ public:
         timer_(TCB0.CTRLA), mode_(TCB0.CTRLB), event_(TCB0.EVCTRL),
         interrupt_(TCB0.INTCTRL), timerCount_(TCB0.CNT), compare_(TCB0.CCMP) {}
     bool begin() {
-        if (!synchronized()) return false;
         // Changing the RTC source also changes PIT frequency. Pause its ticks
         // for this burst, then restore the sleep clock before returning.
+        // Disable before waiting: after a capture the stopped counter can
+        // report CNTBUSY indefinitely, and only a CTRLA write clears it.
         RTC.PITINTCTRL = 0; RTC.PITCTRLA = 0; RTC.INTCTRL = 0; RTC.CTRLA = 0;
         if (!synchronized()) return false;
         RTC.CLKSEL = RTC_CLKSEL_INT32K_gc; RTC.PER = 63; RTC.CNT = 0;
