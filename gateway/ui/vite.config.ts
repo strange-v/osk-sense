@@ -15,7 +15,10 @@ function gitSha(): string {
   const configured = process.env.GIT_SHA?.trim()
   if (configured) return configured
   try {
-    return execFileSync('git', ['-c', 'safe.directory=*', 'rev-parse', '--short=12', 'HEAD'], { cwd: repositoryDirectory, encoding: 'utf8' }).trim()
+    return execFileSync('git', ['-c', 'safe.directory=*', 'rev-parse', '--short=12', 'HEAD'], {
+      cwd: repositoryDirectory,
+      encoding: 'utf8',
+    }).trim()
   } catch {
     throw new Error('Unable to determine Git SHA. Set GIT_SHA for production builds.')
   }
@@ -26,7 +29,10 @@ function manifestPlugin(): Plugin {
     name: 'gateway-ui-manifest',
     closeBundle() {
       mkdirSync(outputDirectory, { recursive: true })
-      writeFileSync(`${outputDirectory}/ui-manifest.json`, `${JSON.stringify({ ui_version: firmwareVersion, required_firmware: firmwareSeries, build: gitSha() })}\n`)
+      writeFileSync(
+        `${outputDirectory}/ui-manifest.json`,
+        `${JSON.stringify({ ui_version: firmwareVersion, required_firmware: firmwareSeries, build: gitSha() })}\n`,
+      )
     },
   }
 }
@@ -53,7 +59,9 @@ export default defineConfig({
     // same module (src/views/admin.ts), not through `manualChunks`: naming a
     // chunk there makes Rollup hoist everything those views reach into it,
     // which moved the Vue runtime out of `app`.
-    rollupOptions: { output: { entryFileNames: 'assets/app-[hash].js', chunkFileNames: 'assets/[name]-[hash].js' } },
+    rollupOptions: {
+      output: { entryFileNames: 'assets/app-[hash].js', chunkFileNames: 'assets/[name]-[hash].js' },
+    },
   },
   server: { proxy: { '/api': gatewayProxy, '/ui': gatewayProxy, '/health': gatewayProxy } },
   define: { __UI_VERSION__: JSON.stringify(firmwareVersion) },

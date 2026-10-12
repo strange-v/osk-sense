@@ -6,8 +6,11 @@ import { en } from '../i18n/en'
 import PhysicalConfirmation from './PhysicalConfirmation.vue'
 
 const global = { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })] }
-const status = (active: boolean, remaining = 0) =>
-  ({ setup_required: true, physical_window_active: active, remaining_seconds: remaining })
+const status = (active: boolean, remaining = 0) => ({
+  setup_required: true,
+  physical_window_active: active,
+  remaining_seconds: remaining,
+})
 
 describe('PhysicalConfirmation', () => {
   it('asks for the gateway button while the window is closed', () => {
@@ -28,7 +31,10 @@ describe('PhysicalConfirmation', () => {
     expect(w.classes()).toContain('ending')
   })
   it('stays closed when recovery blocks setup', () => {
-    const w = mount(PhysicalConfirmation, { global, props: { status: { ...status(true, 60), recovery_required: true } } })
+    const w = mount(PhysicalConfirmation, {
+      global,
+      props: { status: { ...status(true, 60), recovery_required: true } },
+    })
     expect(w.text()).toContain(en.setup.physicalClosed)
   })
 })

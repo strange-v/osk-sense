@@ -20,7 +20,16 @@ const passes: Array<{ width: number; height: number }> = []
 let closed = 0
 
 function stubImageBitmap(width: number, height: number) {
-  vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width, height, close: () => { closed += 1 } })))
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async () => ({
+      width,
+      height,
+      close: () => {
+        closed += 1
+      },
+    })),
+  )
 }
 
 beforeEach(() => {
@@ -29,7 +38,9 @@ beforeEach(() => {
   decode.mockReset()
   // jsdom has no 2D canvas; a stub that reports the requested size is all the
   // pipeline needs.
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+    this: HTMLCanvasElement,
+  ) {
     const canvas = this
     return {
       drawImage: () => {},
@@ -40,7 +51,10 @@ beforeEach(() => {
     } as unknown as CanvasRenderingContext2D
   })
 })
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 describe('scanPairingQr', () => {
   it('yields a frame before the blocking decode so a busy state can paint', async () => {
@@ -54,7 +68,10 @@ describe('scanPairingQr', () => {
   it('fills credentials from a canonical pairing code', async () => {
     stubImageBitmap(800, 600)
     decode.mockReturnValue({ data: PAIRING_URI })
-    await expect(scanPairingQr(photo())).resolves.toEqual({ status: 'read', credentials: { uid: UID, key: KEY } })
+    await expect(scanPairingQr(photo())).resolves.toEqual({
+      status: 'read',
+      credentials: { uid: UID, key: KEY },
+    })
   })
 
   it('reports a QR code that is not a pairing code', async () => {
@@ -70,7 +87,12 @@ describe('scanPairingQr', () => {
   })
 
   it('reports a file the browser cannot decode as an image', async () => {
-    vi.stubGlobal('createImageBitmap', vi.fn(async () => { throw new Error('not an image') }))
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => {
+        throw new Error('not an image')
+      }),
+    )
     await expect(scanPairingQr(photo())).resolves.toEqual({ status: 'unreadable' })
     expect(decode).not.toHaveBeenCalled()
   })
@@ -88,7 +110,10 @@ describe('scanPairingQr', () => {
     stubImageBitmap(3072, 4080)
     decode.mockReturnValueOnce(null).mockReturnValueOnce({ data: PAIRING_URI })
     await expect(scanPairingQr(photo())).resolves.toMatchObject({ status: 'read' })
-    expect(passes).toEqual([{ width: 527, height: 700 }, { width: 301, height: 400 }])
+    expect(passes).toEqual([
+      { width: 527, height: 700 },
+      { width: 301, height: 400 },
+    ])
   })
 
   it('works up the whole ladder before reporting a miss', async () => {
@@ -109,7 +134,11 @@ describe('scanPairingQr', () => {
     await scanPairingQr(photo())
     // Three, not five: the ladder's three unblurred passes all collapse onto
     // the same pixels, while the two blurred ones stay distinct.
-    expect(passes).toEqual([{ width: 240, height: 180 }, { width: 240, height: 180 }, { width: 240, height: 180 }])
+    expect(passes).toEqual([
+      { width: 240, height: 180 },
+      { width: 240, height: 180 },
+      { width: 240, height: 180 },
+    ])
     expect(new Set(DECODE_PASSES.map((pass) => pass.blur)).size).toBe(passes.length)
   })
 

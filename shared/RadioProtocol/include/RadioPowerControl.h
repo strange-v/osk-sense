@@ -63,28 +63,24 @@ inline uint8_t minLevel(const uint8_t left, const uint8_t right) {
 // A new policy takes effect before the node's next report. Automatic control
 // starts a new average from the level last reported; before any report it
 // has nothing to ask for.
-inline uint8_t changePolicy(
-    ControlState& state, const uint8_t policy, const uint8_t ceiling) {
+inline uint8_t changePolicy(ControlState &state, const uint8_t policy, const uint8_t ceiling) {
     state.reports = 0;
     state.rssiSum = 0;
-    if (isFixedPolicy(policy)) {
+    if (isFixedPolicy(policy))
         state.desired = minLevel(fixedLevel(policy), ceiling);
-    } else if (state.known) {
+    else if (state.known)
         state.desired = minLevel(state.reportedLevel, ceiling);
-    } else {
+    else
         return kNoLevel;
-    }
     return state.desired;
 }
 
 // Records one report and returns the level the gateway wants next.
-inline uint8_t observe(
-    ControlState& state, const uint8_t policy, const uint8_t ceiling,
-    const Report& report) {
+inline uint8_t
+observe(ControlState &state, const uint8_t policy, const uint8_t ceiling, const Report &report) {
     if (report.fallback && state.known && !state.fallback) {
-        state.floor = minLevel(
-            ceiling,
-            static_cast<uint8_t>(state.reportedLevel + kFallbackMargin));
+        state.floor =
+            minLevel(ceiling, static_cast<uint8_t>(state.reportedLevel + kFallbackMargin));
     }
     if (!state.known || report.level != state.reportedLevel) {
         state.reports = 0;
@@ -113,24 +109,20 @@ inline uint8_t observe(
         const int32_t average = state.rssiSum / state.reports;
         if (average > kTargetRssiHigh) {
             const int32_t excess = average - kTargetRssiCenter;
-            const uint8_t step = excess > kMaxStepDown
-                ? kMaxStepDown
-                : static_cast<uint8_t>(excess);
-            desired = report.level > step
-                ? static_cast<uint8_t>(report.level - step)
-                : 0;
+            const uint8_t step =
+                excess > kMaxStepDown ? kMaxStepDown : static_cast<uint8_t>(excess);
+            desired = report.level > step ? static_cast<uint8_t>(report.level - step) : 0;
         } else if (average < kTargetRssiLow) {
             const int32_t deficit = kTargetRssiCenter - average;
-            const uint8_t step = deficit > kMaxStepUp
-                ? kMaxStepUp
-                : static_cast<uint8_t>(deficit);
+            const uint8_t step = deficit > kMaxStepUp ? kMaxStepUp : static_cast<uint8_t>(deficit);
             desired = static_cast<uint8_t>(report.level + step);
         }
-        if (desired < state.floor) desired = state.floor;
+        if (desired < state.floor)
+            desired = state.floor;
     }
     state.desired = minLevel(desired, ceiling);
     return state.desired;
 }
 
-}  // namespace radio_power
-}  // namespace radiosensors
+} // namespace radio_power
+} // namespace radiosensors

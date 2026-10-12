@@ -6,17 +6,17 @@
   /* Type. System stack only: a Cyrillic web font would cost ~50 KB gzip,
      roughly two thirds of the whole LittleFS image. Every family listed is
      sans-serif, so the fallback chain can never land on a serif face. */
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace;
 
-  --text-micro: 11px;   /* uppercase eyebrows only */
-  --text-xs: 12px;      /* captions, helper text */
-  --text-sm: 13px;      /* dense labels, chips */
-  --text-md: 14px;      /* body, values, buttons */
-  --text-lg: 16px;      /* panel titles */
-  --text-xl: 20px;      /* section titles */
-  --text-2xl: 25px;     /* page titles */
-  --text-metric: 26px;  /* summary numbers */
+  --text-micro: 11px; /* uppercase eyebrows only */
+  --text-xs: 12px; /* captions, helper text */
+  --text-sm: 13px; /* dense labels, chips */
+  --text-md: 14px; /* body, values, buttons */
+  --text-lg: 16px; /* panel titles */
+  --text-xl: 20px; /* section titles */
+  --text-2xl: 25px; /* page titles */
+  --text-metric: 26px; /* summary numbers */
 
   /* Spacing. 4px grid. */
   --space-1: 4px;
@@ -70,7 +70,7 @@
 /* Light palette. Applied when the browser asks for it, or when a future
    theme switch stamps data-theme on <html>. */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
+  :root:not([data-theme='dark']) {
     --bg: #f4f6f9;
     --bg-shell: #fff;
     --surface: #fff;
@@ -99,7 +99,7 @@
   }
 }
 
-:root[data-theme="light"] {
+:root[data-theme='light'] {
   --bg: #f4f6f9;
   --bg-shell: #fff;
   --surface: #fff;

@@ -9,5 +9,5 @@ namespace node {
 // from a ReadInfo command.
 constexpr protocol::FirmwareVersion kFirmwareVersion{1, 1, 0};
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

@@ -14,10 +14,9 @@ constexpr size_t kConfigB = 0x20;
 constexpr size_t kReserveB = 0x3A;
 constexpr uint32_t kReservationSize = 1024;
 constexpr uint32_t kMaxFloorAdvance = 256;
-static_assert(kConfigA + kConfigSize == kReserveA &&
-              kReserveA + kReserveSize == kConfigB &&
-              kConfigB + kConfigSize == kReserveB &&
-              kReserveB + kReserveSize == storage::kProfileAreaStart,
+static_assert(kConfigA + kConfigSize == kReserveA && kReserveA + kReserveSize == kConfigB &&
+                  kConfigB + kConfigSize == kReserveB &&
+                  kReserveB + kReserveSize == storage::kProfileAreaStart,
               "security records must not overlap the profile area");
 
 struct NetworkConfig {
@@ -30,21 +29,19 @@ struct NetworkConfig {
     uint64_t requestNonce = 0;
 };
 
-inline void write64(uint8_t* output, uint64_t value) {
+inline void write64(uint8_t *output, uint64_t value) {
     storage::write32(output, static_cast<uint32_t>(value));
     storage::write32(output + 4, static_cast<uint32_t>(value >> 32));
 }
-inline uint64_t read64(const uint8_t* input) {
-    return storage::read32(input) |
-        (static_cast<uint64_t>(storage::read32(input + 4)) << 32);
+inline uint64_t read64(const uint8_t *input) {
+    return storage::read32(input) | (static_cast<uint64_t>(storage::read32(input + 4)) << 32);
 }
-inline bool encodeConfig(const NetworkConfig& value, uint8_t* output, size_t capacity) {
+inline bool encodeConfig(const NetworkConfig &value, uint8_t *output, size_t capacity) {
     const uint8_t state = static_cast<uint8_t>(value.state);
-    if (output == nullptr || capacity < kConfigSize ||
-        value.nodeId == 0 || value.nodeId == 255 ||
-        value.gatewayId == 0 || value.gatewayId == 255 ||
-        value.nodeId == value.gatewayId ||
-        (state != 1 && state != 2)) return false;
+    if (output == nullptr || capacity < kConfigSize || value.nodeId == 0 || value.nodeId == 255 ||
+        value.gatewayId == 0 || value.gatewayId == 255 || value.nodeId == value.gatewayId ||
+        (state != 1 && state != 2))
+        return false;
     output[0] = 'R';
     output[1] = 'N';
     output[2] = 3;
@@ -58,13 +55,12 @@ inline bool encodeConfig(const NetworkConfig& value, uint8_t* output, size_t cap
     storage::write16(output + 24, storage::crc16Ccitt(output, 24));
     return true;
 }
-inline bool decodeConfig(const uint8_t* input, size_t size, NetworkConfig& value) {
-    if (input == nullptr || size != kConfigSize ||
-        input[0] != 'R' || input[1] != 'N' || input[2] != 3 ||
-        (input[4] != 1 && input[4] != 2) ||
-        input[5] == 0 || input[5] == 255 || input[6] == 0 || input[6] == 255 ||
-        input[5] == input[6] ||
-        storage::read16(input + 24) != storage::crc16Ccitt(input, 24)) return false;
+inline bool decodeConfig(const uint8_t *input, size_t size, NetworkConfig &value) {
+    if (input == nullptr || size != kConfigSize || input[0] != 'R' || input[1] != 'N' ||
+        input[2] != 3 || (input[4] != 1 && input[4] != 2) || input[5] == 0 || input[5] == 255 ||
+        input[6] == 0 || input[6] == 255 || input[5] == input[6] ||
+        storage::read16(input + 24) != storage::crc16Ccitt(input, 24))
+        return false;
     value.generation = input[3];
     value.state = static_cast<storage::ProvisioningState>(input[4]);
     value.nodeId = input[5];
@@ -75,12 +71,12 @@ inline bool decodeConfig(const uint8_t* input, size_t size, NetworkConfig& value
     return true;
 }
 
-template <typename Storage>
-class NetworkConfigStore {
-public:
-    constexpr explicit NetworkConfigStore(Storage& storage) : storage_(storage) {}
+template <typename Storage> class NetworkConfigStore {
+  public:
+    constexpr explicit NetworkConfigStore(Storage &storage) : storage_(storage) {
+    }
 
-    bool load(NetworkConfig& value) {
+    bool load(NetworkConfig &value) {
         uint8_t bytes[kConfigSize];
         NetworkConfig a, b;
         storage::readBlock(storage_, kConfigA, bytes, sizeof(bytes));
@@ -89,7 +85,11 @@ public:
         const bool validB = decodeConfig(bytes, sizeof(bytes), b);
         initialized_ = true;
         hasValue_ = validA || validB;
-        if (!hasValue_) { slot_ = 1; generation_ = 0; return false; }
+        if (!hasValue_) {
+            slot_ = 1;
+            generation_ = 0;
+            return false;
+        }
         if (validA && (!validB || storage::generationIsNewer(a.generation, b.generation))) {
             value = a;
             slot_ = 0;
@@ -101,22 +101,27 @@ public:
         return true;
     }
 
-    bool save(NetworkConfig& value) {
-        if (!initialized_) { NetworkConfig ignored; load(ignored); }
+    bool save(NetworkConfig &value) {
+        if (!initialized_) {
+            NetworkConfig ignored;
+            load(ignored);
+        }
         NetworkConfig candidate = value;
         candidate.generation = hasValue_ ? static_cast<uint8_t>(generation_ + 1) : 0;
         uint8_t bytes[kConfigSize];
-        if (!encodeConfig(candidate, bytes, sizeof(bytes))) return false;
+        if (!encodeConfig(candidate, bytes, sizeof(bytes)))
+            return false;
         const uint8_t nextSlot = slot_ ^ 1;
         const size_t address = nextSlot == 0 ? kConfigA : kConfigB;
         storage_.update(address, 0);
         storage_.update(address + 1, 0);
-        for (size_t i = 2; i < sizeof(bytes); ++i) storage_.update(address + i, bytes[i]);
+        for (size_t i = 2; i < sizeof(bytes); ++i)
+            storage_.update(address + i, bytes[i]);
         storage_.update(address + 1, bytes[1]);
         storage_.update(address, bytes[0]);
-        for (size_t i = 0; i < sizeof(bytes); ++i) {
-            if (storage_.read(address + i) != bytes[i]) return false;
-        }
+        for (size_t i = 0; i < sizeof(bytes); ++i)
+            if (storage_.read(address + i) != bytes[i])
+                return false;
         value = candidate;
         slot_ = nextSlot;
         generation_ = value.generation;
@@ -130,7 +135,8 @@ public:
         storage_.update(kConfigB, 0);
         storage_.update(kConfigB + 1, 0);
         if (storage_.read(kConfigA) != 0 || storage_.read(kConfigA + 1) != 0 ||
-            storage_.read(kConfigB) != 0 || storage_.read(kConfigB + 1) != 0) return false;
+            storage_.read(kConfigB) != 0 || storage_.read(kConfigB + 1) != 0)
+            return false;
         initialized_ = true;
         hasValue_ = false;
         slot_ = 1;
@@ -138,8 +144,8 @@ public:
         return true;
     }
 
-private:
-    Storage& storage_;
+  private:
+    Storage &storage_;
     bool initialized_ = false;
     bool hasValue_ = false;
     uint8_t slot_ = 1;
@@ -152,16 +158,17 @@ inline void encodeReserve(uint32_t limit, uint8_t output[kReserveSize]) {
     storage::write32(output, limit);
     storage::write16(output + 4, storage::crc16Ccitt(output, 4));
 }
-inline bool decodeReserve(const uint8_t input[kReserveSize], uint32_t& limit) {
-    if (storage::read16(input + 4) != storage::crc16Ccitt(input, 4)) return false;
+inline bool decodeReserve(const uint8_t input[kReserveSize], uint32_t &limit) {
+    if (storage::read16(input + 4) != storage::crc16Ccitt(input, 4))
+        return false;
     limit = storage::read32(input);
     return true;
 }
 
-template <typename Storage>
-class FrameCounterStore {
-public:
-    constexpr explicit FrameCounterStore(Storage& storage) : storage_(storage) {}
+template <typename Storage> class FrameCounterStore {
+  public:
+    constexpr explicit FrameCounterStore(Storage &storage) : storage_(storage) {
+    }
 
     // With configuration present, failure prohibits all transmission until
     // its keys are discarded. Re-pairing then establishes a fresh salt.
@@ -187,11 +194,16 @@ public:
 
     // Every allocation is new content. Retransmissions retain their original
     // frame and do not call this again.
-    bool take(uint32_t& counter) {
-        if (!healthy_) return false;
+    bool take(uint32_t &counter) {
+        if (!healthy_)
+            return false;
         if (next_ == limit_) {
-            if (next_ > UINT32_MAX - kReservationSize) { healthy_ = false; return false; }
-            if (!commit(next_ + kReservationSize)) return false;
+            if (next_ > UINT32_MAX - kReservationSize) {
+                healthy_ = false;
+                return false;
+            }
+            if (!commit(next_ + kReservationSize))
+                return false;
         }
         counter = next_++;
         hasIssued_ = true;
@@ -200,33 +212,44 @@ public:
 
     bool advanceToFloor(uint32_t acknowledgedCounter, uint32_t floor) {
         if (!healthy_ || !hasIssued_ || acknowledgedCounter != next_ - 1 ||
-            floor <= acknowledgedCounter || floor - acknowledgedCounter > kMaxFloorAdvance) return false;
-        if (floor > UINT32_MAX - kReservationSize) { healthy_ = false; return false; }
-        if (!commit(floor + kReservationSize)) return false;
+            floor <= acknowledgedCounter || floor - acknowledgedCounter > kMaxFloorAdvance)
+            return false;
+        if (floor > UINT32_MAX - kReservationSize) {
+            healthy_ = false;
+            return false;
+        }
+        if (!commit(floor + kReservationSize))
+            return false;
         next_ = floor;
         hasIssued_ = false;
         return true;
     }
 
-    uint32_t limit() const { return limit_; }
+    uint32_t limit() const {
+        return limit_;
+    }
 
-private:
+  private:
     bool commit(uint32_t limit) {
         uint8_t bytes[kReserveSize];
         encodeReserve(limit, bytes);
         const uint8_t nextSlot = slot_ ^ 1;
         const size_t address = nextSlot == 0 ? kReserveA : kReserveB;
         // CRC is last. The other valid slot covers every counter already used.
-        for (size_t i = 0; i < sizeof(bytes); ++i) storage_.update(address + i, bytes[i]);
+        for (size_t i = 0; i < sizeof(bytes); ++i)
+            storage_.update(address + i, bytes[i]);
         for (size_t i = 0; i < sizeof(bytes); ++i) {
-            if (storage_.read(address + i) != bytes[i]) { healthy_ = false; return false; }
+            if (storage_.read(address + i) != bytes[i]) {
+                healthy_ = false;
+                return false;
+            }
         }
         slot_ = nextSlot;
         limit_ = limit;
         return true;
     }
 
-    Storage& storage_;
+    Storage &storage_;
     uint32_t next_ = 0;
     uint32_t limit_ = 0;
     uint8_t slot_ = 1;
@@ -234,6 +257,6 @@ private:
     bool hasIssued_ = false;
 };
 
-}  // namespace security_storage
-}  // namespace node
-}  // namespace radiosensors
+} // namespace security_storage
+} // namespace node
+} // namespace radiosensors

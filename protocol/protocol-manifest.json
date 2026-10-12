@@ -15,7 +15,12 @@
     "salt_bytes": 8,
     "request_nonce_bytes": 8,
     "join_wire_sizes": { "request": 33, "accept": 35, "confirm": 27, "complete": 25 },
-    "command_payload": { "envelope_bytes": 3, "max_bytes": 11, "ready_bytes": 0, "no_command_bytes": 0 }
+    "command_payload": {
+      "envelope_bytes": 3,
+      "max_bytes": 11,
+      "ready_bytes": 0,
+      "no_command_bytes": 0
+    }
   },
   "radio": {
     "protocol_major": 2,
@@ -87,9 +92,7 @@
       {
         "type": 1,
         "name": "set_count",
-        "arguments": [
-          { "name": "count", "offset": 8, "encoding": "uint32_le" }
-        ],
+        "arguments": [{ "name": "count", "offset": 8, "encoding": "uint32_le" }],
         "result": [
           { "name": "previous_count", "offset": 8, "encoding": "uint32_le" },
           { "name": "count", "offset": 12, "encoding": "uint32_le" }

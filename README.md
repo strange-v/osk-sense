@@ -8,12 +8,12 @@ sensor node -- encrypted RFM69 --> gateway -- REST/WebSocket --> Home Assistant
 
 ## Sensors
 
-| Node | Measures | Power |
-| --- | --- | --- |
-| Climate | temperature (TMP112), supply voltage | solar + supercapacitor |
-| Binary input | open/closed contact (door, window, float switch) | CR2032 |
-| Binary input + climate | contact, temperature and humidity (SHT40) | CR2032 |
-| Counter | reed-switch pulses (gas, water meters) | CR2032 |
+| Node                   | Measures                                         | Power                  |
+| ---------------------- | ------------------------------------------------ | ---------------------- |
+| Climate                | temperature (TMP112), supply voltage             | solar + supercapacitor |
+| Binary input           | open/closed contact (door, window, float switch) | CR2032                 |
+| Binary input + climate | contact, temperature and humidity (SHT40)        | CR2032                 |
+| Counter                | reed-switch pulses (gas, water meters)           | CR2032                 |
 
 Battery nodes target at least three years on one cell. Contact changes are reported at once; otherwise nodes report every minute to hourly depending on type.
 
@@ -24,16 +24,16 @@ Runs on either board:
 - Waveshare ESP32-S3-ETH (W5500 Ethernet, optional PoE) — recommended.
 - Wireless-Tag WT32-ETH01 (LAN8720 Ethernet).
 
-Both need an RFM69 module wired as described in the [gateway README](gateway/README.md#hardware). The gateway hosts a web interface for setup, users, pairing, node commands, and status. It installs signed releases from GitHub when an administrator asks (*Administration → Firmware update*).
+Both need an RFM69 module wired as described in the [gateway README](gateway/README.md#hardware). The gateway hosts a web interface for setup, users, pairing, node commands, and status. It installs signed releases from GitHub when an administrator asks (_Administration → Firmware update_).
 
 ## Getting started
 
 1. **Gateway.** Build and flash the firmware and the web UI ([gateway README](gateway/README.md)). Open `http://osk-hub-<MAC>.local` (the name is in the serial log), press the gateway button (BOOT on Waveshare) when asked, and create the admin account.
 2. **Nodes.** Flash the image for your sensor type and give each node its unique factory key; the provisioning tool also exports a pairing QR code ([node README](node/README.md)).
-3. **Pairing.** In the gateway UI open *Nodes → Add node*, scan the node's QR code or enter its UID and key, press *Add*, then press the button on the node.
-4. **Home Assistant.** On the gateway's *Connect Home Assistant* page create a connection key, then add the [osk-sense-ha](https://github.com/strange-v/osk-sense-ha) integration with it.
+3. **Pairing.** In the gateway UI open _Nodes → Add node_, scan the node's QR code or enter its UID and key, press _Add_, then press the button on the node.
+4. **Home Assistant.** On the gateway's _Connect Home Assistant_ page create a connection key, then add the [osk-sense-ha](https://github.com/strange-v/osk-sense-ha) integration with it.
 
-After reflashing a paired node, open its card in the gateway UI, send the *Read node information* command, then short-press the node's button. The node stays paired; the gateway records its new firmware version and type.
+After reflashing a paired node, open its card in the gateway UI, send the _Read node information_ command, then short-press the node's button. The node stays paired; the gateway records its new firmware version and type.
 
 ## Security
 
@@ -48,16 +48,16 @@ In active development; formats may still change between versions. Unfinished wor
 
 ## Documentation
 
-| Topic | Document |
-| --- | --- |
-| System design | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| Gateway build, flashing, recovery | [gateway/README.md](gateway/README.md) |
-| Node builds, provisioning, behaviour | [node/README.md](node/README.md) |
-| Node power consumption | [node/POWER.md](node/POWER.md) |
-| Radio protocol | [protocol/PROTOCOL.md](protocol/PROTOCOL.md) |
-| Gateway REST API | [gateway/API.md](gateway/API.md) |
-| Gateway WebSocket | [gateway/WEBSOCKET.md](gateway/WEBSOCKET.md) |
-| Development checks | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Topic                                | Document                                     |
+| ------------------------------------ | -------------------------------------------- |
+| System design                        | [ARCHITECTURE.md](ARCHITECTURE.md)           |
+| Gateway build, flashing, recovery    | [gateway/README.md](gateway/README.md)       |
+| Node builds, provisioning, behaviour | [node/README.md](node/README.md)             |
+| Node power consumption               | [node/POWER.md](node/POWER.md)               |
+| Radio protocol                       | [protocol/PROTOCOL.md](protocol/PROTOCOL.md) |
+| Gateway REST API                     | [gateway/API.md](gateway/API.md)             |
+| Gateway WebSocket                    | [gateway/WEBSOCKET.md](gateway/WEBSOCKET.md) |
+| Development checks                   | [CONTRIBUTING.md](CONTRIBUTING.md)           |
 
 ## License
 

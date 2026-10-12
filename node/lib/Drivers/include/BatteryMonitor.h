@@ -6,9 +6,9 @@ namespace radiosensors {
 namespace node {
 
 class BatteryMonitor {
-public:
+  public:
     uint16_t readMillivolts() const;
 };
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

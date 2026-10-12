@@ -40,7 +40,10 @@ async function load() {
 async function afterSave(selfRevoked: boolean) {
   adding.value = false
   editing.value = null
-  if (selfRevoked) { emit('signedOut'); return }
+  if (selfRevoked) {
+    emit('signedOut')
+    return
+  }
   await load()
 }
 
@@ -52,7 +55,10 @@ async function remove() {
   try {
     await api.deleteUser(removing.value.id)
     removing.value = null
-    if (self) { emit('signedOut'); return }
+    if (self) {
+      emit('signedOut')
+      return
+    }
     await load()
   } catch (error) {
     failure.value = errorCode(error)
@@ -70,20 +76,42 @@ onMounted(load)
 <template>
   <section class="panel admin-card">
     <header class="panel-heading">
-      <div><h2>{{ $t('users.title') }}</h2><p>{{ $t('users.hint') }}</p></div>
+      <div>
+        <h2>{{ $t('users.title') }}</h2>
+        <p>{{ $t('users.hint') }}</p>
+      </div>
       <span class="panel-count">{{ users.length }} / {{ USER_LIMIT }}</span>
     </header>
 
-    <div v-if="loading" class="empty-state"><span class="loader"></span></div>
+    <div
+      v-if="loading"
+      class="empty-state"
+    >
+      <span class="loader"></span>
+    </div>
     <template v-else>
       <ul class="user-list">
-        <li v-for="user in users" :key="user.id">
-          <span class="user-symbol" aria-hidden="true"><Icon name="account" /></span>
+        <li
+          v-for="user in users"
+          :key="user.id"
+        >
+          <span
+            class="user-symbol"
+            aria-hidden="true"
+            ><Icon name="account"
+          /></span>
           <span class="user-name">
-            <strong>{{ user.username }}<em v-if="isSelf(user)">{{ $t('users.you') }}</em></strong>
-            <small>{{ user.role === 'admin' ? $t('users.roleAdmin') : $t('users.roleViewer') }}</small>
+            <strong
+              >{{ user.username }}<em v-if="isSelf(user)">{{ $t('users.you') }}</em></strong
+            >
+            <small>{{
+              user.role === 'admin' ? $t('users.roleAdmin') : $t('users.roleViewer')
+            }}</small>
           </span>
-          <span class="inline-status" :class="{ warning: !user.enabled }">
+          <span
+            class="inline-status"
+            :class="{ warning: !user.enabled }"
+          >
             {{ user.enabled ? $t('users.stateEnabled') : $t('users.stateDisabled') }}
           </span>
           <span class="user-actions">
@@ -93,7 +121,9 @@ onMounted(load)
               :aria-label="$t('users.editUser', { name: user.username })"
               :title="$t('users.edit')"
               @click="editing = user"
-            ><Icon name="pencil" /></button>
+            >
+              <Icon name="pencil" />
+            </button>
             <button
               class="icon-button danger"
               type="button"
@@ -101,20 +131,55 @@ onMounted(load)
               :aria-label="$t('users.deleteUser', { name: user.username })"
               :title="protectedAdmin(user) ? $t('users.lastAdminLocked') : $t('users.delete')"
               @click="removing = user"
-            ><Icon name="delete" /></button>
+            >
+              <Icon name="delete" />
+            </button>
           </span>
         </li>
       </ul>
 
-      <div v-if="failure" class="notice error">{{ $t(`error.${failure}`) }}</div>
-      <p v-if="full" class="capacity-note">{{ $t('users.capacity', { limit: USER_LIMIT }) }}</p>
-      <button v-else class="button primary" type="button" @click="adding = true"><Icon name="plus" /> {{ $t('users.add') }}</button>
+      <div
+        v-if="failure"
+        class="notice error"
+      >
+        {{ $t(`error.${failure}`) }}
+      </div>
+      <p
+        v-if="full"
+        class="capacity-note"
+      >
+        {{ $t('users.capacity', { limit: USER_LIMIT }) }}
+      </p>
+      <button
+        v-else
+        class="button primary"
+        type="button"
+        @click="adding = true"
+      >
+        <Icon name="plus" /> {{ $t('users.add') }}
+      </button>
     </template>
 
-    <UserDialog v-if="adding" :users="users" @close="adding = false" @saved="afterSave" />
-    <UserDialog v-else-if="editing" :users="users" :user="editing" @close="editing = null" @saved="afterSave" />
+    <UserDialog
+      v-if="adding"
+      :users="users"
+      @close="adding = false"
+      @saved="afterSave"
+    />
+    <UserDialog
+      v-else-if="editing"
+      :users="users"
+      :user="editing"
+      @close="editing = null"
+      @saved="afterSave"
+    />
 
-    <Modal v-if="removing" :title="$t('users.deleteTitle')" :busy="deleteBusy ? $t('users.deleting') : undefined" @close="removing = null">
+    <Modal
+      v-if="removing"
+      :title="$t('users.deleteTitle')"
+      :busy="deleteBusy ? $t('users.deleting') : undefined"
+      @close="removing = null"
+    >
       <div class="form-stack">
         <div class="notice error">
           <span>
@@ -123,8 +188,21 @@ onMounted(load)
           </span>
         </div>
         <div class="modal-actions">
-          <button class="button secondary" type="button" @click="removing = null">{{ $t('common.cancel') }}</button>
-          <button class="button danger" :disabled="deleteBusy" type="button" @click="remove">{{ $t('users.delete') }}</button>
+          <button
+            class="button secondary"
+            type="button"
+            @click="removing = null"
+          >
+            {{ $t('common.cancel') }}
+          </button>
+          <button
+            class="button danger"
+            :disabled="deleteBusy"
+            type="button"
+            @click="remove"
+          >
+            {{ $t('users.delete') }}
+          </button>
         </div>
       </div>
     </Modal>
@@ -132,7 +210,13 @@ onMounted(load)
 </template>
 
 <style scoped>
-.user-list { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.user-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .user-list li {
   display: flex;
   flex-wrap: wrap;
@@ -140,17 +224,55 @@ onMounted(load)
   gap: var(--space-2) var(--space-3);
   padding: var(--space-2) 0;
 }
-.user-list .user-name { flex: 1 1 8rem; }
-.user-list .user-actions { margin-left: auto; }
-.user-actions .icon-button { width: 30px; height: 30px; font-size: var(--text-md); }
-.user-list li + li { box-shadow: 0 -1px 0 var(--line); }
-.user-symbol { width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--radius-md); color: var(--primary); background: var(--primary-soft); }
-.user-name { min-width: 0; display: grid; }
-.user-name strong { display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--text-md); font-weight: 500; }
-.user-name em { color: var(--muted); font-size: var(--text-xs); font-style: normal; }
-.user-name small { color: var(--muted); font-size: var(--text-xs); }
-.user-actions { display: flex; gap: var(--space-1); }
-.capacity-note { color: var(--ink-soft); font-size: var(--text-sm); }
-
-
+.user-list .user-name {
+  flex: 1 1 8rem;
+}
+.user-list .user-actions {
+  margin-left: auto;
+}
+.user-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  font-size: var(--text-md);
+}
+.user-list li + li {
+  box-shadow: 0 -1px 0 var(--line);
+}
+.user-symbol {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.user-name {
+  min-width: 0;
+  display: grid;
+}
+.user-name strong {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+.user-name em {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-style: normal;
+}
+.user-name small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.user-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+.capacity-note {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
 </style>

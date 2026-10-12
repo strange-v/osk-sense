@@ -12,36 +12,41 @@
 #include <string.h>
 
 using namespace radiosensors::node::storage;
-using radiosensors::node::CounterReportSchedule;
+using radiosensors::node::afterAcknowledged;
+using radiosensors::node::afterUnacknowledged;
+using radiosensors::node::BinaryReportSchedule;
 using radiosensors::node::ClimateReportPolicy;
 using radiosensors::node::ClimateReportSchedule;
 using radiosensors::node::ConfirmedInput;
-using radiosensors::node::InputChange;
-using radiosensors::node::MinimumPhaseFilter;
-using radiosensors::node::BinaryReportSchedule;
-using radiosensors::node::LoadedSupplyVoltage;
-using radiosensors::node::SupplyGate;
-using radiosensors::node::RollingKeepAlive;
-using radiosensors::node::RadioRetryBackoff;
+using radiosensors::node::CounterReportSchedule;
 using radiosensors::node::HintedSessionPolicy;
+using radiosensors::node::InputChange;
 using radiosensors::node::JoinRetrySchedule;
-using radiosensors::node::PowerDecision;
-using radiosensors::node::afterAcknowledged;
-using radiosensors::node::afterUnacknowledged;
-using radiosensors::node::kTelemetryAttempts;
-using radiosensors::node::telemetryAttempts;
 using radiosensors::node::kCounterMinimumReportMs;
+using radiosensors::node::kTelemetryAttempts;
+using radiosensors::node::LoadedSupplyVoltage;
+using radiosensors::node::MinimumPhaseFilter;
+using radiosensors::node::PowerDecision;
+using radiosensors::node::RadioRetryBackoff;
 using radiosensors::node::recoverI2cBus;
+using radiosensors::node::RollingKeepAlive;
+using radiosensors::node::SupplyGate;
+using radiosensors::node::telemetryAttempts;
 
 namespace {
 
 class FakeStorage {
-public:
-    FakeStorage() { memset(bytes, 0xFF, sizeof(bytes)); }
+  public:
+    FakeStorage() {
+        memset(bytes, 0xFF, sizeof(bytes));
+    }
 
-    uint8_t read(const size_t address) const { return bytes[address]; }
+    uint8_t read(const size_t address) const {
+        return bytes[address];
+    }
     void update(const size_t address, const uint8_t value) {
-        if (bytes[address] == value) return;
+        if (bytes[address] == value)
+            return;
         bytes[address] = value;
         ++writes[address];
     }
@@ -56,23 +61,23 @@ NetworkConfig makeConfig(const uint8_t nodeId = 7) {
     value.nodeId = nodeId;
     value.gatewayId = 100;
     value.networkId = 42;
-    for (uint8_t index = 0; index < sizeof(value.installationKey); ++index) {
+    for (uint8_t index = 0; index < sizeof(value.installationKey); ++index)
         value.installationKey[index] = static_cast<uint8_t>(index + 1);
-    }
     value.requestNonce = 0x89ABCDEFUL;
     return value;
 }
 
 class FakeContact {
-public:
+  public:
     bool readOnce() {
         ++reads;
         return level;
     }
 
-    bool sample(bool& high) {
+    bool sample(bool &high) {
         ++bursts;
-        if (!settles) return false;
+        if (!settles)
+            return false;
         high = settledLevel;
         return true;
     }
@@ -93,37 +98,56 @@ public:
 // has seen `heldClocks` more SCL rising edges; a negative count holds it
 // forever.
 class FakeI2cBus {
-public:
-    explicit FakeI2cBus(const int heldClocks) : heldClocks_(heldClocks) {}
+  public:
+    explicit FakeI2cBus(const int heldClocks) : heldClocks_(heldClocks) {
+    }
 
-    void pullSclLow() { setScl(false); }
-    void releaseScl() { setScl(true); }
-    void pullSdaLow() { setSda(false); }
-    void releaseSda() { setSda(true); }
-    bool sclHigh() const { return sclReleased_; }
-    bool sdaHigh() const { return sdaReleased_ && heldClocks_ == 0; }
-    void halfPeriod() {}
+    void pullSclLow() {
+        setScl(false);
+    }
+    void releaseScl() {
+        setScl(true);
+    }
+    void pullSdaLow() {
+        setSda(false);
+    }
+    void releaseSda() {
+        setSda(true);
+    }
+    bool sclHigh() const {
+        return sclReleased_;
+    }
+    bool sdaHigh() const {
+        return sdaReleased_ && heldClocks_ == 0;
+    }
+    void halfPeriod() {
+    }
 
     int clocks = 0;
     int starts = 0;
     int stops = 0;
 
-private:
+  private:
     void setScl(const bool released) {
         const bool rising = released && !sclReleased_;
         sclReleased_ = released;
-        if (!rising) return;
+        if (!rising)
+            return;
         ++clocks;
-        if (heldClocks_ > 0) --heldClocks_;
+        if (heldClocks_ > 0)
+            --heldClocks_;
     }
 
     void setSda(const bool released) {
         const bool before = sdaHigh();
         sdaReleased_ = released;
         const bool after = sdaHigh();
-        if (!sclReleased_ || before == after) return;
-        if (after) ++stops;
-        else ++starts;
+        if (!sclReleased_ || before == after)
+            return;
+        if (after)
+            ++stops;
+        else
+            ++starts;
     }
 
     int heldClocks_;
@@ -138,19 +162,20 @@ FactoryCredentials makeFactoryCredentials() {
     return value;
 }
 
-}  // namespace
+} // namespace
 
-void setUp() {}
-void tearDown() {}
+void setUp() {
+}
+void tearDown() {
+}
 
 void test_layout_fills_eeprom_without_overlap() {
     TEST_ASSERT_EQUAL_UINT32(32, kNetworkConfigSlotSize);
     TEST_ASSERT_EQUAL_UINT32(0x20, kNetworkConfigSlotB);
     TEST_ASSERT_EQUAL_UINT32(0x40, kSetCountSlotA);
     TEST_ASSERT_EQUAL_UINT32(0x60, kCounterRingStart);
-    TEST_ASSERT_EQUAL_UINT32(
-        kEepromSize,
-        kCounterRingStart + kCounterRecordSize * kCounterRecordCount);
+    TEST_ASSERT_EQUAL_UINT32(kEepromSize,
+                             kCounterRingStart + kCounterRecordSize * kCounterRecordCount);
 }
 
 void test_factory_credentials_round_trip_and_validation() {
@@ -160,10 +185,9 @@ void test_factory_credentials_round_trip_and_validation() {
     uint8_t bytes[kFactoryCredentialSize];
     TEST_ASSERT_TRUE(encodeFactoryCredentials(source, bytes, sizeof(bytes)));
     const uint8_t expected[kFactoryCredentialSize] = {
-        0x52, 0x53, 0x46, 0x43, 0x01, 0x01, 0x00, 0x00,
-        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-        0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-        0xAE, 0xDC, 0x51, 0x23, 0x00, 0x00, 0x00, 0x00,
+        0x52, 0x53, 0x46, 0x43, 0x01, 0x01, 0x00, 0x00, 0x01, 0x02, 0x03,
+        0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+        0x0F, 0x10, 0xAE, 0xDC, 0x51, 0x23, 0x00, 0x00, 0x00, 0x00,
     };
     TEST_ASSERT_EQUAL_MEMORY(expected, bytes, sizeof(expected));
     FactoryCredentials restored{};
@@ -307,9 +331,8 @@ void test_factory_reset_preserves_counter_area() {
 void test_counter_ring_restores_latest_across_wraps() {
     FakeStorage memory;
     CounterStore<FakeStorage> writer(memory);
-    for (uint32_t value = 1; value <= 600; ++value) {
+    for (uint32_t value = 1; value <= 600; ++value)
         TEST_ASSERT_TRUE(writer.save(value));
-    }
     CounterStore<FakeStorage> reader(memory);
     uint32_t restored = 0;
     TEST_ASSERT_TRUE(reader.load(restored));
@@ -335,9 +358,8 @@ void test_counter_ignores_uncommitted_record() {
 void test_counter_ignores_count_torn_before_sequence_commit() {
     FakeStorage memory;
     CounterStore<FakeStorage> writer(memory);
-    for (uint32_t value = 1; value <= 40; ++value) {
+    for (uint32_t value = 1; value <= 40; ++value)
         TEST_ASSERT_TRUE(writer.save(value));
-    }
     // The next destination still carries the oldest sequence in the ring.
     const size_t interrupted = kCounterRingStart + 8 * kCounterRecordSize;
     uint8_t bytes[4];
@@ -358,13 +380,11 @@ void test_counter_writes_each_sequence_byte_once_per_visit() {
     FakeStorage memory;
     CounterStore<FakeStorage> writer(memory);
     constexpr uint16_t kRotations = 10;
-    for (uint32_t value = 1; value <= kRotations * kCounterRecordCount; ++value) {
+    for (uint32_t value = 1; value <= kRotations * kCounterRecordCount; ++value)
         TEST_ASSERT_TRUE(writer.save(value));
-    }
     for (size_t slot = 0; slot < kCounterRecordCount; ++slot) {
-        TEST_ASSERT_EQUAL_UINT16(
-            kRotations,
-            memory.writes[kCounterRingStart + slot * kCounterRecordSize]);
+        TEST_ASSERT_EQUAL_UINT16(kRotations,
+                                 memory.writes[kCounterRingStart + slot * kCounterRecordSize]);
     }
 }
 
@@ -384,9 +404,8 @@ void test_set_count_result_round_trip_and_corruption_fallback() {
     SetCountStore<FakeStorage> reader(memory);
     SetCountResult restored{};
     TEST_ASSERT_TRUE(reader.load(restored));
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(SetCountStatus::Applied),
-        static_cast<uint8_t>(restored.status));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SetCountStatus::Applied),
+                            static_cast<uint8_t>(restored.status));
     TEST_ASSERT_EQUAL_UINT16(17, restored.commandId);
     TEST_ASSERT_EQUAL_UINT32(100, restored.oldCount);
     TEST_ASSERT_EQUAL_UINT32(500, restored.appliedCount);
@@ -394,9 +413,8 @@ void test_set_count_result_round_trip_and_corruption_fallback() {
     memory.bytes[kSetCountSlotB + 9] ^= 0x01;
     SetCountStore<FakeStorage> fallbackReader(memory);
     TEST_ASSERT_TRUE(fallbackReader.load(restored));
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(SetCountStatus::Pending),
-        static_cast<uint8_t>(restored.status));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SetCountStatus::Pending),
+                            static_cast<uint8_t>(restored.status));
 }
 
 void test_set_count_result_generation_wrap_selects_latest() {
@@ -429,9 +447,8 @@ void test_set_count_journal_applies_and_recognizes_redelivery() {
     journal.recover(count);
 
     SetCountResult result{};
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(SetCountOutcome::Applied),
-        static_cast<uint8_t>(journal.apply(17, 500, count, result)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SetCountOutcome::Applied),
+                            static_cast<uint8_t>(journal.apply(17, 500, count, result)));
     TEST_ASSERT_EQUAL_UINT32(500, count);
     TEST_ASSERT_EQUAL_UINT32(100, result.oldCount);
     TEST_ASSERT_EQUAL_UINT32(500, result.appliedCount);
@@ -439,9 +456,8 @@ void test_set_count_journal_applies_and_recognizes_redelivery() {
     // Pulses counted after the command must survive its redelivery.
     count = 503;
     TEST_ASSERT_TRUE(counter.save(count));
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(SetCountOutcome::Redelivered),
-        static_cast<uint8_t>(journal.apply(17, 500, count, result)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SetCountOutcome::Redelivered),
+                            static_cast<uint8_t>(journal.apply(17, 500, count, result)));
     TEST_ASSERT_EQUAL_UINT32(503, count);
     TEST_ASSERT_EQUAL_UINT32(100, result.oldCount);
     TEST_ASSERT_EQUAL_UINT32(500, result.appliedCount);
@@ -449,9 +465,8 @@ void test_set_count_journal_applies_and_recognizes_redelivery() {
     SetCountStore<FakeStorage> reader(memory);
     SetCountResult stored{};
     TEST_ASSERT_TRUE(reader.load(stored));
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(SetCountStatus::Applied),
-        static_cast<uint8_t>(stored.status));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SetCountStatus::Applied),
+                            static_cast<uint8_t>(stored.status));
     TEST_ASSERT_EQUAL_UINT16(17, stored.commandId);
 }
 
@@ -484,9 +499,8 @@ void test_set_count_journal_completes_an_interrupted_apply_on_boot() {
     TEST_ASSERT_TRUE(ringReader.load(persisted));
     TEST_ASSERT_EQUAL_UINT32(42, persisted);
     SetCountResult result{};
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(SetCountOutcome::Redelivered),
-        static_cast<uint8_t>(journal.apply(9, 42, count, result)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SetCountOutcome::Redelivered),
+                            static_cast<uint8_t>(journal.apply(9, 42, count, result)));
 }
 
 void test_set_count_journal_forgets_ids_after_commissioning() {
@@ -497,14 +511,12 @@ void test_set_count_journal_forgets_ids_after_commissioning() {
     uint32_t count = 0;
     journal.recover(count);
     SetCountResult result{};
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(SetCountOutcome::Applied),
-        static_cast<uint8_t>(journal.apply(5, 10, count, result)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SetCountOutcome::Applied),
+                            static_cast<uint8_t>(journal.apply(5, 10, count, result)));
 
     journal.forgetCommandIds(count);
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(SetCountOutcome::Applied),
-        static_cast<uint8_t>(journal.apply(5, 20, count, result)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SetCountOutcome::Applied),
+                            static_cast<uint8_t>(journal.apply(5, 20, count, result)));
     TEST_ASSERT_EQUAL_UINT32(20, count);
     TEST_ASSERT_EQUAL_UINT32(10, result.oldCount);
 }
@@ -683,9 +695,8 @@ void test_join_retries_every_five_minutes_for_twelve_attempts() {
 void test_join_retries_hourly_while_provisional() {
     constexpr uint32_t minute = 60UL * 1000UL;
     JoinRetrySchedule schedule;
-    for (uint32_t attempt = 0; attempt < 12; ++attempt) {
+    for (uint32_t attempt = 0; attempt < 12; ++attempt)
         schedule.attempted(attempt * 5U * minute, false);
-    }
     const uint32_t last = 55U * minute;
     TEST_ASSERT_FALSE(schedule.due(last + 60U * minute - 1U, true));
     TEST_ASSERT_TRUE(schedule.due(last + 60U * minute, true));
@@ -695,8 +706,7 @@ void test_join_retries_hourly_while_provisional() {
 }
 
 void test_climate_schedule_follows_voltage_of_failed_reports() {
-    const ClimateReportPolicy policy = ClimateReportPolicy::adaptive(
-        64000UL, 320000UL, 2500);
+    const ClimateReportPolicy policy = ClimateReportPolicy::adaptive(64000UL, 320000UL, 2500);
     ClimateReportSchedule schedule(policy);
     TEST_ASSERT_TRUE(schedule.due(0));
     TEST_ASSERT_EQUAL_UINT32(64000UL, schedule.attempted(0, 2800));
@@ -716,8 +726,7 @@ void test_fixed_climate_policy_ignores_supply_voltage() {
 }
 
 void test_adaptive_climate_policy_uses_v1_threshold_semantics() {
-    const ClimateReportPolicy policy = ClimateReportPolicy::adaptive(
-        60000UL, 300000UL, 2500);
+    const ClimateReportPolicy policy = ClimateReportPolicy::adaptive(60000UL, 300000UL, 2500);
     TEST_ASSERT_EQUAL_UINT32(300000UL, policy.intervalForMillivolts(2499));
     TEST_ASSERT_EQUAL_UINT32(300000UL, policy.intervalForMillivolts(2500));
     TEST_ASSERT_EQUAL_UINT32(60000UL, policy.intervalForMillivolts(2501));
@@ -771,17 +780,15 @@ void test_confirmed_input_bursts_only_on_disagreeing_read() {
     FakeContact contact;
     ConfirmedInput input(true);
     for (int tick = 0; tick < 10; ++tick) {
-        TEST_ASSERT_EQUAL_UINT8(
-            static_cast<uint8_t>(InputChange::None),
-            static_cast<uint8_t>(input.update(contact)));
+        TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::None),
+                                static_cast<uint8_t>(input.update(contact)));
     }
     TEST_ASSERT_EQUAL_INT(10, contact.reads);
     TEST_ASSERT_EQUAL_INT(0, contact.bursts);
 
     contact.set(false);
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(InputChange::Fell),
-        static_cast<uint8_t>(input.update(contact)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::Fell),
+                            static_cast<uint8_t>(input.update(contact)));
     TEST_ASSERT_EQUAL_INT(1, contact.bursts);
     TEST_ASSERT_FALSE(input.high());
 }
@@ -791,22 +798,19 @@ void test_confirmed_input_rejects_glitch_and_unsettled_burst() {
     ConfirmedInput input(true);
     contact.level = false;
     contact.settledLevel = true;
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(InputChange::None),
-        static_cast<uint8_t>(input.update(contact)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::None),
+                            static_cast<uint8_t>(input.update(contact)));
     TEST_ASSERT_TRUE(input.high());
 
     contact.settles = false;
     contact.settledLevel = false;
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(InputChange::None),
-        static_cast<uint8_t>(input.update(contact)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::None),
+                            static_cast<uint8_t>(input.update(contact)));
     TEST_ASSERT_TRUE(input.high());
 
     contact.settles = true;
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(InputChange::Fell),
-        static_cast<uint8_t>(input.update(contact)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::Fell),
+                            static_cast<uint8_t>(input.update(contact)));
 }
 
 void test_confirmed_input_counts_boot_inside_low_phase_once() {
@@ -817,7 +821,8 @@ void test_confirmed_input_counts_boot_inside_low_phase_once() {
     const bool levels[] = {false, false, true, true, false, true};
     for (const bool level : levels) {
         contact.set(level);
-        if (input.update(contact) == InputChange::Rose) ++rises;
+        if (input.update(contact) == InputChange::Rose)
+            ++rises;
     }
     TEST_ASSERT_EQUAL_INT(2, rises);
 }
@@ -827,16 +832,29 @@ void test_minimum_phase_rejects_chatter_and_counts_one_rise_per_pulse() {
     // Level sampled every 250 ms: chatter while the magnet approaches, a held
     // LOW, chatter while it leaves, then a held HIGH.
     const bool levels[] = {
-        true, false, true, false, false, false, false,
-        true, false, true, true, true, true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
     };
     int falls = 0;
     int rises = 0;
     uint32_t now = 0;
     for (const bool level : levels) {
         const InputChange change = phase.update(now, level);
-        if (change == InputChange::Fell) ++falls;
-        if (change == InputChange::Rose) ++rises;
+        if (change == InputChange::Fell)
+            ++falls;
+        if (change == InputChange::Rose)
+            ++rises;
         now += 250;
     }
     TEST_ASSERT_EQUAL_INT(1, falls);
@@ -845,18 +863,14 @@ void test_minimum_phase_rejects_chatter_and_counts_one_rise_per_pulse() {
 
 void test_minimum_phase_accepts_level_held_for_minimum_time() {
     MinimumPhaseFilter phase(500, true);
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(InputChange::None),
-        static_cast<uint8_t>(phase.update(1000, false)));
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(InputChange::None),
-        static_cast<uint8_t>(phase.update(1250, false)));
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(InputChange::Fell),
-        static_cast<uint8_t>(phase.update(1500, false)));
-    TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(InputChange::None),
-        static_cast<uint8_t>(phase.update(1750, false)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::None),
+                            static_cast<uint8_t>(phase.update(1000, false)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::None),
+                            static_cast<uint8_t>(phase.update(1250, false)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::Fell),
+                            static_cast<uint8_t>(phase.update(1500, false)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(InputChange::None),
+                            static_cast<uint8_t>(phase.update(1750, false)));
 }
 
 void test_i2c_recovery_on_idle_bus_only_sends_stop() {
@@ -885,7 +899,7 @@ void test_i2c_recovery_gives_up_after_nine_clocks() {
     TEST_ASSERT_EQUAL_INT(0, bus.starts);
 }
 
-int main(int, char**) {
+int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(security_store_tests::test_config_layout_and_crc);
     RUN_TEST(security_store_tests::test_config_torn_write_is_atomic);

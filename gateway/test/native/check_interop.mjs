@@ -8,8 +8,11 @@ assert.equal(file.readUInt32LE(8), 100_000)
 assert.equal(file.readUInt32LE(12), file.length - 60)
 const key = pbkdf2Sync('backup test password', file.subarray(16, 32), 100_000, 32, 'sha256')
 const decipher = createDecipheriv('aes-256-gcm', key, file.subarray(32, 44))
-decipher.setAAD(file.subarray(0, 44)); decipher.setAuthTag(file.subarray(-16))
-const payload = JSON.parse(Buffer.concat([decipher.update(file.subarray(44, -16)), decipher.final()]))
+decipher.setAAD(file.subarray(0, 44))
+decipher.setAuthTag(file.subarray(-16))
+const payload = JSON.parse(
+  Buffer.concat([decipher.update(file.subarray(44, -16)), decipher.final()]),
+)
 assert.equal(payload.version, 3)
 assert.equal(payload.network_id, 123)
 assert.equal(payload.settings.hostname, 'greenhouse')
@@ -21,6 +24,9 @@ assert.equal(pairing.length, 123)
 assert.equal(pairing.subarray(0, 4).toString(), 'RSPT')
 assert.equal(pairing[12], 2)
 assert.equal(pairing.readBigUInt64LE(30), 0xfedcba980000002an)
-assert.equal(payload.device_secret, Buffer.from(Array.from({ length: 32 }, (_, i) => i)).toString('hex'))
+assert.equal(
+  payload.device_secret,
+  Buffer.from(Array.from({ length: 32 }, (_, i) => i)).toString('hex'),
+)
 assert.equal(Object.hasOwn(payload, 'installation_key'), false)
 console.log('Mbed TLS backup decrypted and validated independently by Node.js crypto')

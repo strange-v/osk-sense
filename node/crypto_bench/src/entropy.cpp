@@ -4,16 +4,18 @@
 namespace {
 uint16_t samples[128];
 uint16_t edge() {
-    while ((TCB0.INTFLAGS & TCB_CAPT_bm) == 0) {}
+    while ((TCB0.INTFLAGS & TCB_CAPT_bm) == 0) {
+    }
     const uint16_t value = TCB0.CCMP;
     TCB0.INTFLAGS = TCB_CAPT_bm;
     return value;
 }
-}
+} // namespace
 
 void setup() {
     Serial.begin(9600);
-    while (RTC.STATUS != 0) {}
+    while (RTC.STATUS != 0) {
+    }
     RTC.CLKSEL = RTC_CLKSEL_INT32K_gc;
     RTC.PER = 63;
     RTC.CTRLA = RTC_PRESCALER_DIV1_gc | RTC_RTCEN_bm;
@@ -32,9 +34,9 @@ void loop() {
     const uint8_t saved = SREG;
     cli();
     edge();
-    for (uint8_t i = 0; i < 128; ++i) {
+    for (uint8_t i = 0; i < 128; ++i)
         samples[i] = edge();
-    }
     SREG = saved;
-    for (uint8_t i = 0; i < 128; ++i) Serial.println(samples[i]);
+    for (uint8_t i = 0; i < 128; ++i)
+        Serial.println(samples[i]);
 }

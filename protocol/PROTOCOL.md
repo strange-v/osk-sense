@@ -4,11 +4,11 @@
 
 ## Protocol layers
 
-| Layer | Representation |
-| --- | --- |
-| RFM69 transport | Target, sender and control bytes, covered by the authentication tag |
-| Radio traffic | V3 header, counter and encrypted payload with a CMAC tag; join frames are clear and authenticated |
-| Gateway telemetry and WebSocket | Application header `0x40`, common prefix and opaque profile payload |
+| Layer                           | Representation                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------- |
+| RFM69 transport                 | Target, sender and control bytes, covered by the authentication tag                               |
+| Radio traffic                   | V3 header, counter and encrypted payload with a CMAC tag; join frames are clear and authenticated |
+| Gateway telemetry and WebSocket | Application header `0x40`, common prefix and opaque profile payload                               |
 
 The gateway authenticates and checks replay state before forwarding telemetry. It removes the radio envelope and prepends `0x40` for the application codec. The profile examples below describe this client representation. The manifest's `security_v3` object describes the radio envelope; its `radio` object describes application codec IDs.
 
@@ -16,18 +16,18 @@ The gateway authenticates and checks replay state before forwarding telemetry. I
 
 V3 headers use bits 7..5 for protocol major `3` and bits 4..0 for the kind. Unknown versions and kinds are rejected.
 
-| Kind | Header | Name |
-| ---: | ---: | --- |
-| 0 | `0x60` | Telemetry |
-| 1 | `0x61` | Join request |
-| 2 | `0x62` | Join accept |
-| 3 | `0x63` | Join confirm |
-| 4 | `0x64` | Command |
-| 5 | `0x65` | Command result |
-| 7 | `0x67` | Join complete |
-| 8 | `0x68` | Command ready |
-| 9 | `0x69` | No command |
-| 10 | `0x6A` | Activation report |
+| Kind | Header | Name              |
+| ---: | -----: | ----------------- |
+|    0 | `0x60` | Telemetry         |
+|    1 | `0x61` | Join request      |
+|    2 | `0x62` | Join accept       |
+|    3 | `0x63` | Join confirm      |
+|    4 | `0x64` | Command           |
+|    5 | `0x65` | Command result    |
+|    7 | `0x67` | Join complete     |
+|    8 | `0x68` | Command ready     |
+|    9 | `0x69` | No command        |
+|   10 | `0x6A` | Activation report |
 
 ## Sleeping-node command session
 
@@ -35,21 +35,21 @@ A sleeping node pulls one pending command when its button is short-pressed or a 
 
 Command and result payloads begin with a nonzero uint16 little-endian command ID and a one-byte type or status, followed by up to eight argument or result bytes. A result carries a fresh node counter greater than the ready's counter. The gateway requires the command ID and pairing salt of its latest delivery to match.
 
-| Status | Name | Meaning |
-| ---: | --- | --- |
-| 0 | `applied` | The effect is durable |
-| 1 | `unsupported` | The firmware does not implement the type |
-| 2 | `invalid_argument` | Wrong argument length or value |
-| 3 | `storage_failure` | Nothing applied; retry in a later session |
+| Status | Name               | Meaning                                   |
+| -----: | ------------------ | ----------------------------------------- |
+|      0 | `applied`          | The effect is durable                     |
+|      1 | `unsupported`      | The firmware does not implement the type  |
+|      2 | `invalid_argument` | Wrong argument length or value            |
+|      3 | `storage_failure`  | Nothing applied; retry in a later session |
 
 Every status except `storage_failure` completes the command. The authenticated ACK confirms queuing; the pending command remains until its result is durably recorded.
 
 ### Command types
 
-| Type | Name | Profiles | Arguments | Result data |
-| ---: | --- | --- | --- | --- |
-| 1 | `set_count` | 6 | `count`: uint32 LE | `previous_count`: uint32 LE, `count`: uint32 LE |
-| 2 | `read_info` | All | None | `profile_id`: uint16 LE, `firmware.major`, `firmware.minor`, `firmware.patch`, `max_power_level`: unsigned bytes |
+| Type | Name        | Profiles | Arguments          | Result data                                                                                                      |
+| ---: | ----------- | -------- | ------------------ | ---------------------------------------------------------------------------------------------------------------- |
+|    1 | `set_count` | 6        | `count`: uint32 LE | `previous_count`: uint32 LE, `count`: uint32 LE                                                                  |
+|    2 | `read_info` | All      | None               | `profile_id`: uint16 LE, `firmware.major`, `firmware.minor`, `firmware.patch`, `max_power_level`: unsigned bytes |
 
 Commands are one-shot actions. Configuration the gateway maintains, such as radio power, is desired state carried by the telemetry acknowledgement instead.
 
@@ -82,11 +82,11 @@ DATA[5..N] profile-specific payload ------------------------------------+--> con
 
 Every telemetry frame has a five-byte common prefix:
 
-| Offset | Bytes | Field | Encoding |
-| ---: | ---: | --- | --- |
-| 1 | 1 | `radio_state` | Bits 0..4 `tx_power_level` `0..31`; bit 5 `radio_fallback`; bits 6..7 zero |
-| 2 | 1 | `downlink_rssi` | Signed dBm of the acknowledgement to the node's previous report, measured while its sync word arrives; `INT8_MIN` means not measured |
-| 3 | 2 | `supply_voltage` | Unsigned little-endian millivolts; `UINT16_MAX` means unavailable |
+| Offset | Bytes | Field            | Encoding                                                                                                                             |
+| -----: | ----: | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+|      1 |     1 | `radio_state`    | Bits 0..4 `tx_power_level` `0..31`; bit 5 `radio_fallback`; bits 6..7 zero                                                           |
+|      2 |     1 | `downlink_rssi`  | Signed dBm of the acknowledgement to the node's previous report, measured while its sync word arrives; `INT8_MIN` means not measured |
+|      3 |     2 | `supply_voltage` | Unsigned little-endian millivolts; `UINT16_MAX` means unavailable                                                                    |
 
 The link fields come first and supply voltage last, next to the measurements. A future profile for a node without a meaningful supply voltage can therefore end the common prefix at offset 3 while every current profile keeps the same bytes, with supply voltage as its first field.
 
@@ -104,15 +104,15 @@ A node that sees `command_pending` opens a command session in the same wake-up. 
 
 Radio power is desired state, not a command. The node owns its level and reports it in every telemetry frame; the gateway owns a policy and, while the reported level differs from the one it wants, adds `power_target` to each telemetry acknowledgement. A lost acknowledgement is simply repeated by the next one, so no command ID or session is involved.
 
-| Rule | Owner | Behaviour |
-| --- | --- | --- |
-| Ceiling | Node | A build constant for its hardware and supply, reported as `max_power_level` in Join request and `read_info` |
-| Clamp | Node | Every level it uses — from a target, a fallback, or commissioning — is at most its ceiling |
-| Start | Node | After commissioning and after every restart it transmits at its ceiling |
-| Apply | Node | A target takes effect after the acknowledgement that carried it; the node keeps the level only in RAM |
-| Fallback | Node | After three consecutive reports without acknowledgement it switches to its ceiling and sets `radio_fallback`; the next applied target clears it |
-| Target | Gateway | A per-node policy: automatic, or a fixed level within the ceiling |
-| Hold | Gateway | While it averages a newly reported level it keeps wanting its previous level, so the next acknowledgement returns a restarted node there; a `radio_fallback` report is taken at its word |
+| Rule     | Owner   | Behaviour                                                                                                                                                                                |
+| -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ceiling  | Node    | A build constant for its hardware and supply, reported as `max_power_level` in Join request and `read_info`                                                                              |
+| Clamp    | Node    | Every level it uses — from a target, a fallback, or commissioning — is at most its ceiling                                                                                               |
+| Start    | Node    | After commissioning and after every restart it transmits at its ceiling                                                                                                                  |
+| Apply    | Node    | A target takes effect after the acknowledgement that carried it; the node keeps the level only in RAM                                                                                    |
+| Fallback | Node    | After three consecutive reports without acknowledgement it switches to its ceiling and sets `radio_fallback`; the next applied target clears it                                          |
+| Target   | Gateway | A per-node policy: automatic, or a fixed level within the ceiling                                                                                                                        |
+| Hold     | Gateway | While it averages a newly reported level it keeps wanting its previous level, so the next acknowledgement returns a restarted node there; a `radio_fallback` report is taken at its word |
 
 Registration stores one stable numeric profile ID; `read_info` replaces it after a reflash. The profile defines the complete node contract: telemetry layout, logical category, supported commands, and Home Assistant entities. A wire-incompatible telemetry layout or different command set requires a new profile ID. The profile ID is not repeated in normal telemetry.
 
@@ -126,14 +126,14 @@ See [pairing layouts and persistence](V3-SECURITY.md#pairing) for the 64-bit req
 
 Each profile added to the manifest and described below must define all of the following:
 
-| Item | Required definition |
-| --- | --- |
-| Identity | Stable numeric profile ID and human-readable profile name |
-| Length | Exact payload length, excluding `DATA[0]` |
-| Fields | Byte offset, byte count, signedness, and byte order |
-| Meaning | Scale, unit, valid range, and sentinel values |
+| Item        | Required definition                                           |
+| ----------- | ------------------------------------------------------------- |
+| Identity    | Stable numeric profile ID and human-readable profile name     |
+| Length      | Exact payload length, excluding `DATA[0]`                     |
+| Fields      | Byte offset, byte count, signedness, and byte order           |
+| Meaning     | Scale, unit, valid range, and sentinel values                 |
 | Test vector | Complete application frame in hexadecimal and expected values |
-| Commands | Supported command types |
+| Commands    | Supported command types                                       |
 
 `field.name` is a stable machine identifier, not a display label. It must be unique across the common and profile-specific fields of a complete telemetry frame. Once released, it must not be renamed or reused for another quantity. The same name in different profiles represents the same logical entity and must have the same `quantity` and `unit`; offsets and wire encodings may differ. A profile containing multiple measurements of one quantity gives each a distinct semantic name. User-facing labels come from the consumer's translations.
 

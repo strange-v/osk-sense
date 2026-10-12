@@ -26,29 +26,28 @@ enum class MessageKind : uint8_t {
     RegistryChanged = 5,
 };
 
-inline void writeUint16(uint8_t* const output, const uint16_t value) {
+inline void writeUint16(uint8_t *const output, const uint16_t value) {
     output[0] = static_cast<uint8_t>(value);
     output[1] = static_cast<uint8_t>(value >> 8U);
 }
 
-inline void writeUint32(uint8_t* const output, const uint32_t value) {
+inline void writeUint32(uint8_t *const output, const uint32_t value) {
     output[0] = static_cast<uint8_t>(value);
     output[1] = static_cast<uint8_t>(value >> 8U);
     output[2] = static_cast<uint8_t>(value >> 16U);
     output[3] = static_cast<uint8_t>(value >> 24U);
 }
 
-inline void writeUint64(uint8_t* const output, const uint64_t value) {
+inline void writeUint64(uint8_t *const output, const uint64_t value) {
     writeUint32(output, static_cast<uint32_t>(value));
     writeUint32(output + 4, static_cast<uint32_t>(value >> 32U));
 }
 
-inline size_t encodeSnapshotControl(
-    const MessageKind kind,
-    const uint32_t sequence,
-    const uint32_t registryGeneration,
-    uint8_t* const output,
-    const size_t capacity) {
+inline size_t encodeSnapshotControl(const MessageKind kind,
+                                    const uint32_t sequence,
+                                    const uint32_t registryGeneration,
+                                    uint8_t *const output,
+                                    const size_t capacity) {
     if (output == nullptr || capacity < kSnapshotControlFrameSize ||
         (kind != MessageKind::SnapshotBegin && kind != MessageKind::SnapshotEnd)) {
         return 0;
@@ -60,15 +59,14 @@ inline size_t encodeSnapshotControl(
     return kSnapshotControlFrameSize;
 }
 
-inline size_t encodeHello(
-    const uint32_t sequence,
-    const uint8_t* const gatewayId,
-    const uint8_t* const bootId,
-    const uint32_t registryGeneration,
-    uint8_t* const output,
-    const size_t capacity) {
-    if (output == nullptr || capacity < kHelloFrameSize ||
-        gatewayId == nullptr || bootId == nullptr) {
+inline size_t encodeHello(const uint32_t sequence,
+                          const uint8_t *const gatewayId,
+                          const uint8_t *const bootId,
+                          const uint32_t registryGeneration,
+                          uint8_t *const output,
+                          const size_t capacity) {
+    if (output == nullptr || capacity < kHelloFrameSize || gatewayId == nullptr ||
+        bootId == nullptr) {
         return 0;
     }
     output[0] = kVersion;
@@ -84,12 +82,12 @@ inline size_t encodeHello(
 
 // The sequence is the telemetry watermark, as in the snapshot control frames,
 // so a consumer can order this against telemetry it has already applied.
-inline size_t encodeRegistryChanged(
-    const uint32_t sequence,
-    const uint32_t registryGeneration,
-    uint8_t* const output,
-    const size_t capacity) {
-    if (output == nullptr || capacity < kRegistryChangedFrameSize) return 0;
+inline size_t encodeRegistryChanged(const uint32_t sequence,
+                                    const uint32_t registryGeneration,
+                                    uint8_t *const output,
+                                    const size_t capacity) {
+    if (output == nullptr || capacity < kRegistryChangedFrameSize)
+        return 0;
     output[0] = kVersion;
     output[1] = static_cast<uint8_t>(MessageKind::RegistryChanged);
     writeUint32(output + 2, sequence);
@@ -97,19 +95,18 @@ inline size_t encodeRegistryChanged(
     return kRegistryChangedFrameSize;
 }
 
-inline size_t encodeTelemetry(
-    const uint32_t sequence,
-    const uint8_t nodeId,
-    const uint16_t profileId,
-    const uint64_t receivedAtUnixMs,
-    const int16_t rssi,
-    const uint8_t* const payload,
-    const size_t payloadSize,
-    uint8_t* const output,
-    const size_t capacity) {
+inline size_t encodeTelemetry(const uint32_t sequence,
+                              const uint8_t nodeId,
+                              const uint16_t profileId,
+                              const uint64_t receivedAtUnixMs,
+                              const int16_t rssi,
+                              const uint8_t *const payload,
+                              const size_t payloadSize,
+                              uint8_t *const output,
+                              const size_t capacity) {
     const size_t requiredSize = kTelemetryEnvelopeSize + payloadSize;
-    if (output == nullptr || capacity < requiredSize ||
-        payloadSize > UINT8_MAX || (payloadSize != 0 && payload == nullptr)) {
+    if (output == nullptr || capacity < requiredSize || payloadSize > UINT8_MAX ||
+        (payloadSize != 0 && payload == nullptr)) {
         return 0;
     }
     output[0] = kVersion;
@@ -120,10 +117,9 @@ inline size_t encodeTelemetry(
     writeUint64(output + 9, receivedAtUnixMs);
     writeUint16(output + 17, static_cast<uint16_t>(rssi));
     output[19] = static_cast<uint8_t>(payloadSize);
-    for (size_t index = 0; index < payloadSize; ++index) {
+    for (size_t index = 0; index < payloadSize; ++index)
         output[kTelemetryEnvelopeSize + index] = payload[index];
-    }
     return requiredSize;
 }
 
-}  // namespace radiosensors::stream
+} // namespace radiosensors::stream

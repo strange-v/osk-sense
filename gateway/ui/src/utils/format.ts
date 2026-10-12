@@ -75,8 +75,10 @@ export function truncateToBytes(value: string, max: number): string {
 export const HOSTNAME_MAX_BYTES = 32
 
 export function isValidHostname(value: string): boolean {
-  return value === '' ||
+  return (
+    value === '' ||
     (value.length <= HOSTNAME_MAX_BYTES && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value))
+  )
 }
 
 // Dates follow the language chosen in the UI rather than the browser default.
@@ -92,7 +94,11 @@ export function countdown(seconds: number): string {
 
 export function dateTime(locale: string, atMs: number | undefined): string {
   if (!atMs) return '—'
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23' }).format(atMs)
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    hourCycle: 'h23',
+  }).format(atMs)
 }
 
 export function timeOfDay(locale: string, at: Date): string {

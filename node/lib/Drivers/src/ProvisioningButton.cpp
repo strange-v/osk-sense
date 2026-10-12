@@ -28,7 +28,8 @@ ButtonGesture ProvisioningButton::takeGesture() {
     const bool edgePending = edgePending_;
     edgePending_ = false;
     SREG = status;
-    if (!edgePending || !settledAt(LOW)) return ButtonGesture::None;
+    if (!edgePending || !settledAt(LOW))
+        return ButtonGesture::None;
 
     const uint32_t pressedAt = millis();
     while (true) {
@@ -49,10 +50,11 @@ ButtonGesture ProvisioningButton::takeGesture() {
 }
 
 bool ProvisioningButton::settledAt(const uint8_t level) const {
-    if (digitalRead(pin_) != level) return false;
+    if (digitalRead(pin_) != level)
+        return false;
     delay(kDebounceMs);
     return digitalRead(pin_) == level;
 }
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

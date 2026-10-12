@@ -4,6 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "format": "node scripts/format.mjs --write",
+    "format:check": "node scripts/format.mjs --check",
+    "format:staged": "node scripts/format.mjs --staged",
+    "test:format": "node --test scripts/format.node-test.mjs",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
     "build": "vue-tsc --noEmit && vite build && node scripts/compress-assets.mjs && node scripts/check-build.mjs"
@@ -19,8 +23,10 @@
     "@types/node": "^24.3.0",
     "@vitejs/plugin-vue": "6.0.1",
     "@vue/test-utils": "^2.5.0",
+    "clang-format-node": "4.0.2",
     "jsdom": "^30.0.1",
-    "prettier": "^3.6.2",
+    "lint-staged": "17.6.0",
+    "prettier": "3.6.2",
     "typescript": "5.9.2",
     "vite": "^7.3.6",
     "vitest": "^3.2.7",

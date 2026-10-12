@@ -2,10 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:osk-sense:protocol-manifest-schema:1",
   "title": "OSK Sense protocol artifacts",
-  "oneOf": [
-    { "$ref": "#/$defs/manifest" },
-    { "$ref": "#/$defs/vector_document" }
-  ],
+  "oneOf": [{ "$ref": "#/$defs/manifest" }, { "$ref": "#/$defs/vector_document" }],
   "$defs": {
     "security_v3": {
       "type": "object",
@@ -21,10 +18,28 @@
         "max_ack_payload_bytes": { "const": 10 },
         "salt_bytes": { "const": 8 },
         "request_nonce_bytes": { "const": 8 },
-        "join_wire_sizes": { "const": { "request": 33, "accept": 35, "confirm": 27, "complete": 25 } },
-        "command_payload": { "const": { "envelope_bytes": 3, "max_bytes": 11, "ready_bytes": 0, "no_command_bytes": 0 } }
+        "join_wire_sizes": {
+          "const": { "request": 33, "accept": 35, "confirm": 27, "complete": 25 }
+        },
+        "command_payload": {
+          "const": { "envelope_bytes": 3, "max_bytes": 11, "ready_bytes": 0, "no_command_bytes": 0 }
+        }
       },
-      "required": ["protocol_major", "node_tag_bytes", "gateway_tag_bytes", "counter_bytes", "counter_encoding", "activation_header", "ack_logical_header", "max_wire_bytes", "max_ack_payload_bytes", "salt_bytes", "request_nonce_bytes", "join_wire_sizes", "command_payload"],
+      "required": [
+        "protocol_major",
+        "node_tag_bytes",
+        "gateway_tag_bytes",
+        "counter_bytes",
+        "counter_encoding",
+        "activation_header",
+        "ack_logical_header",
+        "max_wire_bytes",
+        "max_ack_payload_bytes",
+        "salt_bytes",
+        "request_nonce_bytes",
+        "join_wire_sizes",
+        "command_payload"
+      ],
       "additionalProperties": false
     },
     "crypto_v3": {
@@ -52,7 +67,29 @@
         "session_ready": { "type": "string", "pattern": "^[0-9a-f]{26}$" },
         "session_no_command": { "type": "string", "pattern": "^[0-9a-f]{22}$" }
       },
-      "required": ["factory_key", "salt", "encryption_key", "authentication_key", "counter", "node_id", "gateway_id", "plaintext", "telemetry", "activation", "ack_floor", "command", "join_confirm", "pairing_request", "pairing_accept", "pairing_confirm", "pairing_complete", "session_command", "session_result", "session_ready", "session_no_command"],
+      "required": [
+        "factory_key",
+        "salt",
+        "encryption_key",
+        "authentication_key",
+        "counter",
+        "node_id",
+        "gateway_id",
+        "plaintext",
+        "telemetry",
+        "activation",
+        "ack_floor",
+        "command",
+        "join_confirm",
+        "pairing_request",
+        "pairing_accept",
+        "pairing_confirm",
+        "pairing_complete",
+        "session_command",
+        "session_result",
+        "session_ready",
+        "session_no_command"
+      ],
       "additionalProperties": false
     },
     "artifact_header": {
@@ -92,15 +129,7 @@
         "quantity": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
         "offset": { "type": "integer", "minimum": 0 },
         "encoding": {
-          "enum": [
-            "uint8",
-            "int8",
-            "int16_le",
-            "uint16_le",
-            "uint32_le",
-            "uint64_le",
-            "bytes"
-          ]
+          "enum": ["uint8", "int8", "int16_le", "uint16_le", "uint32_le", "uint64_le", "bytes"]
         },
         "length": { "type": "integer", "minimum": 1 },
         "length_from": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
@@ -115,10 +144,7 @@
           "uniqueItems": true
         },
         "no_value_raw": {
-          "oneOf": [
-            { "enum": ["type_min", "type_max"] },
-            { "type": "integer" }
-          ]
+          "oneOf": [{ "enum": ["type_min", "type_max"] }, { "type": "integer" }]
         },
         "const_raw": { "type": "integer" },
         "bits": {
@@ -146,10 +172,7 @@
             "required": ["encoding"]
           },
           "then": {
-            "oneOf": [
-              { "required": ["length"] },
-              { "required": ["length_from"] }
-            ]
+            "oneOf": [{ "required": ["length"] }, { "required": ["length_from"] }]
           }
         }
       ]
@@ -177,10 +200,7 @@
         "kind": { "type": "integer", "minimum": 1, "maximum": 255 },
         "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
         "size": {
-          "oneOf": [
-            { "$ref": "#/$defs/fixed_size" },
-            { "$ref": "#/$defs/variable_size" }
-          ]
+          "oneOf": [{ "$ref": "#/$defs/fixed_size" }, { "$ref": "#/$defs/variable_size" }]
         },
         "fields": {
           "type": "array",
@@ -318,14 +338,7 @@
           "minItems": 1
         }
       },
-      "required": [
-        "offset_base",
-        "envelope_size",
-        "command",
-        "result",
-        "statuses",
-        "types"
-      ],
+      "required": ["offset_base", "envelope_size", "command", "result", "statuses", "types"],
       "additionalProperties": false
     },
     "gateway_stream": {
@@ -345,13 +358,7 @@
           "minItems": 1
         }
       },
-      "required": [
-        "version",
-        "byte_order",
-        "common_prefix_size",
-        "common_fields",
-        "messages"
-      ],
+      "required": ["version", "byte_order", "common_prefix_size", "common_fields", "messages"],
       "additionalProperties": false
     },
     "telemetry": {
@@ -371,13 +378,7 @@
           "minItems": 1
         }
       },
-      "required": [
-        "offset_base",
-        "header",
-        "common_prefix_size",
-        "common_fields",
-        "profiles"
-      ],
+      "required": ["offset_base", "header", "common_prefix_size", "common_fields", "profiles"],
       "additionalProperties": false
     },
     "manifest": {

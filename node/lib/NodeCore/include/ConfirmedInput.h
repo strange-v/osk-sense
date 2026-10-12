@@ -21,21 +21,25 @@ enum class InputChange : uint8_t {
 //   bool readOnce();           // true when the contact is open
 //   bool sample(bool& high);   // false when the contact did not stabilize
 class ConfirmedInput {
-public:
-    explicit ConfirmedInput(const bool initialHigh) : high_(initialHigh) {}
+  public:
+    explicit ConfirmedInput(const bool initialHigh) : high_(initialHigh) {
+    }
 
-    bool high() const { return high_; }
+    bool high() const {
+        return high_;
+    }
 
-    template <typename Input>
-    InputChange update(Input& input) {
-        if (input.readOnce() == high_) return InputChange::None;
+    template <typename Input> InputChange update(Input &input) {
+        if (input.readOnce() == high_)
+            return InputChange::None;
         bool stable = high_;
-        if (!input.sample(stable) || stable == high_) return InputChange::None;
+        if (!input.sample(stable) || stable == high_)
+            return InputChange::None;
         high_ = stable;
         return high_ ? InputChange::Rose : InputChange::Fell;
     }
 
-private:
+  private:
     bool high_;
 };
 
@@ -45,9 +49,10 @@ private:
 // pulse. Binary inputs must not use this: it trades latency for that
 // certainty.
 class MinimumPhaseFilter {
-public:
+  public:
     MinimumPhaseFilter(const uint32_t minimumPhaseMs, const bool initialHigh)
-        : minimumPhaseMs_(minimumPhaseMs), accepted_(initialHigh) {}
+        : minimumPhaseMs_(minimumPhaseMs), accepted_(initialHigh) {
+    }
 
     InputChange update(const uint32_t now, const bool high) {
         if (high == accepted_) {
@@ -59,20 +64,19 @@ public:
             pendingSince_ = now;
             return InputChange::None;
         }
-        if (!intervalElapsed(now, pendingSince_, minimumPhaseMs_)) {
+        if (!intervalElapsed(now, pendingSince_, minimumPhaseMs_))
             return InputChange::None;
-        }
         accepted_ = high;
         pending_ = false;
         return high ? InputChange::Rose : InputChange::Fell;
     }
 
-private:
+  private:
     uint32_t minimumPhaseMs_;
     uint32_t pendingSince_ = 0;
     bool accepted_;
     bool pending_ = false;
 };
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

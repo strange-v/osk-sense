@@ -16,11 +16,11 @@ Do not run `run typecheck` and `run build` together: `build` starts with the sam
 
 Run them in WSL from the repository root. `pio test -e native` does not work on Windows: there is no host `g++`.
 
-| Component | Command |
-| --- | --- |
-| protocol | `wsl bash protocol/scripts/run_native_tests_wsl.sh` |
-| node | `wsl bash node/scripts/run_native_tests_wsl.sh` |
-| gateway | `wsl bash gateway/scripts/run_native_tests_wsl.sh` |
+| Component                   | Command                                                             |
+| --------------------------- | ------------------------------------------------------------------- |
+| protocol                    | `wsl bash protocol/scripts/run_native_tests_wsl.sh`                 |
+| node                        | `wsl bash node/scripts/run_native_tests_wsl.sh`                     |
+| gateway                     | `wsl bash gateway/scripts/run_native_tests_wsl.sh`                  |
 | gateway registry/radio only | `wsl bash gateway/scripts/run_native_tests_wsl.sh --registry-radio` |
 
 Firmware images build on Windows with `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e <env>` from `node/` or `gateway/`.
@@ -49,19 +49,19 @@ Short signals in either direction:
 - "go" or "fix it" -- carry out the work and verify it per the tiers below.
 - "describe the plan first" -- propose, then wait. Worth using for anything that moves files, routes, or navigation.
 
-The exception is a question whose answer is **not** in the code -- hardware behaviour, real-world data, how a browser actually acts. Reproduce those, because reading cannot settle them. Two examples from this repository: pairing QR photos failed for the opposite of the reason the RFM69 datasheet suggested (more pixels decode *worse*), and the signal-bar thresholds were only settled by field measurements from the installed network. Neither was answerable by reasoning.
+The exception is a question whose answer is **not** in the code -- hardware behaviour, real-world data, how a browser actually acts. Reproduce those, because reading cannot settle them. Two examples from this repository: pairing QR photos failed for the opposite of the reason the RFM69 datasheet suggested (more pixels decode _worse_), and the signal-bar thresholds were only settled by field measurements from the installed network. Neither was answerable by reasoning.
 
 ## How much to verify
 
 Run only tests relevant to the changed behaviour and its direct consumers. Finishing a task does not require the full suite. Run the full suite only when the user explicitly requests it or a broad change makes targeted coverage insufficient. Build only affected components when compilation or bundling needs verification.
 
-| Change | Verification |
-| --- | --- |
-| Answering a question, reading code | none |
-| Pure logic (`utils/`, parsers, formatting) | just that test file |
-| Component or view behaviour | relevant unit and component test files |
-| CSS, layout, theming | browser, with a screenshot |
-| Finishing a piece of work | relevant tests once at the end; affected builds as needed |
+| Change                                     | Verification                                              |
+| ------------------------------------------ | --------------------------------------------------------- |
+| Answering a question, reading code         | none                                                      |
+| Pure logic (`utils/`, parsers, formatting) | just that test file                                       |
+| Component or view behaviour                | relevant unit and component test files                    |
+| CSS, layout, theming                       | browser, with a screenshot                                |
+| Finishing a piece of work                  | relevant tests once at the end; affected builds as needed |
 
 In the browser preview:
 

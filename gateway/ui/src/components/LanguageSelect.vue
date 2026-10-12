@@ -17,7 +17,19 @@ function choose(event: Event) {
 </script>
 
 <template>
-  <select class="select" :class="{ compact }" :value="locale" :aria-label="$t('common.language')" @change="choose">
-    <option v-for="entry in SUPPORTED_LOCALES" :key="entry.code" :value="entry.code">{{ entry.label }}</option>
+  <select
+    class="select"
+    :class="{ compact }"
+    :value="locale"
+    :aria-label="$t('common.language')"
+    @change="choose"
+  >
+    <option
+      v-for="entry in SUPPORTED_LOCALES"
+      :key="entry.code"
+      :value="entry.code"
+    >
+      {{ entry.label }}
+    </option>
   </select>
 </template>

@@ -34,7 +34,10 @@ export type TokenDraft = { name: string }
 // `duplicate_name` is deliberately not an error: the gateway accepts two keys
 // with the same name, and refusing here would invent a rule the API does not
 // have. The card warns about it instead.
-export function tokenDraftError(draft: TokenDraft, tokens: ApiToken[]): 'invalid_name' | 'capacity_reached' | '' {
+export function tokenDraftError(
+  draft: TokenDraft,
+  tokens: ApiToken[],
+): 'invalid_name' | 'capacity_reached' | '' {
   if (!isValidTokenName(draft.name)) return 'invalid_name'
   if (!canAddToken(tokens)) return 'capacity_reached'
   return ''

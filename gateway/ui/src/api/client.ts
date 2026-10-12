@@ -1,7 +1,39 @@
 import { computed, ref } from 'vue'
-import type { UpdateStatus, ApiTokenList, CommandList, CommandRequest, CreatedApiToken, NodeCommand, PatchedNode, PowerPolicyWrite, GatewayProbe, StreamClientList, GatewayInfo, GatewaySettings, GatewayUser, Health, NodeRegistry, PairingStatus, RadioNetworkReset, RenamedNode, Session, SessionUser, SetupRequest, SetupStatus, UserList, UserWrite } from './types'
+import type {
+  UpdateStatus,
+  ApiTokenList,
+  CommandList,
+  CommandRequest,
+  CreatedApiToken,
+  NodeCommand,
+  PatchedNode,
+  PowerPolicyWrite,
+  GatewayProbe,
+  StreamClientList,
+  GatewayInfo,
+  GatewaySettings,
+  GatewayUser,
+  Health,
+  NodeRegistry,
+  PairingStatus,
+  RadioNetworkReset,
+  RenamedNode,
+  Session,
+  SessionUser,
+  SetupRequest,
+  SetupStatus,
+  UserList,
+  UserWrite,
+} from './types'
 
-export class ApiError extends Error { constructor(public status: number, public code: string) { super(code) } }
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+  ) {
+    super(code)
+  }
+}
 
 // Whether the gateway is answering at all. Every request updates it, so the
 // shell can report a dropped connection without polling for it: an HTTP error
@@ -18,14 +50,31 @@ const REQUEST_TIMEOUT_MS = 30_000
 // gateway that is already slow.
 const POLL_TIMEOUT_MS = 8_000
 
-async function request<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS, binary = false): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+  binary = false,
+): Promise<T> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const response = await fetch(path, { ...init, credentials: 'same-origin', signal: controller.signal, headers: { Accept: 'application/json', ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...(csrfToken && init?.method && !['GET', 'HEAD'].includes(init.method) ? { 'X-CSRF-Token': csrfToken } : {}), ...init?.headers } })
+    const response = await fetch(path, {
+      ...init,
+      credentials: 'same-origin',
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(csrfToken && init?.method && !['GET', 'HEAD'].includes(init.method)
+          ? { 'X-CSRF-Token': csrfToken }
+          : {}),
+        ...init?.headers,
+      },
+    })
     gatewayReachable.value = true
-    if (response.ok && binary) return await response.blob() as T
-    const body = await response.json().catch(() => ({})) as { error?: string }
+    if (response.ok && binary) return (await response.blob()) as T
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
     if (!response.ok) {
       const error = new ApiError(response.status, body.error ?? 'generic')
       if (isLostSession(error)) dropLostSession()
@@ -35,7 +84,9 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_
   } catch (error) {
     if (!(error instanceof ApiError)) gatewayReachable.value = false
     throw error
-  } finally { globalThis.clearTimeout(timeout) }
+  } finally {
+    globalThis.clearTimeout(timeout)
+  }
 }
 
 let csrfToken = ''
@@ -72,7 +123,9 @@ export function onSessionLost(handler: () => void) {
 }
 
 function isLostSession(error: ApiError) {
-  return error.status === 401 && error.code === 'authentication_required' && sessionUser.value !== null
+  return (
+    error.status === 401 && error.code === 'authentication_required' && sessionUser.value !== null
+  )
 }
 
 function dropLostSession() {
@@ -81,14 +134,51 @@ function dropLostSession() {
 }
 
 export const api = {
-  exportBackup: (password: string) => request<Blob>('/ui/backup/export', { method: 'POST', body: JSON.stringify({ password }) }, 120_000, true),
-  previewBackup: (file: string, password: string) => request<import('./types').BackupPreview>('/ui/backup/preview', { method: 'POST', headers: { 'X-Backup-Request': '1' }, body: JSON.stringify({ file, password }) }, 120_000),
-  restoreBackup: (file: string, password: string, username: string, adminPassword: string) => request<void>('/ui/backup/restore', { method: 'POST', headers: { 'X-Backup-Request': '1' }, body: JSON.stringify({ file, password, username, admin_password: adminPassword }) }, 120_000),
+  exportBackup: (password: string) =>
+    request<Blob>(
+      '/ui/backup/export',
+      { method: 'POST', body: JSON.stringify({ password }) },
+      120_000,
+      true,
+    ),
+  previewBackup: (file: string, password: string) =>
+    request<import('./types').BackupPreview>(
+      '/ui/backup/preview',
+      {
+        method: 'POST',
+        headers: { 'X-Backup-Request': '1' },
+        body: JSON.stringify({ file, password }),
+      },
+      120_000,
+    ),
+  restoreBackup: (file: string, password: string, username: string, adminPassword: string) =>
+    request<void>(
+      '/ui/backup/restore',
+      {
+        method: 'POST',
+        headers: { 'X-Backup-Request': '1' },
+        body: JSON.stringify({ file, password, username, admin_password: adminPassword }),
+      },
+      120_000,
+    ),
   setupStatus: () => request<SetupStatus>('/ui/setup'),
-  setup: async (payload: SetupRequest) => rememberSession(await request<Session>('/ui/setup', { method: 'POST', body: JSON.stringify(payload) })),
-  login: async (username: string, password: string) => rememberSession(await request<Session>('/ui/session', { method: 'POST', body: JSON.stringify({ username, password }) })),
+  setup: async (payload: SetupRequest) =>
+    rememberSession(
+      await request<Session>('/ui/setup', { method: 'POST', body: JSON.stringify(payload) }),
+    ),
+  login: async (username: string, password: string) =>
+    rememberSession(
+      await request<Session>('/ui/session', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      }),
+    ),
   session: async () => rememberSession(await request<Session>('/ui/session')),
-  logout: async () => { await request<void>('/ui/session', { method: 'DELETE' }); csrfToken = ''; sessionUser.value = null },
+  logout: async () => {
+    await request<void>('/ui/session', { method: 'DELETE' })
+    csrfToken = ''
+    sessionUser.value = null
+  },
   info: () => request<GatewayInfo>('/api/info'),
   nodes: () => request<NodeRegistry>('/api/nodes'),
   status: () => request<Health>('/ui/status'),
@@ -107,32 +197,57 @@ export const api = {
     commands: () => request<CommandList>('/ui/commands', undefined, POLL_TIMEOUT_MS),
   },
   commands: () => request<CommandList>('/ui/commands'),
-  queueCommand: (command: CommandRequest) => request<NodeCommand>('/ui/commands', { method: 'POST', body: JSON.stringify(command) }),
-  cancelCommand: (nodeId: number) => request<void>('/ui/commands', { method: 'DELETE', body: JSON.stringify({ node_id: nodeId }) }),
-  renameNode: (nodeId: number, displayName: string) => request<RenamedNode>('/ui/nodes', { method: 'PATCH', body: JSON.stringify({ node_id: nodeId, display_name: displayName }) }),
-  setPowerPolicy: (nodeId: number, policy: PowerPolicyWrite) => request<PatchedNode>('/ui/nodes', { method: 'PATCH', body: JSON.stringify({ node_id: nodeId, ...policy }) }),
-  deleteNode: (nodeId: number) => request<void>('/ui/nodes', { method: 'DELETE', body: JSON.stringify({ node_id: nodeId }) }),
+  queueCommand: (command: CommandRequest) =>
+    request<NodeCommand>('/ui/commands', { method: 'POST', body: JSON.stringify(command) }),
+  cancelCommand: (nodeId: number) =>
+    request<void>('/ui/commands', { method: 'DELETE', body: JSON.stringify({ node_id: nodeId }) }),
+  renameNode: (nodeId: number, displayName: string) =>
+    request<RenamedNode>('/ui/nodes', {
+      method: 'PATCH',
+      body: JSON.stringify({ node_id: nodeId, display_name: displayName }),
+    }),
+  setPowerPolicy: (nodeId: number, policy: PowerPolicyWrite) =>
+    request<PatchedNode>('/ui/nodes', {
+      method: 'PATCH',
+      body: JSON.stringify({ node_id: nodeId, ...policy }),
+    }),
+  deleteNode: (nodeId: number) =>
+    request<void>('/ui/nodes', { method: 'DELETE', body: JSON.stringify({ node_id: nodeId }) }),
   settings: () => request<GatewaySettings>('/ui/settings'),
-  updateSettings: (settings: Omit<GatewaySettings, 'generation'>) => request<GatewaySettings>('/ui/settings', { method: 'PUT', body: JSON.stringify(settings) }),
-  openPairing: (deviceUid: string, factoryKey: string) => request<PairingStatus>('/ui/pairing/open', { method: 'POST', body: JSON.stringify({ device_uid: deviceUid, factory_key: factoryKey }) }),
+  updateSettings: (settings: Omit<GatewaySettings, 'generation'>) =>
+    request<GatewaySettings>('/ui/settings', { method: 'PUT', body: JSON.stringify(settings) }),
+  openPairing: (deviceUid: string, factoryKey: string) =>
+    request<PairingStatus>('/ui/pairing/open', {
+      method: 'POST',
+      body: JSON.stringify({ device_uid: deviceUid, factory_key: factoryKey }),
+    }),
   closePairing: () => request<PairingStatus>('/ui/pairing/close', { method: 'POST' }),
   // Omitting the id lets the gateway generate one. The gateway restarts right
   // after answering, so this call is the last one the session can make.
   checkUpdate: () => request<UpdateStatus>('/ui/update/check', { method: 'POST' }),
   installUpdate: () => request<UpdateStatus>('/ui/update/install', { method: 'POST' }),
-  resetRadioNetwork: (networkId?: number) => request<RadioNetworkReset>('/ui/radio/reset', { method: 'POST', body: JSON.stringify(networkId ? { operational_network_id: networkId } : {}) }),
+  resetRadioNetwork: (networkId?: number) =>
+    request<RadioNetworkReset>('/ui/radio/reset', {
+      method: 'POST',
+      body: JSON.stringify(networkId ? { operational_network_id: networkId } : {}),
+    }),
   users: () => request<UserList>('/ui/users'),
-  createUser: (user: UserWrite & { password: string }) => request<GatewayUser>('/ui/users', { method: 'POST', body: JSON.stringify(user) }),
+  createUser: (user: UserWrite & { password: string }) =>
+    request<GatewayUser>('/ui/users', { method: 'POST', body: JSON.stringify(user) }),
   // Replaces username, role and enabled; a password is only sent when set.
   // Every session of that user is revoked, including this one when it is you.
-  updateUser: (id: number, user: UserWrite) => request<GatewayUser>('/ui/users', { method: 'PUT', body: JSON.stringify({ id, ...user }) }),
-  deleteUser: (id: number) => request<void>('/ui/users', { method: 'DELETE', body: JSON.stringify({ id }) }),
+  updateUser: (id: number, user: UserWrite) =>
+    request<GatewayUser>('/ui/users', { method: 'PUT', body: JSON.stringify({ id, ...user }) }),
+  deleteUser: (id: number) =>
+    request<void>('/ui/users', { method: 'DELETE', body: JSON.stringify({ id }) }),
   tokens: () => request<ApiTokenList>('/ui/tokens'),
   // `scopes` is omitted deliberately: the gateway grants its only scope when
   // the field is absent, and sending it would make this the second place that
   // has to be edited when the set of scopes changes.
-  createToken: (name: string) => request<CreatedApiToken>('/ui/tokens', { method: 'POST', body: JSON.stringify({ name }) }),
-  deleteToken: (id: number) => request<void>('/ui/tokens', { method: 'DELETE', body: JSON.stringify({ id }) }),
+  createToken: (name: string) =>
+    request<CreatedApiToken>('/ui/tokens', { method: 'POST', body: JSON.stringify({ name }) }),
+  deleteToken: (id: number) =>
+    request<void>('/ui/tokens', { method: 'DELETE', body: JSON.stringify({ id }) }),
 }
 
 export function errorCode(error: unknown): string {

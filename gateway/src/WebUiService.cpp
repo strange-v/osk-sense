@@ -72,16 +72,15 @@ void clearManifest() {
 //
 // The patch level is ignored: it does not reshape /ui/*, and rejecting a good
 // UI over one would only tempt someone to skip the check.
-bool firmwareSeriesMatches(const char* const required) {
-    const char* const minorDot = strchr(required, '.');
-    if (minorDot == nullptr) return false;
-    const char* const patchDot = strchr(minorDot + 1, '.');
-    const size_t length = patchDot == nullptr
-        ? strlen(required)
-        : static_cast<size_t>(patchDot - required);
-    return length != 0 &&
-        strncmp(required, firmware::version, length) == 0 &&
-        (firmware::version[length] == '\0' || firmware::version[length] == '.');
+bool firmwareSeriesMatches(const char *const required) {
+    const char *const minorDot = strchr(required, '.');
+    if (minorDot == nullptr)
+        return false;
+    const char *const patchDot = strchr(minorDot + 1, '.');
+    const size_t length =
+        patchDot == nullptr ? strlen(required) : static_cast<size_t>(patchDot - required);
+    return length != 0 && strncmp(required, firmware::version, length) == 0 &&
+           (firmware::version[length] == '\0' || firmware::version[length] == '.');
 }
 
 void inspectManifest() {
@@ -103,33 +102,28 @@ void inspectManifest() {
         return;
     }
 
-    const char* uiVersion = document["ui_version"].as<const char*>();
-    const char* requiredFirmware = document["required_firmware"].as<const char*>();
-    if (uiVersion == nullptr || uiVersion[0] == '\0' ||
-        strlen(uiVersion) > kMaximumVersionLength ||
+    const char *uiVersion = document["ui_version"].as<const char *>();
+    const char *requiredFirmware = document["required_firmware"].as<const char *>();
+    if (uiVersion == nullptr || uiVersion[0] == '\0' || strlen(uiVersion) > kMaximumVersionLength ||
         requiredFirmware == nullptr || requiredFirmware[0] == '\0' ||
-        strlen(requiredFirmware) > kMaximumVersionLength ||
-        !indexPresent()) {
+        strlen(requiredFirmware) > kMaximumVersionLength || !indexPresent()) {
         currentState = State::InvalidManifest;
         return;
     }
 
     strlcpy(currentVersion, uiVersion, sizeof(currentVersion));
-    strlcpy(
-        currentRequiredFirmware, requiredFirmware,
-        sizeof(currentRequiredFirmware));
-    currentState = firmwareSeriesMatches(requiredFirmware)
-        ? State::Ready
-        : State::Incompatible;
+    strlcpy(currentRequiredFirmware, requiredFirmware, sizeof(currentRequiredFirmware));
+    currentState = firmwareSeriesMatches(requiredFirmware) ? State::Ready : State::Incompatible;
 }
 
-bool acceptsHtml(AsyncWebServerRequest* request) {
-    if (!request->hasHeader("Accept")) return false;
+bool acceptsHtml(AsyncWebServerRequest *request) {
+    if (!request->hasHeader("Accept"))
+        return false;
     const String value = request->getHeader("Accept")->value();
     return value.indexOf("text/html") >= 0;
 }
 
-}  // namespace
+} // namespace
 
 void begin() {
     mounted = LittleFS.begin(false, "/littlefs", 10, kPartitionLabel);
@@ -140,12 +134,13 @@ void begin() {
         return;
     }
     inspectManifest();
-    Serial.printf("Web UI: %s%s%s\n", stateName(),
+    Serial.printf("Web UI: %s%s%s\n",
+                  stateName(),
                   currentVersion[0] == '\0' ? "" : ", version=",
                   currentVersion);
 }
 
-void addRoutes(AsyncWebServer& server) {
+void addRoutes(AsyncWebServer &server) {
     if (currentState == State::Ready) {
         // Only the hashed build output is reachable over HTTP. Serving the
         // filesystem root instead would also expose /ui-manifest.json, which
@@ -174,10 +169,11 @@ void recoverAfterFailedFilesystemUpdate() {
     begin();
 }
 
-bool handlePageRequest(AsyncWebServerRequest* request) {
-    if (request->method() != HTTP_GET || !acceptsHtml(request)) return false;
+bool handlePageRequest(AsyncWebServerRequest *request) {
+    if (request->method() != HTTP_GET || !acceptsHtml(request))
+        return false;
     if (currentState == State::Ready && mounted) {
-        AsyncWebServerResponse* response =
+        AsyncWebServerResponse *response =
             request->beginResponse(LittleFS, kIndexPath, "text/html");
         response->addHeader("Cache-Control", "no-cache");
         request->send(response);
@@ -187,31 +183,43 @@ bool handlePageRequest(AsyncWebServerRequest* request) {
     return true;
 }
 
-State state() { return currentState; }
+State state() {
+    return currentState;
+}
 
-const char* stateName() {
+const char *stateName() {
     switch (currentState) {
-        case State::Unavailable: return "unavailable";
-        case State::MissingManifest: return "missing_manifest";
-        case State::InvalidManifest: return "invalid_manifest";
-        case State::Incompatible: return "incompatible";
-        case State::Ready: return "ready";
-        case State::Updating: return "updating";
+    case State::Unavailable:
+        return "unavailable";
+    case State::MissingManifest:
+        return "missing_manifest";
+    case State::InvalidManifest:
+        return "invalid_manifest";
+    case State::Incompatible:
+        return "incompatible";
+    case State::Ready:
+        return "ready";
+    case State::Updating:
+        return "updating";
     }
     return "unknown";
 }
 
-const char* version() { return currentVersion; }
-const char* requiredFirmware() { return currentRequiredFirmware; }
+const char *version() {
+    return currentVersion;
+}
+const char *requiredFirmware() {
+    return currentRequiredFirmware;
+}
 
-void sendRecoveryPage(AsyncWebServerRequest* request) {
+void sendRecoveryPage(AsyncWebServerRequest *request) {
     String page{kRecoveryPage};
     page.replace("%FIRMWARE%", firmware::version);
     page.replace("%STATE%", stateName());
     page.replace("%SETUP%", status::setupRequired() ? "1" : "0");
-    AsyncWebServerResponse* response = request->beginResponse(503, "text/html", page);
+    AsyncWebServerResponse *response = request->beginResponse(503, "text/html", page);
     response->addHeader("Cache-Control", "no-store");
     request->send(response);
 }
 
-}  // namespace gateway::web_ui
+} // namespace gateway::web_ui

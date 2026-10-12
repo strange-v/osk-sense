@@ -16,7 +16,11 @@ const state = vi.hoisted(() => ({
   pairing: { active: false, remaining_seconds: 0 },
 }))
 const registry = () => ({ registry_generation: state.generation, nodes: [...state.nodes] })
-const health = () => ({ registry: { records: state.nodes.length }, telemetry: { nodes_seen: 0, updates: 0 }, pairing: { ...state.pairing } })
+const health = () => ({
+  registry: { records: state.nodes.length },
+  telemetry: { nodes_seen: 0, updates: 0 },
+  pairing: { ...state.pairing },
+})
 
 const gatewayApi = vi.hoisted(() => ({
   nodes: vi.fn(),
@@ -25,28 +29,53 @@ const gatewayApi = vi.hoisted(() => ({
   openPairing: vi.fn(),
   closePairing: vi.fn(async () => undefined),
 }))
-vi.mock('../api/client', () => ({ api: gatewayApi, errorCode: () => 'generic', gatewayReachable: { value: true } }))
+vi.mock('../api/client', () => ({
+  api: gatewayApi,
+  errorCode: () => 'generic',
+  gatewayReachable: { value: true },
+}))
 
 import NodesView from './NodesView.vue'
 
 const node = (over: Record<string, unknown> = {}) => ({
-  node_id: 2, device_uid: 'A1B2C3D4E5F60718293A', display_name: 'Кухня', profile_id: 1,
-  firmware: '2.1.0', state: 'active', last_seen_at_ms: Date.now(), rssi: -68, has_telemetry: true, ...over,
+  node_id: 2,
+  device_uid: 'A1B2C3D4E5F60718293A',
+  display_name: 'Кухня',
+  profile_id: 1,
+  firmware: '2.1.0',
+  state: 'active',
+  last_seen_at_ms: Date.now(),
+  rssi: -68,
+  has_telemetry: true,
+  ...over,
 })
 
 async function mountView() {
-  const router = createRouter({ history: createWebHistory(), routes: [{ path: '/nodes', component: NodesView }, { path: '/:rest(.*)*', component: NodesView }] })
+  const router = createRouter({
+    history: createWebHistory(),
+    routes: [
+      { path: '/nodes', component: NodesView },
+      { path: '/:rest(.*)*', component: NodesView },
+    ],
+  })
   await router.push('/nodes')
   await router.isReady()
   const wrapper = mount(NodesView, {
-    global: { plugins: [router, createI18n({ legacy: false, locale: 'en', messages: { en } })], stubs: { NodeDetail: true } },
+    global: {
+      plugins: [router, createI18n({ legacy: false, locale: 'en', messages: { en } })],
+      stubs: { NodeDetail: true },
+    },
   })
   await flushPromises()
   return wrapper
 }
 
-const tick = async (ms = 10_000) => { await vi.advanceTimersByTimeAsync(ms); await flushPromises() }
-const signalText = (wrapper: Awaited<ReturnType<typeof mountView>>) => wrapper.get('.node-row .node-signal').text()
+const tick = async (ms = 10_000) => {
+  await vi.advanceTimersByTimeAsync(ms)
+  await flushPromises()
+}
+const signalText = (wrapper: Awaited<ReturnType<typeof mountView>>) =>
+  wrapper.get('.node-row .node-signal').text()
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -112,7 +141,10 @@ describe('node list refresh', () => {
     state.nodes = [node({ rssi: -91 })]
     await tick()
 
-    expect(wrapper.getComponent({ name: 'NodeDetail' }).props('node')).toMatchObject({ node_id: 2, rssi: -91 })
+    expect(wrapper.getComponent({ name: 'NodeDetail' }).props('node')).toMatchObject({
+      node_id: 2,
+      rssi: -91,
+    })
   })
 
   it('closes the node card when the node leaves the registry', async () => {
@@ -128,7 +160,7 @@ describe('node list refresh', () => {
 
   it('holds off while pairing, and resumes once the dialog closes', async () => {
     const wrapper = await mountView()
-    await wrapper.get('.page-heading button').trigger('click')  // open pairing
+    await wrapper.get('.page-heading button').trigger('click') // open pairing
     await flushPromises()
 
     await tick()

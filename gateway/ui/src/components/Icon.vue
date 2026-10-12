@@ -7,9 +7,22 @@ defineProps<{ name: string }>()
 </script>
 
 <template>
-  <svg class="icon" aria-hidden="true" focusable="false"><use :href="`#i-${name}`" /></svg>
+  <svg
+    class="icon"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <use :href="`#i-${name}`" />
+  </svg>
 </template>
 
 <style scoped>
-.icon { width: 1em; height: 1em; flex: none; display: inline-block; vertical-align: -0.125em; fill: currentColor; }
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  display: inline-block;
+  vertical-align: -0.125em;
+  fill: currentColor;
+}
 </style>

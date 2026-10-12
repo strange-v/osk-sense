@@ -42,12 +42,12 @@ Use a non-OTA target for serial or USB recovery.
 
 Pushing a tag `major.minor.patch` that equals `FirmwareVersion.h` runs `.github/workflows/gateway-release.yml`: Web UI and native tests, firmware and Web UI images for both boards, then a GitHub Release with these assets:
 
-| Asset | Content |
-| --- | --- |
-| `gateway-<board>-firmware.bin` | App image for an OTA slot |
-| `gateway-<board>-ui.bin.gz` | LittleFS image of that board's `web` partition, gzip with a 4 KB deflate window |
-| `manifest.json` | Format 2: version, and per board each image's file, download size and SHA-256; for the Web UI also `image_size`, with the hash over the inflated image |
-| `manifest.signed` | First line: base64 of the DER ECDSA P-256 / SHA-256 signature; then the exact `manifest.json` bytes |
+| Asset                          | Content                                                                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `gateway-<board>-firmware.bin` | App image for an OTA slot                                                                                                                              |
+| `gateway-<board>-ui.bin.gz`    | LittleFS image of that board's `web` partition, gzip with a 4 KB deflate window                                                                        |
+| `manifest.json`                | Format 2: version, and per board each image's file, download size and SHA-256; for the Web UI also `image_size`, with the hash over the inflated image |
+| `manifest.signed`              | First line: base64 of the DER ECDSA P-256 / SHA-256 signature; then the exact `manifest.json` bytes                                                    |
 
 A release already drafted for the tag receives the assets and is published with its own title and notes; otherwise the workflow creates one titled with the version and generated notes.
 
@@ -62,7 +62,7 @@ The Web UI is stored in a LittleFS partition named `web`. Its partition-table su
 Every UI image must contain `/index.html` and `/ui-manifest.json`:
 
 ```json
-{"ui_version":"0.9.0","required_firmware":"0.9","build":"git-sha"}
+{ "ui_version": "0.9.0", "required_firmware": "0.9", "build": "git-sha" }
 ```
 
 Both versions come from `include/FirmwareVersion.h` at build time: `ui_version` is the full version, `required_firmware` its `major.minor`. The gateway serves the image only when that `major.minor` matches its own; the patch level is ignored. `build` is diagnostic metadata and is not used for compatibility. The UI does not gate on `api_version`: that number describes the external client contract under `/api`, which the UI barely uses, while the UI depends on `/ui` and so moves with the firmware.

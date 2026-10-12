@@ -11,7 +11,7 @@ namespace node {
 // period, and arming it on every 250 ms tick would cost more than the sleep
 // current. Guard only work that touches the radio or a sensor.
 class WatchdogWindow {
-public:
+  public:
     WatchdogWindow() {
         waitForSync();
         _PROTECTED_WRITE(WDT.CTRLA, WDT_PERIOD_8KCLK_gc);
@@ -25,14 +25,15 @@ public:
         waitForSync();
     }
 
-    WatchdogWindow(const WatchdogWindow&) = delete;
-    WatchdogWindow& operator=(const WatchdogWindow&) = delete;
+    WatchdogWindow(const WatchdogWindow &) = delete;
+    WatchdogWindow &operator=(const WatchdogWindow &) = delete;
 
-private:
+  private:
     static void waitForSync() {
-        while ((WDT.STATUS & WDT_SYNCBUSY_bm) != 0) {}
+        while ((WDT.STATUS & WDT_SYNCBUSY_bm) != 0) {
+        }
     }
 };
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

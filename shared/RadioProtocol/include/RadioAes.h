@@ -16,16 +16,13 @@ constexpr uint8_t kAesOn = 0x01;
 // Loads a raw key and turns AES on. RFM69::encrypt() is not usable: it takes
 // the key as a C string and leaves AES off when the first byte is zero, which
 // a random key has one time in 256.
-template <typename Radio>
-void enable(Radio& radio, const uint8_t (&key)[kKeySize]) {
+template <typename Radio> void enable(Radio &radio, const uint8_t (&key)[kKeySize]) {
     radio.setMode(kStandbyMode);
-    for (uint8_t i = 0; i < kKeySize; ++i) {
+    for (uint8_t i = 0; i < kKeySize; ++i)
         radio.writeReg(static_cast<uint8_t>(kAesKey1Register + i), key[i]);
-    }
-    radio.writeReg(
-        kPacketConfig2Register,
-        static_cast<uint8_t>(radio.readReg(kPacketConfig2Register) | kAesOn));
+    radio.writeReg(kPacketConfig2Register,
+                   static_cast<uint8_t>(radio.readReg(kPacketConfig2Register) | kAesOn));
 }
 
-}  // namespace radio_aes
-}  // namespace radiosensors
+} // namespace radio_aes
+} // namespace radiosensors

@@ -20,21 +20,25 @@ struct PasswordCredential {
     uint8_t hash[gateway_storage::kPasswordHashSize];
 };
 
-bool validUsername(const char* username, size_t length);
-bool validCredential(const PasswordCredential& credential);
+bool validUsername(const char *username, size_t length);
+bool validCredential(const PasswordCredential &credential);
 
-Status create(
-    gateway_storage::AuthenticationData& data,
-    const char* username, size_t usernameLength,
-    gateway_storage::UserRole role, bool enabled,
-    const PasswordCredential& credential, uint32_t& createdId);
+Status create(gateway_storage::AuthenticationData &data,
+              const char *username,
+              size_t usernameLength,
+              gateway_storage::UserRole role,
+              bool enabled,
+              const PasswordCredential &credential,
+              uint32_t &createdId);
 
-Status update(
-    gateway_storage::AuthenticationData& data, uint32_t id,
-    const char* username, size_t usernameLength,
-    gateway_storage::UserRole role, bool enabled,
-    const PasswordCredential* credential = nullptr);
+Status update(gateway_storage::AuthenticationData &data,
+              uint32_t id,
+              const char *username,
+              size_t usernameLength,
+              gateway_storage::UserRole role,
+              bool enabled,
+              const PasswordCredential *credential = nullptr);
 
-Status remove(gateway_storage::AuthenticationData& data, uint32_t id);
+Status remove(gateway_storage::AuthenticationData &data, uint32_t id);
 
-}  // namespace radiosensors::user_management
+} // namespace radiosensors::user_management

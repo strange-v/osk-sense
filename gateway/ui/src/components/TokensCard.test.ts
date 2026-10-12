@@ -15,7 +15,12 @@ const gatewayApi = vi.hoisted(() => ({
   // Like the gateway: the key joins the list, and the secret is in the 201
   // body only.
   createToken: vi.fn(async (name: string) => {
-    const created = { id: 9, name, created_at_ms: 1_700_000_000_000, scopes: ['telemetry:read' as const] }
+    const created = {
+      id: 9,
+      name,
+      created_at_ms: 1_700_000_000_000,
+      scopes: ['telemetry:read' as const],
+    }
     state.tokens = [...state.tokens, { ...created, enabled: true }]
     return { ...created, token: 'secret-value-shown-once' }
   }),
@@ -25,11 +30,18 @@ vi.mock('../api/client', () => ({ api: gatewayApi, errorCode: () => 'generic' })
 
 import TokensCard from './TokensCard.vue'
 
-const token = (over: Partial<ApiToken> & { id: number }): ApiToken =>
-  ({ name: `t${over.id}`, enabled: true, created_at_ms: 1_700_000_000_000, scopes: ['telemetry:read'], ...over })
+const token = (over: Partial<ApiToken> & { id: number }): ApiToken => ({
+  name: `t${over.id}`,
+  enabled: true,
+  created_at_ms: 1_700_000_000_000,
+  scopes: ['telemetry:read'],
+  ...over,
+})
 
 const mountCard = async () => {
-  const wrapper = mount(TokensCard, { global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })] } })
+  const wrapper = mount(TokensCard, {
+    global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })] },
+  })
   await flushPromises()
   return wrapper
 }
@@ -37,7 +49,10 @@ const rows = (wrapper: Awaited<ReturnType<typeof mountCard>>) => wrapper.findAll
 
 // Create through the dialog the way someone would: open it, name the key,
 // confirm.
-const createThroughDialog = async (wrapper: Awaited<ReturnType<typeof mountCard>>, name = 'Grafana') => {
+const createThroughDialog = async (
+  wrapper: Awaited<ReturnType<typeof mountCard>>,
+  name = 'Grafana',
+) => {
   await wrapper.get('.admin-card > .button.primary').trigger('click')
   await wrapper.get('.modal-body input[type="text"], .modal-body input:not([type])').setValue(name)
   await wrapper.get('.modal-actions .button.primary').trigger('click')

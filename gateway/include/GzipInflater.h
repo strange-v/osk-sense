@@ -10,30 +10,32 @@ namespace gateway::gzip {
 // with a larger window inflates to wrong bytes without an error, so the caller
 // checks the output against a hash.
 class Inflater {
-public:
-    using Sink = bool (*)(void* context, const uint8_t* data, size_t size);
+  public:
+    using Sink = bool (*)(void *context, const uint8_t *data, size_t size);
 
     Inflater() = default;
     ~Inflater();
-    Inflater(const Inflater&) = delete;
-    Inflater& operator=(const Inflater&) = delete;
+    Inflater(const Inflater &) = delete;
+    Inflater &operator=(const Inflater &) = delete;
 
     // `windowSize` is a power of two. False when memory is short.
-    bool begin(size_t windowSize, Sink sink, void* context);
+    bool begin(size_t windowSize, Sink sink, void *context);
     // False on a malformed stream, a sink failure, or data after the stream.
-    bool write(const uint8_t* data, size_t size);
+    bool write(const uint8_t *data, size_t size);
     // True once the deflate stream has ended.
     bool finish() const;
-    size_t outputSize() const { return output_; }
+    size_t outputSize() const {
+        return output_;
+    }
 
-private:
+  private:
     enum class State : uint8_t { Header, Deflate, Trailer, Failed };
 
     bool fail();
 
     State state_ = State::Header;
-    void* decompressor_ = nullptr;
-    uint8_t* window_ = nullptr;
+    void *decompressor_ = nullptr;
+    uint8_t *window_ = nullptr;
     size_t windowSize_ = 0;
     size_t position_ = 0;
     size_t output_ = 0;
@@ -41,7 +43,7 @@ private:
     size_t headerSize_ = 0;
     size_t trailerSize_ = 0;
     Sink sink_ = nullptr;
-    void* context_ = nullptr;
+    void *context_ = nullptr;
 };
 
-}  // namespace gateway::gzip
+} // namespace gateway::gzip

@@ -10,9 +10,9 @@ enum class EthernetController {
 };
 
 struct Profile {
-    const char* name;
+    const char *name;
     // Board key in a release manifest.
-    const char* releaseId;
+    const char *releaseId;
     EthernetController ethernetController;
     bool hasPoe;
 };
@@ -90,4 +90,4 @@ constexpr int buttonPin = 0;
 #error "Select a supported gateway board profile."
 #endif
 
-}  // namespace gateway::board
+} // namespace gateway::board

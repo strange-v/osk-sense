@@ -72,8 +72,7 @@ void toggleSetup(const uint32_t now) {
         Serial.println("Initial setup window closed by button");
         return;
     }
-    const radiosensors::gateway_storage::GatewaySettings settings =
-        configuration_store::settings();
+    const radiosensors::gateway_storage::GatewaySettings settings = configuration_store::settings();
     setupEndsAt.store(now + static_cast<uint32_t>(settings.setupWindowSeconds) * 1000U);
     current.store(Indication::Setup);
     indicationEndsAt.store(0);
@@ -88,46 +87,45 @@ void render(const uint32_t now) {
         return;
     }
     switch (current.load()) {
-        case Indication::Unconfigured:
-            setRgb(0, phase < 500 ? kBrightness : 0, 0);
-            break;
-        case Indication::Operational:
-            setRgb(0, kBrightness, 0);
-            break;
-        case Indication::Setup: {
-            const uint32_t triangle = phase < 500 ? phase : 1000 - phase;
-            const uint8_t level = static_cast<uint8_t>(8 + triangle * 40 / 500);
-            setRgb(level, 0, level);
-            break;
-        }
-        case Indication::Pairing: {
-            const uint32_t triangle = phase < 500 ? phase : 1000 - phase;
-            const uint8_t level = static_cast<uint8_t>(8 + triangle * 64 / 500);
-            setRgb(0, 0, level);
-            break;
-        }
-        case Indication::PersistingNode:
-            setRgb(phase < 300 ? kBrightness : 0, phase < 300 ? 24 : 0, 0);
-            break;
-        case Indication::AwaitingConfirm:
-            setRgb(0, phase % 250 < 125 ? kBrightness : 0,
-                   phase % 250 < 125 ? kBrightness : 0);
-            break;
-        case Indication::PairingSucceeded:
-            setRgb(kBrightness, kBrightness, kBrightness);
-            break;
-        case Indication::Error:
-            setRgb(phase % 200 < 100 ? kBrightness : 0, 0, 0);
-            break;
-        case Indication::ProfileConflict: {
-            const bool on = phase < 100 || (phase >= 200 && phase < 300);
-            setRgb(on ? kBrightness : 0, 0, on ? kBrightness : 0);
-            break;
-        }
+    case Indication::Unconfigured:
+        setRgb(0, phase < 500 ? kBrightness : 0, 0);
+        break;
+    case Indication::Operational:
+        setRgb(0, kBrightness, 0);
+        break;
+    case Indication::Setup: {
+        const uint32_t triangle = phase < 500 ? phase : 1000 - phase;
+        const uint8_t level = static_cast<uint8_t>(8 + triangle * 40 / 500);
+        setRgb(level, 0, level);
+        break;
+    }
+    case Indication::Pairing: {
+        const uint32_t triangle = phase < 500 ? phase : 1000 - phase;
+        const uint8_t level = static_cast<uint8_t>(8 + triangle * 64 / 500);
+        setRgb(0, 0, level);
+        break;
+    }
+    case Indication::PersistingNode:
+        setRgb(phase < 300 ? kBrightness : 0, phase < 300 ? 24 : 0, 0);
+        break;
+    case Indication::AwaitingConfirm:
+        setRgb(0, phase % 250 < 125 ? kBrightness : 0, phase % 250 < 125 ? kBrightness : 0);
+        break;
+    case Indication::PairingSucceeded:
+        setRgb(kBrightness, kBrightness, kBrightness);
+        break;
+    case Indication::Error:
+        setRgb(phase % 200 < 100 ? kBrightness : 0, 0, 0);
+        break;
+    case Indication::ProfileConflict: {
+        const bool on = phase < 100 || (phase >= 200 && phase < 300);
+        setRgb(on ? kBrightness : 0, 0, on ? kBrightness : 0);
+        break;
+    }
     }
 }
 
-}  // namespace
+} // namespace
 
 void begin() {
     pinMode(board::buttonPin, INPUT_PULLUP);
@@ -144,7 +142,8 @@ void loop() {
         const bool switched = radio::requestProfile(radio::Profile::Operational);
         pairingEndsAt.store(0);
         if (switched) {
-            if (indicationEndsAt.load() == 0) current.store(idleIndication());
+            if (indicationEndsAt.load() == 0)
+                current.store(idleIndication());
             Serial.println("Pairing window expired");
         } else {
             current.store(Indication::Error);
@@ -167,20 +166,16 @@ void loop() {
         rawButtonPressed = pressed;
         rawButtonChangedAt = now;
     }
-    if (pressed != stableButtonPressed && now - rawButtonChangedAt >= kDebounceMs) {
+    if (pressed != stableButtonPressed && now - rawButtonChangedAt >= kDebounceMs)
         stableButtonPressed = pressed;
-    }
     const auto action = resetButton.update(stableButtonPressed, now);
     const bool confirmed = action == radiosensors::ResetButton::Action::ConfirmReset;
-    if (resetButton.armed() && !resetArmed) {
+    if (resetButton.armed() && !resetArmed)
         Serial.println("Factory reset armed: release the button, then press it again within 5 s");
-    }
-    if (resetButton.waiting() && !resetWaiting) {
+    if (resetButton.waiting() && !resetWaiting)
         Serial.println("Factory reset: waiting 5 s for the confirming press");
-    }
-    if (resetWaiting && !resetButton.waiting() && !confirmed) {
+    if (resetWaiting && !resetButton.waiting() && !confirmed)
         Serial.println("Factory reset cancelled: no confirming press");
-    }
     resetArmed = resetButton.armed();
     resetWaiting = resetButton.waiting();
     if (confirmed) {
@@ -192,8 +187,10 @@ void loop() {
     } else if (action == radiosensors::ResetButton::Action::ShortPress && !recovery::blocked()) {
         recovery::Guard guard(0);
         if (guard) {
-            if (setupRequired()) toggleSetup(now);
-            else togglePairing(now);
+            if (setupRequired())
+                toggleSetup(now);
+            else
+                togglePairing(now);
         }
     }
     render(now);
@@ -205,7 +202,8 @@ bool pairingActive() {
 }
 
 uint32_t pairingRemainingSeconds() {
-    if (!pairingActive()) return 0;
+    if (!pairingActive())
+        return 0;
     return (pairingEndsAt.load() - millis() + 999) / 1000;
 }
 
@@ -214,13 +212,15 @@ bool setupRequired() {
 }
 
 bool setupActive() {
-    if (recovery::blocked() || !setupRequired()) return false;
+    if (recovery::blocked() || !setupRequired())
+        return false;
     const uint32_t deadline = setupEndsAt.load();
     return deadline != 0 && static_cast<int32_t>(deadline - millis()) > 0;
 }
 
 uint32_t setupRemainingSeconds() {
-    if (!setupActive()) return 0;
+    if (!setupActive())
+        return 0;
     return (setupEndsAt.load() - millis() + 999) / 1000;
 }
 
@@ -246,12 +246,10 @@ bool closePairing() {
 
 bool openPairing() {
     const auto settings = configuration_store::settings();
-    pairingEndsAt.store(
-        millis() + static_cast<uint32_t>(settings.pairingWindowSeconds) * 1000U);
+    pairingEndsAt.store(millis() + static_cast<uint32_t>(settings.pairingWindowSeconds) * 1000U);
     current.store(Indication::Pairing);
     indicationEndsAt.store(0);
-    Serial.printf("Pairing window opened for %u seconds\n",
-                  settings.pairingWindowSeconds);
+    Serial.printf("Pairing window opened for %u seconds\n", settings.pairingWindowSeconds);
     return true;
 }
 
@@ -260,19 +258,28 @@ void indicate(const Indication indication, const uint32_t durationMs) {
     indicationEndsAt.store(durationMs == 0 ? 0 : millis() + durationMs);
 }
 
-const char* indicationName() {
+const char *indicationName() {
     switch (current.load()) {
-        case Indication::Unconfigured: return "unconfigured";
-        case Indication::Operational: return "operational";
-        case Indication::Setup: return "setup";
-        case Indication::Pairing: return "pairing";
-        case Indication::PersistingNode: return "persisting_node";
-        case Indication::AwaitingConfirm: return "awaiting_confirm";
-        case Indication::PairingSucceeded: return "pairing_succeeded";
-        case Indication::Error: return "error";
-        case Indication::ProfileConflict: return "profile_conflict";
+    case Indication::Unconfigured:
+        return "unconfigured";
+    case Indication::Operational:
+        return "operational";
+    case Indication::Setup:
+        return "setup";
+    case Indication::Pairing:
+        return "pairing";
+    case Indication::PersistingNode:
+        return "persisting_node";
+    case Indication::AwaitingConfirm:
+        return "awaiting_confirm";
+    case Indication::PairingSucceeded:
+        return "pairing_succeeded";
+    case Indication::Error:
+        return "error";
+    case Indication::ProfileConflict:
+        return "profile_conflict";
     }
     return "unknown";
 }
 
-}  // namespace gateway::status
+} // namespace gateway::status

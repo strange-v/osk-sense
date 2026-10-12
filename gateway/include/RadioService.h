@@ -87,27 +87,26 @@ struct Snapshot {
 
 // Returns true once the radio task runs. Initial setup supplies its network.
 bool begin();
-bool receive(ReceivedFrame& frame, TickType_t waitTicks = 0);
-bool receiveTelemetry(ReceivedFrame& frame, TickType_t waitTicks = 0);
+bool receive(ReceivedFrame &frame, TickType_t waitTicks = 0);
+bool receiveTelemetry(ReceivedFrame &frame, TickType_t waitTicks = 0);
 // Command ready and Command result frames from active nodes.
-bool receiveSessionFrame(ReceivedFrame& frame, TickType_t waitTicks = 0);
+bool receiveSessionFrame(ReceivedFrame &frame, TickType_t waitTicks = 0);
 bool requestProfile(Profile profile);
 bool beginCommissioning();
 // Switches to the operational network with hardware AES disabled.
 bool applyInstallation(uint8_t networkId);
-bool send(uint16_t targetId, const uint8_t* data, size_t size, bool requestAck = false);
-bool sendCommandReply(const ReceivedFrame& ready, uint8_t header, const uint8_t* payload, size_t size);
-bool sendThenSwitchProfile(
-    uint16_t targetId,
-    const uint8_t* data,
-    size_t size,
-    Profile profile);
+bool send(uint16_t targetId, const uint8_t *data, size_t size, bool requestAck = false);
+bool sendCommandReply(const ReceivedFrame &ready,
+                      uint8_t header,
+                      const uint8_t *payload,
+                      size_t size);
+bool sendThenSwitchProfile(uint16_t targetId, const uint8_t *data, size_t size, Profile profile);
 State state();
-const char* stateName();
-const char* frequencyBandName();
-const char* spiHostName();
-const char* profileName();
+const char *stateName();
+const char *frequencyBandName();
+const char *spiHostName();
+const char *profileName();
 Snapshot snapshot();
 uint32_t stackFreeBytes();
 
-}  // namespace gateway::radio
+} // namespace gateway::radio

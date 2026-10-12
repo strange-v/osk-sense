@@ -22,27 +22,54 @@ const state = vi.hoisted(() => ({
 }))
 
 const gatewayApi = vi.hoisted(() => ({
-  nodes: vi.fn(async () => ({ registry_generation: state.registry.registry_generation, nodes: [...state.registry.nodes] })),
+  nodes: vi.fn(async () => ({
+    registry_generation: state.registry.registry_generation,
+    nodes: [...state.registry.nodes],
+  })),
   status: vi.fn(async () => ({
     registry: { records: state.registry.nodes.length },
     telemetry: { nodes_seen: 0, updates: 0 },
     pairing: { ...state.pairing },
   })),
   poll: { status: vi.fn(async () => ({ pairing: { ...state.pairing } })) },
-  openPairing: vi.fn(async () => { state.pairing = { active: true, remaining_seconds: 60 }; return { ...state.pairing } }),
-  closePairing: vi.fn(async () => { state.pairing = { active: false, remaining_seconds: 0 }; return undefined }),
+  openPairing: vi.fn(async () => {
+    state.pairing = { active: true, remaining_seconds: 60 }
+    return { ...state.pairing }
+  }),
+  closePairing: vi.fn(async () => {
+    state.pairing = { active: false, remaining_seconds: 0 }
+    return undefined
+  }),
 }))
-vi.mock('../api/client', () => ({ api: gatewayApi, errorCode: (error: Error) => error.message, gatewayReachable: { value: true } }))
+vi.mock('../api/client', () => ({
+  api: gatewayApi,
+  errorCode: (error: Error) => error.message,
+  gatewayReachable: { value: true },
+}))
 
 import NodesView from './NodesView.vue'
 
 const node = (overrides: Record<string, unknown> = {}) => ({
-  node_id: 7, device_uid: UID, display_name: '', profile_id: 1, firmware: '2.1.0',
-  state: 'active', last_seen_at_ms: 0, rssi: -60, has_telemetry: true, ...overrides,
+  node_id: 7,
+  device_uid: UID,
+  display_name: '',
+  profile_id: 1,
+  firmware: '2.1.0',
+  state: 'active',
+  last_seen_at_ms: 0,
+  rssi: -60,
+  has_telemetry: true,
+  ...overrides,
 })
 
 async function mountView() {
-  const router = createRouter({ history: createWebHistory(), routes: [{ path: '/nodes', component: NodesView }, { path: '/:rest(.*)*', component: NodesView }] })
+  const router = createRouter({
+    history: createWebHistory(),
+    routes: [
+      { path: '/nodes', component: NodesView },
+      { path: '/:rest(.*)*', component: NodesView },
+    ],
+  })
   await router.push('/nodes')
   await router.isReady()
   const wrapper = mount(NodesView, {
@@ -63,7 +90,10 @@ async function startPairing(wrapper: Awaited<ReturnType<typeof mountView>>) {
   await flushPromises()
   scanPairingQr.mockResolvedValue({ status: 'read', credentials: { uid: UID, key: KEY } })
   const input = wrapper.get('input[type="file"]')
-  Object.defineProperty(input.element, 'files', { configurable: true, value: [new File([''], 'q.png', { type: 'image/png' })] })
+  Object.defineProperty(input.element, 'files', {
+    configurable: true,
+    value: [new File([''], 'q.png', { type: 'image/png' })],
+  })
   await input.trigger('change')
   await flushPromises()
   await wrapper.get('.modal-actions .button.primary').trigger('click')
@@ -143,10 +173,16 @@ describe('pairing window outcome', () => {
   })
 
   it('opens the node when a resumed pending transaction becomes active', async () => {
-    state.registry = { registry_generation: 5, nodes: [node({ state: 'pending', device_uid: UID.toLowerCase() })] }
+    state.registry = {
+      registry_generation: 5,
+      nodes: [node({ state: 'pending', device_uid: UID.toLowerCase() })],
+    }
     const wrapper = await mountView()
     await startPairing(wrapper)
-    state.registry = { registry_generation: 6, nodes: [node({ state: 'active', device_uid: UID.toLowerCase() })] }
+    state.registry = {
+      registry_generation: 6,
+      nodes: [node({ state: 'active', device_uid: UID.toLowerCase() })],
+    }
     state.pairing = { active: false, remaining_seconds: 0 }
     await pollOnce()
 
@@ -157,7 +193,10 @@ describe('pairing window outcome', () => {
   })
 
   it('resumes an existing pending UID after a scan', async () => {
-    state.registry = { registry_generation: 5, nodes: [node({ state: 'pending', device_uid: UID.toLowerCase() })] }
+    state.registry = {
+      registry_generation: 5,
+      nodes: [node({ state: 'pending', device_uid: UID.toLowerCase() })],
+    }
     const wrapper = await mountView()
     await startPairing(wrapper)
 
@@ -167,25 +206,31 @@ describe('pairing window outcome', () => {
     wrapper.unmount()
   })
 
-  it.each(['active', 'disabled'])('blocks an existing %s UID after a scan, regardless of case', async (nodeState) => {
-    state.registry = { registry_generation: 5, nodes: [node({ state: nodeState, device_uid: UID.toLowerCase() })] }
-    const wrapper = await mountView()
-    await startPairing(wrapper)
+  it.each(['active', 'disabled'])(
+    'blocks an existing %s UID after a scan, regardless of case',
+    async (nodeState) => {
+      state.registry = {
+        registry_generation: 5,
+        nodes: [node({ state: nodeState, device_uid: UID.toLowerCase() })],
+      }
+      const wrapper = await mountView()
+      await startPairing(wrapper)
 
-    expect(gatewayApi.openPairing).not.toHaveBeenCalled()
-    expect(wrapper.get('.modal-actions .button.primary').attributes('disabled')).toBeDefined()
-    expect(wrapper.find('node-detail-stub').exists()).toBe(false)
-    expect(wrapper.get('.notice.error').text()).toBe(en.error.node_already_exists)
+      expect(gatewayApi.openPairing).not.toHaveBeenCalled()
+      expect(wrapper.get('.modal-actions .button.primary').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('node-detail-stub').exists()).toBe(false)
+      expect(wrapper.get('.notice.error').text()).toBe(en.error.node_already_exists)
 
-    await wrapper.get('.field-group textarea').setValue('AAAAAAAAAAAAAAAAAAAA')
-    expect(wrapper.find('.notice.error').exists()).toBe(false)
-    expect(wrapper.get('.modal-actions .button.primary').attributes('disabled')).toBeUndefined()
+      await wrapper.get('.field-group textarea').setValue('AAAAAAAAAAAAAAAAAAAA')
+      expect(wrapper.find('.notice.error').exists()).toBe(false)
+      expect(wrapper.get('.modal-actions .button.primary').attributes('disabled')).toBeUndefined()
 
-    await wrapper.get('.field-group textarea').setValue(UID)
-    expect(wrapper.get('.notice.error').text()).toBe(en.error.node_already_exists)
-    expect(wrapper.get('.modal-actions .button.primary').attributes('disabled')).toBeDefined()
-    wrapper.unmount()
-  })
+      await wrapper.get('.field-group textarea').setValue(UID)
+      expect(wrapper.get('.notice.error').text()).toBe(en.error.node_already_exists)
+      expect(wrapper.get('.modal-actions .button.primary').attributes('disabled')).toBeDefined()
+      wrapper.unmount()
+    },
+  )
 
   it('shows the API conflict when the local list does not contain the UID yet', async () => {
     gatewayApi.openPairing.mockRejectedValueOnce(new Error('node_already_exists'))

@@ -18,8 +18,7 @@
 namespace {
 using namespace radiosensors;
 
-constexpr uint16_t kProfileId =
-    protocol::profileIdValue(protocol::ProfileId::Voltage);
+constexpr uint16_t kProfileId = protocol::profileIdValue(protocol::ProfileId::Voltage);
 constexpr uint16_t kSummaryFrames = 100;
 
 // PB2/PB3 carry the UART summary.
@@ -43,7 +42,8 @@ uint32_t windowStartedAt = 0;
 void restart() {
     Serial.flush();
     _PROTECTED_WRITE(RSTCTRL.SWRR, RSTCTRL_SWRE_bm);
-    while (true) {}
+    while (true) {
+    }
 }
 
 // The level stays fixed: the gateway's power targets are counted, not
@@ -61,12 +61,14 @@ void transmit() {
     security::Ack ack;
     int8_t ackRssi = protocol::kNoDownlinkRssi;
     node::WatchdogWindow watchdog;
-    if (commissioning.sendReport(
-            frame,
-            static_cast<uint8_t>(sizeof(frame)), node::kTelemetryAttempts,
-            ack, ackRssi)) {
+    if (commissioning.sendReport(frame,
+                                 static_cast<uint8_t>(sizeof(frame)),
+                                 node::kTelemetryAttempts,
+                                 ack,
+                                 ackRssi)) {
         ++acknowledged;
-        if (ack.hasPowerTarget) ++powerTargets;
+        if (ack.hasPowerTarget)
+            ++powerTargets;
     }
     ++sent;
 }
@@ -93,7 +95,7 @@ void printSummary() {
     powerTargets = 0;
     windowStartedAt = now;
 }
-}  // namespace
+} // namespace
 
 void setup() {
     Serial.begin(9600);
@@ -105,16 +107,14 @@ void setup() {
         node::WatchdogWindow watchdog;
         radioReady = commissioning.begin() == node::StartStatus::Ready;
     }
-    if (radioReady && commissioning.active()) {
+    if (radioReady && commissioning.active())
         radio.setPowerLevel(NODE_FLOOD_POWER_LEVEL);
-    }
     Serial.println(radioReady ? F("rf ok") : F("rf fail"));
 }
 
 void loop() {
     const node::ButtonGesture gesture = button.takeGesture();
-    if (gesture == node::ButtonGesture::LongPress &&
-        commissioning.resetNetwork()) {
+    if (gesture == node::ButtonGesture::LongPress && commissioning.resetNetwork()) {
         Serial.println(F("rst"));
         restart();
     }
@@ -126,7 +126,8 @@ void loop() {
         if (gesture == node::ButtonGesture::ShortPress) {
             node::WatchdogWindow watchdog;
             const bool joined = commissioning.advance();
-            if (joined) radio.setPowerLevel(NODE_FLOOD_POWER_LEVEL);
+            if (joined)
+                radio.setPowerLevel(NODE_FLOOD_POWER_LEVEL);
             Serial.println(joined ? F("join ok") : F("join fail"));
             windowStartedAt = millis();
         }
@@ -135,7 +136,8 @@ void loop() {
     }
 
     transmit();
-    if (sent == kSummaryFrames) printSummary();
+    if (sent == kSummaryFrames)
+        printSummary();
 #if NODE_FLOOD_INTERVAL_MS > 0
     delay(NODE_FLOOD_INTERVAL_MS);
 #endif

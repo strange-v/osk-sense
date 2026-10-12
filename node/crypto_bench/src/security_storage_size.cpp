@@ -11,7 +11,8 @@ volatile uint8_t sink;
 
 void setup() {
     // Keep the EEPROM paths linked without changing a bench board's records.
-    if (sink == 0) return;
+    if (sink == 0)
+        return;
     secure::NetworkConfig config;
     const bool configured = configStore.load(config);
     counterStore.load(configured);
@@ -23,9 +24,12 @@ void setup() {
         config.gatewayId = 100;
         config.networkId = sink;
         config.requestNonce = counter;
-        for (uint8_t i = 0; i < 8; ++i) config.salt[i] = sink + i;
+        for (uint8_t i = 0; i < 8; ++i)
+            config.salt[i] = sink + i;
         sink = configStore.save(config);
     }
-    if (sink & 2) sink = configStore.factoryReset();
+    if (sink & 2)
+        sink = configStore.factoryReset();
 }
-void loop() {}
+void loop() {
+}

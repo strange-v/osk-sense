@@ -18,7 +18,7 @@ namespace radiosensors {
 namespace node {
 
 class CounterReedProfile {
-public:
+  public:
     static constexpr uint16_t kProfileId =
         protocol::profileIdValue(protocol::ProfileId::PulseCounter);
     static constexpr size_t kTelemetrySize = protocol::kCounterTelemetrySize;
@@ -26,12 +26,9 @@ public:
     // Starting from HIGH is correct for counting: a boot inside a LOW phase
     // first confirms a fall, so that pulse is counted once, on its rise.
     CounterReedProfile(const pin_size_t pin, const uint32_t minimumPhaseMs)
-        : input_(pin),
-          contact_(true),
-          phase_(minimumPhaseMs, true),
-          store_(eeprom_),
-          results_(eeprom_),
-          journal_(store_, results_) {}
+        : input_(pin), contact_(true), phase_(minimumPhaseMs, true), store_(eeprom_),
+          results_(eeprom_), journal_(store_, results_) {
+    }
 
     void begin() {
         input_.sleep();
@@ -46,14 +43,14 @@ public:
         const InputChange contactChange = contact_.update(input_);
 #if defined(NODE_DEBUG)
         if (contactChange != InputChange::None) {
-            debugValue(contactChange == InputChange::Rose
-                ? F("reed open @")
-                : F("reed shut @"), now);
+            debugValue(contactChange == InputChange::Rose ? F("reed open @") : F("reed shut @"),
+                       now);
         }
 #else
         (void)contactChange;
 #endif
-        if (phase_.update(now, contact_.high()) != InputChange::Rose) return;
+        if (phase_.update(now, contact_.high()) != InputChange::Rose)
+            return;
         ++count_;
         store_.save(count_);
         reportSchedule_.pulseRecorded();
@@ -66,38 +63,41 @@ public:
         return reportSchedule_.due(now);
     }
 
-    bool takeUrgentReport() { return reportSchedule_.takeUrgent(); }
+    bool takeUrgentReport() {
+        return reportSchedule_.takeUrgent();
+    }
 
-    size_t encodeTelemetry(
-        const protocol::TelemetryPrefix& prefix, uint8_t* output,
-        const size_t capacity) {
-        return protocol::encodeCounterTelemetry(
-                   prefix, count_, output, capacity) ==
-                protocol::TelemetryCodecStatus::Ok
-            ? kTelemetrySize
-            : 0;
+    size_t encodeTelemetry(const protocol::TelemetryPrefix &prefix,
+                           uint8_t *output,
+                           const size_t capacity) {
+        return protocol::encodeCounterTelemetry(prefix, count_, output, capacity) ==
+                       protocol::TelemetryCodecStatus::Ok
+                   ? kTelemetrySize
+                   : 0;
     }
 
     void reportAcknowledged(const uint32_t now, uint16_t) {
         reportSchedule_.transmissionSucceeded(now);
     }
 
-    void reportFailed(uint32_t, uint16_t) {}
+    void reportFailed(uint32_t, uint16_t) {
+    }
 
-    void applyCommand(
-    const security::frames::Command& command, security::frames::CommandResult& result) {
-        if (command.type != static_cast<uint8_t>(protocol::CommandType::SetCount)) {
+    void applyCommand(const security::frames::Command &command,
+                      security::frames::CommandResult &result) {
+        if (command.type != static_cast<uint8_t>(protocol::CommandType::SetCount))
             return;
-        }
-        if (!protocol::validCommandArguments(
-                command.type, command.arguments, command.argumentSize)) {
+        if (!protocol::validCommandArguments(command.type,
+                                             command.arguments,
+                                             command.argumentSize)) {
             result.status = protocol::CommandStatus::InvalidArgument;
             return;
         }
         storage::SetCountResult stored{};
-        if (journal_.apply(
-                command.commandId, protocol::readUint32Le(command.arguments),
-                count_, stored) == storage::SetCountOutcome::StorageFailure) {
+        if (journal_.apply(command.commandId,
+                           protocol::readUint32Le(command.arguments),
+                           count_,
+                           stored) == storage::SetCountOutcome::StorageFailure) {
             result.status = protocol::CommandStatus::StorageFailure;
             return;
         }
@@ -108,9 +108,11 @@ public:
         reportSchedule_.countSet();
     }
 
-    void commissioned() { journal_.forgetCommandIds(count_); }
+    void commissioned() {
+        journal_.forgetCommandIds(count_);
+    }
 
-private:
+  private:
     PolledReedInput input_;
     ConfirmedInput contact_;
     MinimumPhaseFilter phase_;
@@ -122,5 +124,5 @@ private:
     uint32_t count_ = 0;
 };
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

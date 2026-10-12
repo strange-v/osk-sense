@@ -12,11 +12,9 @@ namespace node {
 // the pre-transmission measurement and the one taken immediately after the
 // previous transmission, while the cell is still recovering.
 class LoadedSupplyVoltage {
-public:
+  public:
     uint16_t report(const uint16_t beforeTransmission) const {
-        return beforeTransmission < afterPrevious_
-            ? beforeTransmission
-            : afterPrevious_;
+        return beforeTransmission < afterPrevious_ ? beforeTransmission : afterPrevious_;
     }
 
     void transmitted(const uint16_t afterTransmission) {
@@ -25,9 +23,11 @@ public:
 
     // A supply that recovered while the node stayed silent must not be
     // reported at the level of a transmission long past.
-    void forget() { afterPrevious_ = 0xFFFFU; }
+    void forget() {
+        afterPrevious_ = 0xFFFFU;
+    }
 
-private:
+  private:
     uint16_t afterPrevious_ = 0xFFFFU;
 };
 
@@ -38,11 +38,12 @@ private:
 // transmission. After a low one the gate holds without measuring, since a
 // report stays due and would otherwise cost a measurement on every tick.
 class SupplyGate {
-public:
+  public:
     static constexpr uint32_t kRecheckMs = 60UL * 1000UL;
 
     explicit SupplyGate(const uint16_t minimumExclusiveMillivolts)
-        : minimumExclusiveMillivolts_(minimumExclusiveMillivolts) {}
+        : minimumExclusiveMillivolts_(minimumExclusiveMillivolts) {
+    }
 
     bool holding(const uint32_t now) const {
         return low_ && !intervalElapsed(now, lowAt_, kRecheckMs);
@@ -51,15 +52,16 @@ public:
     // Returns whether the measurement permits transmitting.
     bool measured(const uint32_t now, const uint16_t supplyMillivolts) {
         low_ = supplyMillivolts <= minimumExclusiveMillivolts_;
-        if (low_) lowAt_ = now;
+        if (low_)
+            lowAt_ = now;
         return !low_;
     }
 
-private:
+  private:
     uint16_t minimumExclusiveMillivolts_;
     uint32_t lowAt_ = 0;
     bool low_ = false;
 };
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

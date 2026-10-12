@@ -4,6 +4,18 @@ set -eu
 repository_root=$(git rev-parse --show-toplevel)
 cd "$repository_root"
 
+if ! command -v node >/dev/null 2>&1; then
+  echo "pre-commit: Node.js is required. Install Node.js and run npm ci in gateway/ui." >&2
+  exit 1
+fi
+
+if [ ! -d gateway/ui/node_modules/lint-staged ]; then
+  echo "pre-commit: run npm ci in gateway/ui to install the formatters." >&2
+  exit 1
+fi
+
+node gateway/ui/scripts/format.mjs --staged
+
 staged_files=$(git diff --cached --name-only --diff-filter=ACMR)
 generate_pattern='^protocol/(protocol-manifest\.json|scripts/generate_protocol_docs\.mjs)$'
 validate_pattern='^protocol/(protocol-manifest\.json|protocol-manifest\.schema\.json|protocol-vectors\.json|scripts/(generate_protocol_docs|validate_protocol_artifacts)\.mjs)$'
@@ -19,11 +31,6 @@ fi
 
 if [ "$needs_generation" -eq 0 ] && [ "$needs_validation" -eq 0 ]; then
   exit 0
-fi
-
-if ! command -v node >/dev/null 2>&1; then
-  echo "pre-commit: Node.js is required for protocol artifact checks." >&2
-  exit 1
 fi
 
 if [ "$needs_generation" -eq 1 ]; then

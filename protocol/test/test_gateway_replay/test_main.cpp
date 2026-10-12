@@ -17,43 +17,51 @@ struct Memory : BlobStorage {
     bool writeResult = true, readError = false, corruptReadback = false;
     bool cutBeforeCommit = false, cutAfterCommit = false;
     bool invalidBlob = false;
-    ReadStatus read(uint8_t* output, size_t capacity, size_t& size) override {
+    ReadStatus read(uint8_t *output, size_t capacity, size_t &size) override {
         size = 0;
-        if (readError) return ReadStatus::Error;
-        if (invalidBlob) return ReadStatus::Invalid;
-        if (!storedSize) return ReadStatus::Missing;
+        if (readError)
+            return ReadStatus::Error;
+        if (invalidBlob)
+            return ReadStatus::Invalid;
+        if (!storedSize)
+            return ReadStatus::Missing;
         size = storedSize;
-        if (size > capacity) return ReadStatus::Error;
+        if (size > capacity)
+            return ReadStatus::Error;
         memcpy(output, blob, size);
-        if (corruptReadback) output[0] ^= 1;
+        if (corruptReadback)
+            output[0] ^= 1;
         return ReadStatus::Ok;
     }
-    bool write(const uint8_t* data, size_t size) override {
+    bool write(const uint8_t *data, size_t size) override {
         ++writes;
-        if (cutBeforeCommit) throw PowerCut{};
+        if (cutBeforeCommit)
+            throw PowerCut{};
         memcpy(blob, data, std::min(size, budget));
         storedSize = size;
-        if (cutAfterCommit) throw PowerCut{};
+        if (cutAfterCommit)
+            throw PowerCut{};
         return writeResult;
     }
 };
 struct Random : RandomSource {
     unsigned calls = 0;
     bool success = true;
-    bool fill(uint8_t* output, size_t size) override {
+    bool fill(uint8_t *output, size_t size) override {
         ++calls;
-        for (size_t i = 0; i < size; ++i) output[i] = calls + i;
+        for (size_t i = 0; i < size; ++i)
+            output[i] = calls + i;
         return success;
     }
 };
-void action(Action expected, const Decision& decision) {
+void action(Action expected, const Decision &decision) {
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(expected), static_cast<uint8_t>(decision.action));
 }
-void seed(Memory& memory, const Snapshot& snapshot, uint32_t generation = 10) {
+void seed(Memory &memory, const Snapshot &snapshot, uint32_t generation = 10) {
     TEST_ASSERT_TRUE(encode(snapshot, generation, memory.blob, kSnapshotSize));
     memory.storedSize = kSnapshotSize;
 }
-uint32_t crc32(const uint8_t* data, size_t size) {
+uint32_t crc32(const uint8_t *data, size_t size) {
     uint32_t crc = UINT32_MAX;
     for (size_t i = 0; i < size; ++i) {
         crc ^= data[i];
@@ -62,12 +70,15 @@ uint32_t crc32(const uint8_t* data, size_t size) {
     }
     return ~crc;
 }
-void repairCrc(uint8_t* bytes) {
-    radiosensors::protocol::writeUint32Le(bytes + kSnapshotSize - 4, crc32(bytes, kSnapshotSize - 4));
+void repairCrc(uint8_t *bytes) {
+    radiosensors::protocol::writeUint32Le(bytes + kSnapshotSize - 4,
+                                          crc32(bytes, kSnapshotSize - 4));
 }
+} // namespace
+void setUp() {
 }
-void setUp() {}
-void tearDown() {}
+void tearDown() {
+}
 
 void test_layout_corruption_and_strict_fields() {
     Snapshot snapshot;
@@ -75,7 +86,7 @@ void test_layout_corruption_and_strict_fields() {
     snapshot.records[63] = Record{RecordState::Bound, 0x12345678};
     uint8_t bytes[kSnapshotSize], changed[kSnapshotSize];
     TEST_ASSERT_TRUE(encode(snapshot, 0xAABBCCDD, bytes, sizeof(bytes)));
-    const uint8_t header[] = {'R','S','R','B',3,0,0xDD,0xCC,0xBB,0xAA,0x20,1};
+    const uint8_t header[] = {'R', 'S', 'R', 'B', 3, 0, 0xDD, 0xCC, 0xBB, 0xAA, 0x20, 1};
     TEST_ASSERT_EQUAL_HEX8_ARRAY(header, bytes, sizeof(header));
     TEST_ASSERT_EQUAL_HEX8(1, bytes[12]);
     TEST_ASSERT_EQUAL_HEX8(0x80, bytes[19]);
@@ -109,7 +120,8 @@ void test_paired_first_frame_duplicate_replay_and_single_jump_write() {
     Store store(memory);
     Random random;
     Guard guard(store, random);
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Empty), static_cast<uint8_t>(store.load()));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Empty),
+                            static_cast<uint8_t>(store.load()));
     TEST_ASSERT_EQUAL_UINT(0, memory.writes);
     guard.restart();
     TEST_ASSERT_TRUE(guard.initializeFreshKeys(0));
@@ -149,7 +161,8 @@ void test_restart_floor_and_node_isolation() {
     action(Action::Accept, guard.inspect(0, 201, 2));
     TEST_ASSERT_EQUAL_UINT32(202, store.snapshot().records[0].upperBound);
     Store restarted(memory);
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Loaded), static_cast<uint8_t>(restarted.load()));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Loaded),
+                            static_cast<uint8_t>(restarted.load()));
     Guard reboot(restarted, random);
     reboot.restart();
     action(Action::CounterFloor, reboot.inspect(0, 201));
@@ -211,33 +224,35 @@ void test_activation_commit_precedes_accept_and_survives_reboot() {
 void test_every_torn_write_and_uncertain_readback_fail_closed() {
     Snapshot baseline;
     baseline.records[0] = Record{RecordState::Bound, 100};
-    for (bool writeResult : {false, true}) for (size_t cut = 0; cut <= kSnapshotSize; ++cut) {
-        Memory memory;
-        seed(memory, baseline);
-        Store store(memory);
-        store.load();
-        Random random;
-        Guard guard(store, random);
-        guard.restart();
-        memory.budget = cut;
-        memory.writeResult = writeResult;
-        Snapshot expected = baseline;
-        expected.records[0].upperBound = 1255;
-        uint8_t bytes[kSnapshotSize];
-        TEST_ASSERT_TRUE(encode(expected, 11, bytes, sizeof(bytes)));
-        const Decision attempt = guard.inspect(0, 1000);
-        const bool committed = writeResult && memcmp(bytes, memory.blob, sizeof(bytes)) == 0;
-        action(committed ? Action::Accept : Action::StorageError, attempt);
-        TEST_ASSERT_EQUAL_UINT32(committed ? 1255 : 100, store.snapshot().records[0].upperBound);
-        action(committed ? Action::Duplicate : Action::StorageError, guard.inspect(0, 1000));
-        TEST_ASSERT_EQUAL_UINT(1, memory.writes);
-        memory.budget = kSnapshotSize;
-        memory.writeResult = true;
-        store.load();
-        guard.restart();
-        Decision old = guard.inspect(0, 100);
-        TEST_ASSERT_TRUE(old.action == Action::CounterFloor || old.action == Action::Challenge);
-    }
+    for (bool writeResult : {false, true})
+        for (size_t cut = 0; cut <= kSnapshotSize; ++cut) {
+            Memory memory;
+            seed(memory, baseline);
+            Store store(memory);
+            store.load();
+            Random random;
+            Guard guard(store, random);
+            guard.restart();
+            memory.budget = cut;
+            memory.writeResult = writeResult;
+            Snapshot expected = baseline;
+            expected.records[0].upperBound = 1255;
+            uint8_t bytes[kSnapshotSize];
+            TEST_ASSERT_TRUE(encode(expected, 11, bytes, sizeof(bytes)));
+            const Decision attempt = guard.inspect(0, 1000);
+            const bool committed = writeResult && memcmp(bytes, memory.blob, sizeof(bytes)) == 0;
+            action(committed ? Action::Accept : Action::StorageError, attempt);
+            TEST_ASSERT_EQUAL_UINT32(committed ? 1255 : 100,
+                                     store.snapshot().records[0].upperBound);
+            action(committed ? Action::Duplicate : Action::StorageError, guard.inspect(0, 1000));
+            TEST_ASSERT_EQUAL_UINT(1, memory.writes);
+            memory.budget = kSnapshotSize;
+            memory.writeResult = true;
+            store.load();
+            guard.restart();
+            Decision old = guard.inspect(0, 100);
+            TEST_ASSERT_TRUE(old.action == Action::CounterFloor || old.action == Action::Challenge);
+        }
     Memory memory;
     seed(memory, baseline);
     Store store(memory);
@@ -261,17 +276,20 @@ void test_damaged_or_missing_blob_requires_activation() {
     seed(memory, snapshot);
     memory.blob[100] ^= 1;
     Store store(memory);
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Unactivated), static_cast<uint8_t>(store.load()));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Unactivated),
+                            static_cast<uint8_t>(store.load()));
     Random random;
     Guard guard(store, random);
     guard.restart();
     action(Action::Challenge, guard.inspect(0, 500));
     memory.storedSize = 0;
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Empty), static_cast<uint8_t>(store.load()));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Empty),
+                            static_cast<uint8_t>(store.load()));
     guard.restart();
     action(Action::Challenge, guard.inspect(0, 500));
     memory.invalidBlob = true;
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Unactivated), static_cast<uint8_t>(store.load()));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Unactivated),
+                            static_cast<uint8_t>(store.load()));
     TEST_ASSERT_TRUE(store.writable());
     guard.restart();
     action(Action::Challenge, guard.inspect(0, 500));
@@ -324,7 +342,8 @@ void test_generation_wrap_and_fresh_key_reset() {
     TEST_ASSERT_TRUE(guard.initializeFreshKeys(0));
     action(Action::Accept, guard.inspect(0, 0));
     TEST_ASSERT_EQUAL_UINT32(2, store.generation());
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Loaded), static_cast<uint8_t>(store.load()));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Loaded),
+                            static_cast<uint8_t>(store.load()));
     guard.restart();
     action(Action::CounterFloor, guard.inspect(0, 0));
 }
@@ -343,11 +362,16 @@ void test_atomic_replacement_power_cut_before_and_after_commit() {
         memory.cutBeforeCommit = before;
         memory.cutAfterCommit = !before;
         bool interrupted = false;
-        try { guard.inspect(0, 1000); } catch (const PowerCut&) { interrupted = true; }
+        try {
+            guard.inspect(0, 1000);
+        } catch (const PowerCut &) {
+            interrupted = true;
+        }
         TEST_ASSERT_TRUE(interrupted);
         TEST_ASSERT_EQUAL_UINT32(100, store.snapshot().records[0].upperBound);
         memory.cutBeforeCommit = memory.cutAfterCommit = false;
-        TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Loaded), static_cast<uint8_t>(store.load()));
+        TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(LoadStatus::Loaded),
+                                static_cast<uint8_t>(store.load()));
         TEST_ASSERT_EQUAL_UINT32(before ? 100 : 1255, store.snapshot().records[0].upperBound);
         guard.restart();
         const Decision replay = guard.inspect(0, 100);
@@ -400,7 +424,8 @@ void test_adaptive_window_trailing_day_and_clock_wrap() {
     TEST_ASSERT_EQUAL_UINT16(3, history.window(86400));
     TEST_ASSERT_EQUAL_UINT16(2, history.window(86401));
     TEST_ASSERT_EQUAL_UINT16(1, history.window(86500));
-    for (unsigned i = 0; i < 300; ++i) history.accepted(86501);
+    for (unsigned i = 0; i < 300; ++i)
+        history.accepted(86501);
     TEST_ASSERT_EQUAL_UINT16(256, history.window(86501));
     TEST_ASSERT_EQUAL_UINT16(1, history.window(172901));
     TEST_ASSERT_EQUAL_UINT16(256, history.window(0));
@@ -419,11 +444,12 @@ void test_compact_history_matches_exact_seconds_across_wraps_and_long_gaps() {
     TEST_ASSERT_LESS_OR_EQUAL_UINT(600, sizeof(history));
     uint64_t now = (1ULL << 18) - 86400;
     history.begin(now);
-    for (unsigned index = 0; index < 600; ++index) history.accepted(now + index * 100);
+    for (unsigned index = 0; index < 600; ++index)
+        history.accepted(now + index * 100);
     TEST_ASSERT_EQUAL_UINT16(256, history.window(now + 86400));
     for (unsigned expired = 1; expired <= 256; ++expired) {
         TEST_ASSERT_EQUAL_UINT16(expired == 256 ? 1 : 256 - expired,
-            history.window(now + (343 + expired) * 100 + 86400));
+                                 history.window(now + (343 + expired) * 100 + 86400));
     }
     uint64_t started = now;
     history.begin(now);
@@ -433,18 +459,22 @@ void test_compact_history_matches_exact_seconds_across_wraps_and_long_gaps() {
         random = random * 1664525U + 1013904223U;
         if (index % 2000 == 1999) {
             now -= 1;
-            started = now; reference.clear();
+            started = now;
+            reference.clear();
         } else {
             now += index < 2000 ? random % 5 : random % 120000;
-            while (!reference.empty() && now - reference.front() >= 86400) reference.pop_front();
+            while (!reference.empty() && now - reference.front() >= 86400)
+                reference.pop_front();
         }
         if (index % 3 != 0) {
             history.accepted(now);
             reference.push_back(now);
-            if (reference.size() > 256) reference.pop_front();
+            if (reference.size() > 256)
+                reference.pop_front();
         }
-        const uint16_t expected = now - started < 86400 ? 256 :
-            static_cast<uint16_t>(reference.empty() ? 1 : reference.size());
+        const uint16_t expected =
+            now - started < 86400 ? 256
+                                  : static_cast<uint16_t>(reference.empty() ? 1 : reference.size());
         TEST_ASSERT_EQUAL_UINT16(expected, history.window(now));
     }
 }

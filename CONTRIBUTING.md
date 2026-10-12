@@ -18,10 +18,48 @@ for the node. The gateway script accepts `--backup` for backup, restore and rese
 checks, or `--registry-radio` for registry/radio storage checks. Omitting selectors
 runs all tests in that script.
 
-Enable the tracked pre-commit hook once per clone:
+## Formatting
+
+Install the formatters and enable the pre-commit hook once per clone (Node.js 24):
 
 ```powershell
+& "$env:ProgramFiles\nodejs\node.exe" "$env:ProgramFiles\nodejs\node_modules\npm\bin\npm-cli.js" --prefix gateway/ui ci
 git config core.hooksPath .githooks
 ```
 
-The hook validates changed protocol artifacts. It regenerates diagrams only when the staged manifest or diagram generator changed, and stops the commit if the generated SVG files need to be staged.
+Open the repository root in VS Code and install the recommended Prettier and
+Clang-Format extensions. Workspace settings enable formatting on save using the
+local, pinned formatters. On Linux or macOS, use the bundled
+`gateway/ui/node_modules/.bin/clang-format` executable; Windows uses the native
+binary directly. On Linux or macOS, also run `chmod +x .githooks/pre-commit`.
+
+| Files                          | Formatter    | Style                                                           |
+| ------------------------------ | ------------ | --------------------------------------------------------------- |
+| C/C++                          | clang-format | 4 spaces, 100 columns, expanded blocks                          |
+| Web code, JSON, Markdown, YAML | Prettier     | 2 spaces, 100 columns, single quotes and no semicolons in JS/TS |
+
+In C++, simple single-statement conditions have no braces and place the body on
+the next line. Separate logical stages with blank lines. clang-format preserves
+braces when removing them would make control flow ambiguous. Generated files, package locks,
+dependencies and firmware filesystem assets are excluded from the commit hook.
+
+The hook formats staged files, stages the formatted result and restores unstaged
+edits in partially staged files. Formatter failures stop the commit and restore
+the index and working files. Review the result in `git show` after committing.
+
+Manual commands from the repository root:
+
+```powershell
+node gateway/ui/scripts/format.mjs --write gateway/src/CommandService.cpp
+node gateway/ui/scripts/format.mjs --check gateway/ui/src/components/NodeCommands.vue
+node gateway/ui/scripts/format.mjs --staged
+```
+
+From `gateway/ui`, `npm run format` formats all tracked supported files in the
+repository; `npm run format:check` checks them without writing. On Windows, use
+the npm CLI invocation above with `run format` or `run format:check` instead of
+`ci`.
+
+The hook also validates changed protocol artifacts. It regenerates diagrams only
+when the staged manifest or diagram generator changed, and stops the commit if
+the generated SVG files need to be staged.

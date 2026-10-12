@@ -4,20 +4,20 @@ This PlatformIO project produces one statically composed ATtiny3224 image per st
 
 ## Builds
 
-| Environment | Profile | Measurements | Tick |
-| --- | ---: | --- | ---: |
-| `climate_tmp112` | 2 | TMP112 temperature, supply voltage | 32 s |
-| `climate_tmp112_debug` | 2 | same, with UART diagnostics | 32 s |
-| `binary` | 5 | binary state, supply voltage | 250 ms |
-| `binary_debug` | 5 | same, with UART diagnostics | 250 ms |
-| `binary_sht40` | 7 | binary state, SHT40 temperature and humidity, supply voltage | 250 ms |
-| `binary_sht40_debug` | 7 | same, with UART diagnostics | 250 ms |
-| `counter_reed` | 6 | pulse count, supply voltage | 250 ms |
-| `counter_reed_debug` | 6 | same, with UART diagnostics | 250 ms |
-| `radio_power_sweep` | diagnostic | supply voltage at power levels 0..31 | 250 ms |
-| `radio_power_sweep_button` | diagnostic | one report every 5 s; PA6 selects the power level | 250 ms |
-| `radio_flood` | 1 | acknowledged voltage reports back to back, for gateway load tests | 250 ms |
-| `radio_replay` | 7 | replayed and tampered reports, for gateway replay and tag checks | 250 ms |
+| Environment                |    Profile | Measurements                                                      |   Tick |
+| -------------------------- | ---------: | ----------------------------------------------------------------- | -----: |
+| `climate_tmp112`           |          2 | TMP112 temperature, supply voltage                                |   32 s |
+| `climate_tmp112_debug`     |          2 | same, with UART diagnostics                                       |   32 s |
+| `binary`                   |          5 | binary state, supply voltage                                      | 250 ms |
+| `binary_debug`             |          5 | same, with UART diagnostics                                       | 250 ms |
+| `binary_sht40`             |          7 | binary state, SHT40 temperature and humidity, supply voltage      | 250 ms |
+| `binary_sht40_debug`       |          7 | same, with UART diagnostics                                       | 250 ms |
+| `counter_reed`             |          6 | pulse count, supply voltage                                       | 250 ms |
+| `counter_reed_debug`       |          6 | same, with UART diagnostics                                       | 250 ms |
+| `radio_power_sweep`        | diagnostic | supply voltage at power levels 0..31                              | 250 ms |
+| `radio_power_sweep_button` | diagnostic | one report every 5 s; PA6 selects the power level                 | 250 ms |
+| `radio_flood`              |          1 | acknowledged voltage reports back to back, for gateway load tests | 250 ms |
+| `radio_replay`             |          7 | replayed and tampered reports, for gateway replay and tag checks  | 250 ms |
 
 The binary-input image with TMP112 (profile 8) is not implemented yet. An installation decides whether a binary input is a door, a window, or a float switch.
 
@@ -30,7 +30,7 @@ pio run -e climate_tmp112 -t upload
 
 For the SHT40 binary node, build `binary_sht40` or `binary_sht40_debug` and upload the chosen environment. It uses the SHT40 at I2C address `0x44`, the active-low contact on PA5, and a five-minute reporting interval; all three settings are in `platformio.ini`.
 
-Uploading to a paired node keeps its network configuration, because the fuses preserve EEPROM on chip erase. The gateway learns the new firmware version and profile only when an administrator sends the *Read node information* command from the node's card ([PROTOCOL.md](../protocol/PROTOCOL.md#command-types)).
+Uploading to a paired node keeps its network configuration, because the fuses preserve EEPROM on chip erase. The gateway learns the new firmware version and profile only when an administrator sends the _Read node information_ command from the node's card ([PROTOCOL.md](../protocol/PROTOCOL.md#command-types)).
 
 Hardware environments inherit serial UPDI upload on COM11 at 115200 baud and serial monitoring on COM12 at 9600 baud. Only the adapter's RX line is connected to COM12.
 
@@ -40,14 +40,14 @@ Hardware environments inherit serial UPDI upload on COM11 at 115200 baud and ser
 
 <a id="radio_replay"></a>`radio_replay` is a bench image for an already commissioned node. Each short PA6 press sends two valid reports A and B with marker values (open, 20.00 °C, 50.00 %), then repeats and tampers with their bytes and prints the gateway's answer to each step on the UART at 9600 baud. Compare `/ui/status` radio counters and `telemetry.updates` before and after one run.
 
-| Step | Frame | Expected |
-| --- | --- | --- |
-| 1 | A, then B | `ack`; `updates` +2 |
-| 2 | B again | Same `ack`, `replay_frames` +1 |
-| 3 | A again | `ack floor=…`, `replay_frames` +1 |
-| 4–6 | B with one bit flipped in ciphertext, tag or counter | `no ack`, `failed_tags` +1 each |
-| 7 | B without the ACK request in its control byte | No ACK expected, `failed_tags` +1 |
-| 8 | B from node ID + 1 | `no ack`; `failed_tags` or `telemetry_rejected_inactive` +1 |
+| Step | Frame                                                | Expected                                                    |
+| ---- | ---------------------------------------------------- | ----------------------------------------------------------- |
+| 1    | A, then B                                            | `ack`; `updates` +2                                         |
+| 2    | B again                                              | Same `ack`, `replay_frames` +1                              |
+| 3    | A again                                              | `ack floor=…`, `replay_frames` +1                           |
+| 4–6  | B with one bit flipped in ciphertext, tag or counter | `no ack`, `failed_tags` +1 each                             |
+| 7    | B without the ACK request in its control byte        | No ACK expected, `failed_tags` +1                           |
+| 8    | B from node ID + 1                                   | `no ack`; `failed_tags` or `telemetry_rejected_inactive` +1 |
 
 Upload never writes fuses. Write them once per chip before the first upload; every environment uses the same values (4 MHz from the 16 MHz oscillator, BOD 1.8 V in active mode only, EEPROM preserved on chip erase, UPDI pin kept):
 
@@ -114,10 +114,10 @@ Measured consumption and the battery budget are in [POWER.md](POWER.md).
 
 PA6 is the active-low provisioning button. A hold is timed with `millis()` while the MCU stays awake, so input polling pauses until the button is released or the hold completes.
 
-| Gesture | Effect |
-| --- | --- |
-| Released within 10 s | Unconfigured or provisional node: commissioning attempt. Active node: command session. |
-| Held for 10 s | Invalidates both network configuration slots and restarts the node unconfigured. USERROW and profile EEPROM, including the counter, are preserved. Refused when the factory credentials are invalid, because the node could never rejoin. |
+| Gesture              | Effect                                                                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Released within 10 s | Unconfigured or provisional node: commissioning attempt. Active node: command session.                                                                                                                                                    |
+| Held for 10 s        | Invalidates both network configuration slots and restarts the node unconfigured. USERROW and profile EEPROM, including the counter, are preserved. Refused when the factory credentials are invalid, because the node could never rejoin. |
 
 Without a button press, a node that is not active attempts commissioning at boot, then every 5 minutes for twelve attempts in all; a press starts the series again. After that a provisional node retries hourly, because the gateway answers its Join confirm at any time, and an unconfigured node waits for the button, because the gateway accepts a Join request only inside a pairing window.
 
@@ -127,20 +127,20 @@ The gateway rejects a join request from a UID it still holds as active. To pair 
 
 Each image has a transmit power ceiling for its board and supply, `NODE_RADIO_MAX_POWER_LEVEL`: 23 for the supercapacitor-powered `climate_tmp112` and 15 for the CR2032-powered `binary`, `binary_sht40`, and `counter_reed` images. The diagnostic power-sweep images use 23 for commissioning but sweep their configured level range independently. Transmission current and report charge per level are in [POWER.md](POWER.md#radio-power-levels). The node sends the ceiling in Join request and reports its level, fallback flag, and the RSSI of the last acknowledgement in every telemetry frame. That RSSI is sampled when the acknowledgement's sync word matches: the RFM69 keeps measuring the channel after a frame ends, so a read after reception returns anything between the frame and the noise floor ([PROTOCOL.md](../protocol/PROTOCOL.md#radio-power)).
 
-| Event | Level |
-| --- | --- |
-| Boot and commissioning | Ceiling |
-| Acknowledgement carrying a power target | The target clamped to the ceiling, applied at once; fallback cleared |
-| Third consecutive report without acknowledgement | Ceiling with the fallback flag, unless already there |
+| Event                                            | Level                                                                |
+| ------------------------------------------------ | -------------------------------------------------------------------- |
+| Boot and commissioning                           | Ceiling                                                              |
+| Acknowledgement carrying a power target          | The target clamped to the ceiling, applied at once; fallback cleared |
+| Third consecutive report without acknowledgement | Ceiling with the fallback flag, unless already there                 |
 
 Level and fallback flag are held only in RAM, so adapting the level never writes EEPROM. After a restart the first report goes out at the ceiling, and its acknowledgement returns the node to the level the gateway still wants.
 
 ## Lost gateway
 
-| | Battery images | Solar `climate_tmp112` |
-| --- | --- | --- |
-| Next attempt after an unacknowledged report | 1 min, 5 min, then every 15 min; hourly once the gateway has been silent for 24 h | The next report interval, about 64 s, or 320 s at low charge |
-| Transmissions per report | 3; 1 after three consecutive unacknowledged reports, except for a binary state change or a set count | 3; 1 after three consecutive unacknowledged reports |
+|                                             | Battery images                                                                                       | Solar `climate_tmp112`                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Next attempt after an unacknowledged report | 1 min, 5 min, then every 15 min; hourly once the gateway has been silent for 24 h                    | The next report interval, about 64 s, or 320 s at low charge |
+| Transmissions per report                    | 3; 1 after three consecutive unacknowledged reports, except for a binary state change or a set count | 3; 1 after three consecutive unacknowledged reports          |
 
 The solar climate image has no finite charge to spare: a drained supercapacitor recovers at sunrise, and the low-charge interval keeps the node alive through the night.
 
@@ -148,20 +148,20 @@ The solar climate image has no finite charge to spare: a drained supercapacitor 
 
 An active node opens a command session when its button is short-pressed, or when an authenticated telemetry acknowledgement carries the command-pending flag. It sends Command ready, listens 250 ms for the answer, and repeats the exact frame up to three times with the same counter. Replies must authenticate against that counter before a command runs. Input polling pauses meanwhile, as during a commissioning window.
 
-| Command | Handled by | Effect |
-| --- | --- | --- |
+| Command     | Handled by    | Effect                                                                                                     |
+| ----------- | ------------- | ---------------------------------------------------------------------------------------------------------- |
 | `set_count` | counter image | Pending result, ring write, Applied result ([EEPROM.md](EEPROM.md)); the new count is reported immediately |
-| `read_info` | every image | Answers with the image's profile ID, firmware version, and power ceiling; writes nothing |
+| `read_info` | every image   | Answers with the image's profile ID, firmware version, and power ceiling; writes nothing                   |
 
 Sessions started by the flag are limited to one per five minutes, and after one the gateway did not answer, to the battery images' telemetry retry delays ([Lost gateway](#lost-gateway)). A button press always opens a session. An event node reports at least hourly, so the button is the prompt way to reach one.
 
 ## Fault recovery
 
-| Fault | Response |
-| --- | --- |
-| I2C sensor read fails | The TWI0 bus is freed (up to nine SCL clocks, then STOP), the sensor is put back into its sleep state or reset, and the read is repeated once. A report whose read fails twice carries the invalid-value sentinel. |
-| Radio or sensor work hangs | A watchdog armed only around startup, reports, command sessions, and commissioning attempts resets the MCU after 8 s. It is off in sleep and on radio-free ticks, which keeps the idle current unchanged. |
-| RFM69 fails to initialize | Software restart 5 minutes after boot. A node without network configuration or factory credentials does not restart. |
+| Fault                                        | Response                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I2C sensor read fails                        | The TWI0 bus is freed (up to nine SCL clocks, then STOP), the sensor is put back into its sleep state or reset, and the read is repeated once. A report whose read fails twice carries the invalid-value sentinel.                                                                                                  |
+| Radio or sensor work hangs                   | A watchdog armed only around startup, reports, command sessions, and commissioning attempts resets the MCU after 8 s. It is off in sleep and on radio-free ticks, which keeps the idle current unchanged.                                                                                                           |
+| RFM69 fails to initialize                    | Software restart 5 minutes after boot. A node without network configuration or factory credentials does not restart.                                                                                                                                                                                                |
 | RFM69 loses its registers while the MCU runs | Before each report, command session, and commissioning attempt the node reads back the frequency, the AES flag, and the network sync byte. On a mismatch it reinitializes the module, disables hardware AES and reapplies its power level; if that fails too, the exchange is skipped and counts as unacknowledged. |
 
 Debug builds log `tmp fail`, `rst wdt` after a watchdog reset, `rst rf` before a radio restart, and `rf lost` before a register repair.

@@ -1,21 +1,29 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { COUNT_MAX, commandArguments, commandValue, parseCommandValue, supportedCommands } from './commands'
+import {
+  COUNT_MAX,
+  commandArguments,
+  commandValue,
+  parseCommandValue,
+  supportedCommands,
+} from './commands'
 
 interface Manifest {
   commands: { types: Array<{ type: number; name: string }> }
   telemetry: { profiles: Array<{ id: number; commands: number[] }> }
 }
 
-const manifest = JSON.parse(readFileSync(
-  new URL('../../../../protocol/protocol-manifest.json', import.meta.url), 'utf8')) as Manifest
+const manifest = JSON.parse(
+  readFileSync(new URL('../../../../protocol/protocol-manifest.json', import.meta.url), 'utf8'),
+) as Manifest
 
 describe('command catalogue', () => {
   it('offers exactly the commands the protocol manifest lists per profile', () => {
     const names = new Map(manifest.commands.types.map((type) => [type.type, type.name]))
     for (const profile of manifest.telemetry.profiles) {
-      expect(supportedCommands(profile.id), `profile ${profile.id}`)
-        .toEqual(profile.commands.map((type) => names.get(type)))
+      expect(supportedCommands(profile.id), `profile ${profile.id}`).toEqual(
+        profile.commands.map((type) => names.get(type)),
+      )
     }
     expect(supportedCommands(0)).toEqual([])
     expect(supportedCommands(99)).toEqual([])

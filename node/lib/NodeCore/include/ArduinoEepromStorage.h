@@ -9,7 +9,7 @@ namespace node {
 namespace storage {
 
 class ArduinoEepromStorage {
-public:
+  public:
     uint8_t read(const size_t address) const {
         return EEPROM.read(static_cast<uint8_t>(address));
     }
@@ -19,6 +19,6 @@ public:
     }
 };
 
-}  // namespace storage
-}  // namespace node
-}  // namespace radiosensors
+} // namespace storage
+} // namespace node
+} // namespace radiosensors

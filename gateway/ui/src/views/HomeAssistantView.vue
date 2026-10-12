@@ -29,7 +29,9 @@ const failure = ref('')
 // than a block: it cannot be read back, and nothing here can tell whether it
 // still works. Saying so is more useful than either hiding the button or
 // pretending the setup is done.
-const existing = computed(() => tokens.value === null ? undefined : findTokenNamed(tokens.value, TOKEN_NAME))
+const existing = computed(() =>
+  tokens.value === null ? undefined : findTokenNamed(tokens.value, TOKEN_NAME),
+)
 const full = computed(() => tokens.value !== null && !canAddToken(tokens.value))
 const address = computed(() => info.value?.hostname || 'osk-hub.local')
 
@@ -62,7 +64,9 @@ onMounted(async () => {
   if (list.status === 'fulfilled') tokens.value = list.value.tokens
 })
 // The secret is never carried off this screen.
-onUnmounted(() => { created.value = null })
+onUnmounted(() => {
+  created.value = null
+})
 </script>
 
 <template>
@@ -73,7 +77,11 @@ onUnmounted(() => { created.value = null })
         <h1>{{ $t('ha.title') }}</h1>
         <p>{{ $t('ha.subtitle') }}</p>
       </div>
-      <RouterLink class="button secondary compact" to="/status">{{ $t('ha.back') }}</RouterLink>
+      <RouterLink
+        class="button secondary compact"
+        to="/status"
+        >{{ $t('ha.back') }}</RouterLink
+      >
     </div>
 
     <ol class="workflow">
@@ -83,25 +91,73 @@ onUnmounted(() => { created.value = null })
           <h2>{{ $t('ha.stepTokenTitle') }}</h2>
           <p>{{ $t('ha.stepTokenHint') }}</p>
 
-          <div v-if="failure" class="notice error">{{ $t(`error.${failure}`) }}</div>
+          <div
+            v-if="failure"
+            class="notice error"
+          >
+            {{ $t(`error.${failure}`) }}
+          </div>
 
-          <div v-if="created" class="revealed-token notice">
+          <div
+            v-if="created"
+            class="revealed-token notice"
+          >
             <div>
               <strong>{{ $t('ha.saveToken') }}</strong>
               <code class="generated-token">{{ created.token }}</code>
               <div class="revealed-actions">
-                <button class="button secondary" type="button" @click="copy">{{ copied ? $t('ha.copied') : $t('ha.copyToken') }}</button>
-                <span v-if="copyFailed" class="notice error" role="alert">{{ $t('ha.copyFailed') }}</span>
-                <button class="button primary" type="button" @click="created = null">{{ $t('tokens.saved') }}</button>
+                <button
+                  class="button secondary"
+                  type="button"
+                  @click="copy"
+                >
+                  {{ copied ? $t('ha.copied') : $t('ha.copyToken') }}
+                </button>
+                <span
+                  v-if="copyFailed"
+                  class="notice error"
+                  role="alert"
+                  >{{ $t('ha.copyFailed') }}</span
+                >
+                <button
+                  class="button primary"
+                  type="button"
+                  @click="created = null"
+                >
+                  {{ $t('tokens.saved') }}
+                </button>
               </div>
             </div>
           </div>
 
           <template v-else>
-            <p v-if="existing" class="notice">{{ $t('ha.alreadyExists') }}</p>
-            <p v-if="full" class="step-note">{{ $t('ha.capacity') }}</p>
-            <button v-else class="button primary" :disabled="busy" type="button" @click="create">
-              <Icon name="key" /> {{ busy ? $t('ha.creatingToken') : existing ? $t('ha.createAnother') : $t('ha.createToken') }}
+            <p
+              v-if="existing"
+              class="notice"
+            >
+              {{ $t('ha.alreadyExists') }}
+            </p>
+            <p
+              v-if="full"
+              class="step-note"
+            >
+              {{ $t('ha.capacity') }}
+            </p>
+            <button
+              v-else
+              class="button primary"
+              :disabled="busy"
+              type="button"
+              @click="create"
+            >
+              <Icon name="key" />
+              {{
+                busy
+                  ? $t('ha.creatingToken')
+                  : existing
+                    ? $t('ha.createAnother')
+                    : $t('ha.createToken')
+              }}
             </button>
           </template>
         </div>
@@ -113,8 +169,14 @@ onUnmounted(() => { created.value = null })
           <h2>{{ $t('ha.stepAddTitle') }}</h2>
           <p>{{ $t('ha.stepAddHint') }}</p>
           <dl class="simple-details">
-            <div><dt>{{ $t('ha.address') }}</dt><dd>{{ address }}</dd></div>
-            <div><dt>{{ $t('ha.integration') }}</dt><dd>OSK Sense</dd></div>
+            <div>
+              <dt>{{ $t('ha.address') }}</dt>
+              <dd>{{ address }}</dd>
+            </div>
+            <div>
+              <dt>{{ $t('ha.integration') }}</dt>
+              <dd>OSK Sense</dd>
+            </div>
           </dl>
         </div>
       </li>
@@ -124,7 +186,11 @@ onUnmounted(() => { created.value = null })
         <div class="step-body">
           <h2>{{ $t('ha.stepVerifyTitle') }}</h2>
           <p>{{ $t('ha.stepVerifyHint') }}</p>
-          <RouterLink class="text-action" to="/status">{{ $t('ha.openOverview') }} →</RouterLink>
+          <RouterLink
+            class="text-action"
+            to="/status"
+            >{{ $t('ha.openOverview') }} →</RouterLink
+          >
         </div>
       </li>
     </ol>
@@ -132,10 +198,22 @@ onUnmounted(() => { created.value = null })
 </template>
 
 <style scoped>
-.workflow { display: grid; gap: var(--space-3); margin: 0; padding: 0; max-width: 46rem; list-style: none; }
+.workflow {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  max-width: 46rem;
+  list-style: none;
+}
 /* `.panel` is only a border and a background; every context sets its own
    padding (see .nodes-panel and .dashboard-side > .panel). */
-.workflow > li { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-5); }
+.workflow > li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
 .step-number {
   flex: none;
   width: 28px;
@@ -148,18 +226,46 @@ onUnmounted(() => { created.value = null })
   font-size: var(--text-sm);
   font-weight: 600;
 }
-.step-body { flex: 1 1 auto; min-width: 0; display: grid; gap: var(--space-2); }
-.step-body h2 { font-size: var(--text-md); }
-.step-body > p { color: var(--ink-soft); font-size: var(--text-sm); }
-.step-note { color: var(--ink-soft); font-size: var(--text-sm); }
-.step-body .button { justify-self: start; }
+.step-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.step-body h2 {
+  font-size: var(--text-md);
+}
+.step-body > p {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+.step-note {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+.step-body .button {
+  justify-self: start;
+}
 /* The step body is a grid, so a block's own bottom margin would stack on top
    of the row gap. Spacing here is the gap's job alone. */
-.step-body > .notice { margin-bottom: 0; }
+.step-body > .notice {
+  margin-bottom: 0;
+}
 /* Not a dialog, for the same reason as in TokensCard: the gateway cannot show
    this secret twice, so it must not be dismissable by a stray click. */
-.revealed-token { margin-bottom: 0; }
-.revealed-token > div { display: grid; gap: var(--space-2); }
-.revealed-token strong { color: var(--warning); }
-.revealed-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.revealed-token {
+  margin-bottom: 0;
+}
+.revealed-token > div {
+  display: grid;
+  gap: var(--space-2);
+}
+.revealed-token strong {
+  color: var(--warning);
+}
+.revealed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
 </style>

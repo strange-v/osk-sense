@@ -22,15 +22,14 @@ const char kSignatureHex[] =
     "3045022044cb4479f623ff28fde401a3f420ff7209ab25c23f31e2b0fc63030613f960e0"
     "022100f4c3d694a07f62fd9642fc3437b5fcce049eb7366158f2164495a5ae992f71de";
 
-Bytes fromHex(const char* hex) {
+Bytes fromHex(const char *hex) {
     Bytes bytes;
-    for (size_t index = 0; hex[index] != '\0'; index += 2) {
+    for (size_t index = 0; hex[index] != '\0'; index += 2)
         bytes.push_back(static_cast<uint8_t>(std::stoi(std::string(hex + index, 2), nullptr, 16)));
-    }
     return bytes;
 }
 
-std::string toHex(const uint8_t* bytes, size_t size) {
+std::string toHex(const uint8_t *bytes, size_t size) {
     static const char digits[] = "0123456789abcdef";
     std::string hex;
     for (size_t index = 0; index < size; ++index) {
@@ -40,15 +39,25 @@ std::string toHex(const uint8_t* bytes, size_t size) {
     return hex;
 }
 
-const uint8_t* data(const std::string& text) { return reinterpret_cast<const uint8_t*>(text.data()); }
-
-Status readManifest(const std::string& manifest, const Bytes& signature,
-                    const char* board = "waveshare-s3-eth", const char* current = "0.8.0") {
-    Release release;
-    return read(data(manifest), manifest.size(), signature.data(), signature.size(), board, current, release);
+const uint8_t *data(const std::string &text) {
+    return reinterpret_cast<const uint8_t *>(text.data());
 }
 
-Status parseJson(const std::string& json, const char* board = "b", const char* current = "0.8.0") {
+Status readManifest(const std::string &manifest,
+                    const Bytes &signature,
+                    const char *board = "waveshare-s3-eth",
+                    const char *current = "0.8.0") {
+    Release release;
+    return read(data(manifest),
+                manifest.size(),
+                signature.data(),
+                signature.size(),
+                board,
+                current,
+                release);
+}
+
+Status parseJson(const std::string &json, const char *board = "b", const char *current = "0.8.0") {
     Release release;
     return parse(data(json), json.size(), board, current, release);
 }
@@ -56,16 +65,16 @@ Status parseJson(const std::string& json, const char* board = "b", const char* c
 const std::string kUi =
     R"({"file":"u.bin.gz","size":1,"image_size":2,"sha256":")" + std::string(64, 'a') + R"("})";
 
-std::string manifestWith(const std::string& firmware, const std::string& ui = kUi) {
-    return R"({"format":2,"version":"1.0.0","boards":{"b":{"firmware":)" + firmware +
-        R"(,"ui":)" + ui + R"(}}})";
+std::string manifestWith(const std::string &firmware, const std::string &ui = kUi) {
+    return R"({"format":2,"version":"1.0.0","boards":{"b":{"firmware":)" + firmware + R"(,"ui":)" +
+           ui + R"(}}})";
 }
 
-std::string image(const std::string& file, const std::string& size, const std::string& sha256) {
+std::string image(const std::string &file, const std::string &size, const std::string &sha256) {
     return R"({"file":")" + file + R"(","size":)" + size + R"(,"sha256":")" + sha256 + R"("})";
 }
 
-void publicKeyMatchesFile(const char* path) {
+void publicKeyMatchesFile(const char *path) {
     std::ifstream file(path, std::ios::binary);
     assert(file);
     std::stringstream contents;
@@ -79,15 +88,29 @@ void versions() {
     Version v;
     assert(parseVersion("0.9.0", v) && v.major == 0 && v.minor == 9 && v.patch == 0);
     assert(parseVersion("65535.65535.65535", v) && v.patch == 65535);
-    for (const char* bad : {"", "1", "1.2", "1.2.3.4", "01.2.3", "1.02.3", "1.2.03", "1.2.3-rc1",
-                            "v1.2.3", " 1.2.3", "1.2.3 ", "1..3", "65536.0.0", "-1.0.0"}) {
+    for (const char *bad : {"",
+                            "1",
+                            "1.2",
+                            "1.2.3.4",
+                            "01.2.3",
+                            "1.02.3",
+                            "1.2.03",
+                            "1.2.3-rc1",
+                            "v1.2.3",
+                            " 1.2.3",
+                            "1.2.3 ",
+                            "1..3",
+                            "65536.0.0",
+                            "-1.0.0"}) {
         assert(!parseVersion(bad, v));
     }
     assert(!parseVersion(nullptr, v));
     Version a, b;
-    parseVersion("0.9.10", a); parseVersion("0.9.9", b);
+    parseVersion("0.9.10", a);
+    parseVersion("0.9.9", b);
     assert(compare(a, b) > 0 && compare(b, a) < 0 && compare(a, a) == 0);
-    parseVersion("1.0.0", a); parseVersion("0.99.99", b);
+    parseVersion("1.0.0", a);
+    parseVersion("0.99.99", b);
     assert(compare(a, b) > 0);
     std::cout << "Release versions: parsing and ordering passed\n";
 }
@@ -101,7 +124,7 @@ void publishedRelease() {
 
     // The same release in format 2, unsigned, through the parser read() uses.
     std::string current = kManifest;
-    const auto replace = [&current](const std::string& from, const std::string& to) {
+    const auto replace = [&current](const std::string &from, const std::string &to) {
         const size_t at = current.find(from);
         assert(at != std::string::npos);
         current.replace(at, from.size(), to);
@@ -136,28 +159,31 @@ void tampering() {
         changed[index] ^= 0x01;
         assert(readManifest(changed, signature) == Status::BadSignature);
     }
-    assert(readManifest(kManifest.substr(0, kManifest.size() - 1), signature) == Status::BadSignature);
+    assert(readManifest(kManifest.substr(0, kManifest.size() - 1), signature) ==
+           Status::BadSignature);
     assert(readManifest(kManifest + " ", signature) == Status::BadSignature);
     for (size_t index = 0; index < signature.size(); ++index) {
         Bytes changed = signature;
         changed[index] ^= 0x01;
         assert(readManifest(kManifest, changed) == Status::BadSignature);
     }
-    assert(readManifest(kManifest, Bytes(signature.begin(), signature.end() - 1)) == Status::BadSignature);
+    assert(readManifest(kManifest, Bytes(signature.begin(), signature.end() - 1)) ==
+           Status::BadSignature);
     assert(readManifest(kManifest, Bytes()) == Status::BadSignature);
     assert(readManifest(kManifest, Bytes(kMaxSignatureSize + 1, 0x30)) == Status::BadSignature);
     assert(readManifest(std::string(kMaxManifestSize + 1, ' '), signature) == Status::TooLarge);
     std::cout << "Release manifest: every flipped manifest and signature byte rejected\n";
 }
 
-std::string base64(const Bytes& bytes) {
+std::string base64(const Bytes &bytes) {
     unsigned char output[200];
     size_t written = 0;
-    assert(mbedtls_base64_encode(output, sizeof(output), &written, bytes.data(), bytes.size()) == 0);
-    return std::string(reinterpret_cast<char*>(output), written);
+    assert(mbedtls_base64_encode(output, sizeof(output), &written, bytes.data(), bytes.size()) ==
+           0);
+    return std::string(reinterpret_cast<char *>(output), written);
 }
 
-Status readEnvelope(const std::string& envelope, const char* current = "0.8.0") {
+Status readEnvelope(const std::string &envelope, const char *current = "0.8.0") {
     Release release;
     return readSigned(data(envelope), envelope.size(), "wt32-eth01", current, release);
 }
@@ -178,7 +204,8 @@ void signedEnvelope() {
     assert(readEnvelope("!" + line.substr(1) + "\n" + kManifest) == Status::BadSignature);
     assert(readEnvelope(line) == Status::BadSignature);
     assert(readEnvelope(line + "\n") == Status::BadSignature);
-    assert(readEnvelope(std::string(kMaxSignatureLineLength + 1, 'A') + "\n" + kManifest) == Status::BadSignature);
+    assert(readEnvelope(std::string(kMaxSignatureLineLength + 1, 'A') + "\n" + kManifest) ==
+           Status::BadSignature);
     std::string changed = envelope;
     changed[line.size() + 10] ^= 0x01;
     assert(readEnvelope(changed) == Status::BadSignature);
@@ -192,14 +219,22 @@ void malformed() {
     assert(parseJson(manifestWith(image("f.bin", "1", sha)), "b", "1.0.0") == Status::NotNewer);
     assert(parseJson(R"({"format":1,"version":"1.0.0","boards":{}})") == Status::UnsupportedFormat);
     assert(parseJson(R"({"format":3,"version":"1.0.0","boards":{}})") == Status::UnsupportedFormat);
-    for (const std::string& json : std::vector<std::string>{
-             "", "[]", "{", R"({"version":"1.0.0","boards":{}})", R"({"format":"1","version":"1.0.0","boards":{}})",
-             R"({"format":2,"version":"1.0","boards":{}})", R"({"format":2,"version":"1.0.0","boards":[]})",
+    for (const std::string &json : std::vector<std::string>{
+             "",
+             "[]",
+             "{",
+             R"({"version":"1.0.0","boards":{}})",
+             R"({"format":"1","version":"1.0.0","boards":{}})",
+             R"({"format":2,"version":"1.0","boards":{}})",
+             R"({"format":2,"version":"1.0.0","boards":[]})",
              R"({"format":2,"version":"1.0.0","boards":{"b":"x"}})",
              R"({"format":2,"version":"1.0.0","boards":{"b":{"firmware":{}}}})",
-             manifestWith(image("f.bin", "1", sha), R"({"file":"u.gz","size":1,"sha256":")" + sha + R"("})"),
-             manifestWith(image("f.bin", "1", sha), R"({"file":"u.gz","size":1,"image_size":0,"sha256":")" + sha + R"("})"),
-             manifestWith(image("f.bin", "1", sha), R"({"file":"u.gz","size":1,"image_size":"2","sha256":")" + sha + R"("})"),
+             manifestWith(image("f.bin", "1", sha),
+                          R"({"file":"u.gz","size":1,"sha256":")" + sha + R"("})"),
+             manifestWith(image("f.bin", "1", sha),
+                          R"({"file":"u.gz","size":1,"image_size":0,"sha256":")" + sha + R"("})"),
+             manifestWith(image("f.bin", "1", sha),
+                          R"({"file":"u.gz","size":1,"image_size":"2","sha256":")" + sha + R"("})"),
              manifestWith(R"({"file":"f.bin","size":1,"image_size":1,"sha256":")" + sha + R"("})"),
              manifestWith(image("", "1", sha)),
              manifestWith(image("../f.bin", "1", sha)),
@@ -220,14 +255,15 @@ void malformed() {
          }) {
         assert(parseJson(json) == Status::Malformed);
     }
-    assert(parseJson(manifestWith(image(std::string(kMaxFileNameLength, 'f'), "1", sha))) == Status::Ok);
+    assert(parseJson(manifestWith(image(std::string(kMaxFileNameLength, 'f'), "1", sha))) ==
+           Status::Ok);
     assert(parseJson(R"({"format":2,"version":"1.0.0","boards":{}})") == Status::BoardMissing);
     assert(parseJson(manifestWith(image("f.bin", "1", sha)), "b", "bad") == Status::Malformed);
     std::cout << "Release manifest: malformed fields, unsafe file names and bad hashes rejected\n";
 }
 
-int main(int argc, char** argv) {
-    assert(argc > 1);  // Path to gateway-signing.pub.pem.
+int main(int argc, char **argv) {
+    assert(argc > 1); // Path to gateway-signing.pub.pem.
     publicKeyMatchesFile(argv[1]);
     versions();
     publishedRelease();

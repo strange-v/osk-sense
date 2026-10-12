@@ -33,7 +33,10 @@ const cmac = (key, input) => {
 // Check the independent CMAC implementation before using it as an oracle.
 const standardKey = bytes('2b7e151628aed2a6abf7158809cf4f3c')
 assert.equal(cmac(standardKey, Buffer.alloc(0)).toString('hex'), 'bb1d6929e95937287fa37d129b756746')
-assert.equal(cmac(standardKey, bytes('6bc1bee22e409f96e93d7e117393172a')).toString('hex'), '070a16b46b4d4144f79bdd9dd04a287c')
+assert.equal(
+  cmac(standardKey, bytes('6bc1bee22e409f96e93d7e117393172a')).toString('hex'),
+  '070a16b46b4d4144f79bdd9dd04a287c',
+)
 
 const factory = bytes('000102030405060708090a0b0c0d0e0f')
 const salt = bytes('1011121314151617')
@@ -42,11 +45,17 @@ const mac = cmac(factory, Buffer.concat([Buffer.from([2]), salt]))
 const counter = bytes('78563412')
 const transport = Buffer.from([100, 7, 0x40])
 const plain = bytes('02bae40c2e09d7119427')
-const nonce = (header, direction = 0, index = 0) => Buffer.concat([
-  Buffer.from([direction, 7, header]), counter, Buffer.alloc(8), Buffer.from([index]),
-])
-const ciphertext = (header, direction = 0) => xor(plain, encrypt(enc, nonce(header, direction)).subarray(0, plain.length))
-const tag = (header, transport, payload) => cmac(mac, Buffer.concat([Buffer.from([header]), transport, counter, payload]))
+const nonce = (header, direction = 0, index = 0) =>
+  Buffer.concat([
+    Buffer.from([direction, 7, header]),
+    counter,
+    Buffer.alloc(8),
+    Buffer.from([index]),
+  ])
+const ciphertext = (header, direction = 0) =>
+  xor(plain, encrypt(enc, nonce(header, direction)).subarray(0, plain.length))
+const tag = (header, transport, payload) =>
+  cmac(mac, Buffer.concat([Buffer.from([header]), transport, counter, payload]))
 const telemetry = ciphertext(0x60)
 const activation = Buffer.concat([salt, ciphertext(0x6a)])
 const downlink = Buffer.from([7, 100, 0x80])
@@ -54,10 +63,16 @@ const ack = bytes('07' + '17' + '78573412')
 const replyTransport = Buffer.from([7, 100, 0])
 const command = ciphertext(0x64, 1)
 const confirm = bytes('630102030405060708090a7876541200010203')
-const confirmTag = cmac(mac, Buffer.concat([confirm.subarray(0, 1), Buffer.from([100,7,0]), confirm.subarray(1), salt]))
+const confirmTag = cmac(
+  mac,
+  Buffer.concat([confirm.subarray(0, 1), Buffer.from([100, 7, 0]), confirm.subarray(1), salt]),
+)
 const join = (rawHex, key, transport, tagSize, implicitSalt = Buffer.alloc(0)) => {
   const raw = bytes(rawHex)
-  const auth = cmac(key, Buffer.concat([raw.subarray(0, 1), transport, raw.subarray(1), implicitSalt]))
+  const auth = cmac(
+    key,
+    Buffer.concat([raw.subarray(0, 1), transport, raw.subarray(1), implicitSalt]),
+  )
   return Buffer.concat([raw, auth.subarray(0, tagSize)]).toString('hex')
 }
 const joinUp = Buffer.from([100, 0, 0])
@@ -66,17 +81,41 @@ const identity = '000102030405060708097856341201020304'
 const applicationReply = (header, payloadHex, direction, transport, tagSize) => {
   const payload = bytes(payloadHex)
   const encrypted = xor(payload, encrypt(enc, nonce(header, direction)).subarray(0, payload.length))
-  return Buffer.concat([Buffer.from([header]), counter, encrypted,
-    tag(header, transport, encrypted).subarray(0, tagSize)]).toString('hex')
+  return Buffer.concat([
+    Buffer.from([header]),
+    counter,
+    encrypted,
+    tag(header, transport, encrypted).subarray(0, tagSize),
+  ]).toString('hex')
 }
 const result = {
-  factory_key: factory.toString('hex'), salt: salt.toString('hex'),
-  encryption_key: enc.toString('hex'), authentication_key: mac.toString('hex'),
-  counter: 0x12345678, node_id: 7, gateway_id: 100, plaintext: plain.toString('hex'),
-  telemetry: Buffer.concat([Buffer.from([0x60]), counter, telemetry, tag(0x60, transport, telemetry).subarray(0, 8)]).toString('hex'),
-  activation: Buffer.concat([Buffer.from([0x6a]), counter, activation, tag(0x6a, transport, activation).subarray(0, 8)]).toString('hex'),
+  factory_key: factory.toString('hex'),
+  salt: salt.toString('hex'),
+  encryption_key: enc.toString('hex'),
+  authentication_key: mac.toString('hex'),
+  counter: 0x12345678,
+  node_id: 7,
+  gateway_id: 100,
+  plaintext: plain.toString('hex'),
+  telemetry: Buffer.concat([
+    Buffer.from([0x60]),
+    counter,
+    telemetry,
+    tag(0x60, transport, telemetry).subarray(0, 8),
+  ]).toString('hex'),
+  activation: Buffer.concat([
+    Buffer.from([0x6a]),
+    counter,
+    activation,
+    tag(0x6a, transport, activation).subarray(0, 8),
+  ]).toString('hex'),
   ack_floor: Buffer.concat([ack, tag(0x7f, downlink, ack).subarray(0, 6)]).toString('hex'),
-  command: Buffer.concat([Buffer.from([0x64]), counter, command, tag(0x64, replyTransport, command).subarray(0, 6)]).toString('hex'),
+  command: Buffer.concat([
+    Buffer.from([0x64]),
+    counter,
+    command,
+    tag(0x64, replyTransport, command).subarray(0, 6),
+  ]).toString('hex'),
   join_confirm: Buffer.concat([confirm, confirmTag.subarray(0, 8)]).toString('hex'),
   pairing_request: join('61' + identity + '06000102031f', factory, joinUp, 8),
   pairing_accept: join('62' + identity + salt.toString('hex') + '077b', factory, joinDown, 6),
@@ -91,14 +130,28 @@ if (process.argv.includes('--print')) {
   console.log(JSON.stringify(result, null, 2))
   process.exit(0)
 }
-const vectors = JSON.parse(readFileSync(new URL('../protocol-vectors.json', import.meta.url), 'utf8'))
+const vectors = JSON.parse(
+  readFileSync(new URL('../protocol-vectors.json', import.meta.url), 'utf8'),
+)
 assert.deepEqual(result, vectors.crypto_v3)
-const manifest = JSON.parse(readFileSync(new URL('../protocol-manifest.json', import.meta.url), 'utf8'))
+const manifest = JSON.parse(
+  readFileSync(new URL('../protocol-manifest.json', import.meta.url), 'utf8'),
+)
 assert.deepEqual(manifest.security_v3, {
-  protocol_major: 3, node_tag_bytes: 8, gateway_tag_bytes: 6, counter_bytes: 4,
-  counter_encoding: 'uint32_le', activation_header: 106, ack_logical_header: 127,
-  max_wire_bytes: 61, max_ack_payload_bytes: 10, salt_bytes: 8, request_nonce_bytes: 8,
+  protocol_major: 3,
+  node_tag_bytes: 8,
+  gateway_tag_bytes: 6,
+  counter_bytes: 4,
+  counter_encoding: 'uint32_le',
+  activation_header: 106,
+  ack_logical_header: 127,
+  max_wire_bytes: 61,
+  max_ack_payload_bytes: 10,
+  salt_bytes: 8,
+  request_nonce_bytes: 8,
   join_wire_sizes: { request: 33, accept: 35, confirm: 27, complete: 25 },
   command_payload: { envelope_bytes: 3, max_bytes: 11, ready_bytes: 0, no_command_bytes: 0 },
 })
-console.log('Validated V3 manifest, KDF, secure frames, pairing and command sessions against independent AES/CMAC.')
+console.log(
+  'Validated V3 manifest, KDF, secure frames, pairing and command sessions against independent AES/CMAC.',
+)

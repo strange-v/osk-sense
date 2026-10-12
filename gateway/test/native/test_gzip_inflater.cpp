@@ -12,19 +12,21 @@ using Bytes = std::vector<uint8_t>;
 
 constexpr size_t kWindow = 4096;
 
-Bytes readFile(const std::string& path) {
+Bytes readFile(const std::string &path) {
     std::ifstream file(path, std::ios::binary);
     assert(file);
     return Bytes(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 }
 
-bool collect(void* context, const uint8_t* data, size_t size) {
-    auto* output = static_cast<Bytes*>(context);
+bool collect(void *context, const uint8_t *data, size_t size) {
+    auto *output = static_cast<Bytes *>(context);
     output->insert(output->end(), data, data + size);
     return true;
 }
 
-bool refuse(void*, const uint8_t*, size_t) { return false; }
+bool refuse(void *, const uint8_t *, size_t) {
+    return false;
+}
 
 struct Result {
     bool written;
@@ -32,7 +34,7 @@ struct Result {
     Bytes output;
 };
 
-Result inflate(const Bytes& input, size_t chunk, size_t window = kWindow) {
+Result inflate(const Bytes &input, size_t chunk, size_t window = kWindow) {
     Result result{true, false, {}};
     Inflater inflater;
     assert(inflater.begin(window, collect, &result.output));
@@ -45,7 +47,7 @@ Result inflate(const Bytes& input, size_t chunk, size_t window = kWindow) {
     return result;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     // Written by run_native_tests_wsl.sh with Python's zlib.
     assert(argc > 1);
     const std::string directory = argv[1];
@@ -53,7 +55,8 @@ int main(int argc, char** argv) {
     const Bytes small = readFile(directory + "/window-4k.gz");
     const Bytes large = readFile(directory + "/window-32k.gz");
 
-    for (size_t chunk : {size_t(1), size_t(3), size_t(64), size_t(1000), size_t(4096), small.size()}) {
+    for (size_t chunk :
+         {size_t(1), size_t(3), size_t(64), size_t(1000), size_t(4096), small.size()}) {
         const Result result = inflate(small, chunk);
         assert(result.written && result.finished && result.output == plain);
     }
@@ -68,7 +71,7 @@ int main(int argc, char** argv) {
     std::cout << "Gzip: 32 KB window stream differs with a 4 KB buffer and inflates with 32 KB\n";
 
     Bytes changed = small;
-    changed[3] = 0x08;  // FNAME flag.
+    changed[3] = 0x08; // FNAME flag.
     assert(!inflate(changed, 4096).written);
     changed = small;
     changed[0] = 0x1e;

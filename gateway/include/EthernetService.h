@@ -15,10 +15,9 @@ enum class State : uint8_t {
 
 bool begin();
 State state();
-const char* stateName();
+const char *stateName();
 bool hasIp();
 String ipAddress();
 String macAddress();
 
-}  // namespace gateway::ethernet
-
+} // namespace gateway::ethernet

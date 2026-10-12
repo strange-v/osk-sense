@@ -10,13 +10,15 @@ describe('backup input', () => {
     expect(validBackupPassword('password\0more')).toBe(false)
   })
   it('rejects oversized and wrong-format files before upload', async () => {
-    await expect(encodeBackupFile(new File([new Uint8Array(MAX_BACKUP_BYTES + 1)], 'large'))).rejects.toThrow()
+    await expect(
+      encodeBackupFile(new File([new Uint8Array(MAX_BACKUP_BYTES + 1)], 'large')),
+    ).rejects.toThrow()
     await expect(encodeBackupFile(new File(['other'.repeat(20)], 'bad'))).rejects.toThrow()
   })
   it('preserves the exact encrypted bytes in base64 transport', async () => {
     const bytes = Uint8Array.from({ length: 100 }, (_, i) => i)
     bytes.set(new TextEncoder().encode('OSKB'))
     const encoded = await encodeBackupFile(new File([bytes], 'test.oskbackup'))
-    expect(Uint8Array.from(atob(encoded), c => c.charCodeAt(0))).toEqual(bytes)
+    expect(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))).toEqual(bytes)
   })
 })

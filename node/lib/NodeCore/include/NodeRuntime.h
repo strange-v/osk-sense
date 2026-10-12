@@ -46,26 +46,24 @@ namespace node {
 //
 // The contract is a template parameter, not an interface: avr-gcc keeps
 // vtables in RAM, and each image contains exactly one profile.
-template <typename Profile>
-class NodeRuntime {
-public:
-    NodeRuntime(
-        Profile& profile, NodeRadio& radio,
-        CommissioningService& commissioning, LowPowerClock& clock,
-        ProvisioningButton& button,
-        const RadioRetryBackoff radioRetry = RadioRetryBackoff())
-        : profile_(profile),
-          radio_(radio),
-          commissioning_(commissioning),
-          clock_(clock),
-          button_(button),
-          radioRetry_(radioRetry) {}
+template <typename Profile> class NodeRuntime {
+  public:
+    NodeRuntime(Profile &profile,
+                NodeRadio &radio,
+                CommissioningService &commissioning,
+                LowPowerClock &clock,
+                ProvisioningButton &button,
+                const RadioRetryBackoff radioRetry = RadioRetryBackoff())
+        : profile_(profile), radio_(radio), commissioning_(commissioning), clock_(clock),
+          button_(button), radioRetry_(radioRetry) {
+    }
 
     void begin() {
         stack_monitor::Scope stackScope;
 #if defined(NODE_DEBUG)
         // The core moves the reset flags to GPIOR0 before setup().
-        if ((GPIOR0 & RSTCTRL_WDRF_bm) != 0) debugLine(F("rst wdt"));
+        if ((GPIOR0 & RSTCTRL_WDRF_bm) != 0)
+            debugLine(F("rst wdt"));
 #endif
         {
             WatchdogWindow watchdog;
@@ -82,11 +80,12 @@ public:
     void runOnce() {
         stack_monitor::Scope stackScope;
         const ButtonGesture gesture = button_.takeGesture();
-        if (gesture == ButtonGesture::LongPress) resetNetwork();
+        if (gesture == ButtonGesture::LongPress)
+            resetNetwork();
         const uint32_t now = clock_.nowMs();
         profile_.poll(now);
         if (radioStart_ == StartStatus::RadioFailed &&
-            intervalElapsed(now, 0, kRadioRestartDelayMs)) {  // since boot
+            intervalElapsed(now, 0, kRadioRestartDelayMs)) { // since boot
 #if defined(NODE_DEBUG)
             debugLine(F("rst rf"));
 #endif
@@ -100,20 +99,20 @@ public:
                         runCommandSession();
                         reportIfDue(now);
                     }
-                } else if (commandPending && hintedSessions_.allowed(now) &&
-                           supplyAllows(now)) {
+                } else if (commandPending && hintedSessions_.allowed(now) && supplyAllows(now)) {
                     hintedSessions_.finished(now, runCommandSession());
                     reportIfDue(now);
                 }
             } else {
                 commissionIfDue(now, gesture == ButtonGesture::ShortPress);
-                if (commissioning_.active()) profile_.commissioned();
+                if (commissioning_.active())
+                    profile_.commissioned();
             }
         }
         clock_.sleepUntilInterrupt();
     }
 
-private:
+  private:
     static constexpr uint32_t kSessionWindowMs = 250;
     static constexpr uint8_t kSessionAttempts = 3;
     // A radio that failed to start gets a fresh boot; the delay bounds how
@@ -140,18 +139,19 @@ private:
         Serial.flush();
 #endif
         _PROTECTED_WRITE(RSTCTRL.SWRR, RSTCTRL_SWRE_bm);
-        while (true) {}
+        while (true) {
+        }
     }
 
     void commissionIfDue(const uint32_t now, const bool requestedByButton) {
-        if (!requestedByButton &&
-            !joinRetry_.due(now, commissioning_.provisional())) {
+        if (!requestedByButton && !joinRetry_.due(now, commissioning_.provisional()))
             return;
-        }
         // Not counted as an attempt: the join runs once the supply recovers.
-        if (!supplyAllows(now)) return;
+        if (!supplyAllows(now))
+            return;
 #if defined(NODE_DEBUG)
-        if (requestedByButton) debugLine(F("join btn"));
+        if (requestedByButton)
+            debugLine(F("join btn"));
 #endif
         WatchdogWindow watchdog;
         joinRetry_.attempted(now, requestedByButton);
@@ -179,16 +179,17 @@ private:
             protocol::encodeRadioState(powerLevel_, radioFallback_),
             downlinkRssi_};
         uint8_t frame[Profile::kTelemetrySize];
-        const size_t size =
-            profile_.encodeTelemetry(prefix, frame, sizeof(frame));
+        const size_t size = profile_.encodeTelemetry(prefix, frame, sizeof(frame));
         bool acknowledged = false;
         security::Ack ack;
         int8_t ackRssi = protocol::kNoDownlinkRssi;
         if (size != 0 && radio_.ensureConfigured()) {
-            acknowledged = commissioning_.sendReport(
-                frame, size,
-                telemetryAttempts(unacknowledgedReports_, urgent), ack,
-                ackRssi);
+            acknowledged =
+                commissioning_.sendReport(frame,
+                                          size,
+                                          telemetryAttempts(unacknowledgedReports_, urgent),
+                                          ack,
+                                          ackRssi);
             supplyVoltage_.transmitted(battery_.readMillivolts());
         }
         if (acknowledged) {
@@ -196,9 +197,11 @@ private:
             profile_.reportAcknowledged(now, prefix.supplyMillivolts);
             radioRetry_.succeeded();
             unacknowledgedReports_ = 0;
-            applyPower(afterAcknowledged(
-                powerLevel_, radioFallback_, ack.hasPowerTarget,
-                ack.powerTarget, NODE_RADIO_MAX_POWER_LEVEL));
+            applyPower(afterAcknowledged(powerLevel_,
+                                         radioFallback_,
+                                         ack.hasPowerTarget,
+                                         ack.powerTarget,
+                                         NODE_RADIO_MAX_POWER_LEVEL));
 #if defined(NODE_DEBUG)
             // The RSSI is in [-128, 0] dBm, -128 when not measured: print
             // its magnitude.
@@ -212,18 +215,20 @@ private:
 #if defined(NODE_DEBUG)
             debugLine(F("tx fail"));
 #endif
-            if (unacknowledgedReports_ < UINT8_MAX) ++unacknowledgedReports_;
-            applyPower(afterUnacknowledged(
-                powerLevel_, radioFallback_, unacknowledgedReports_,
-                NODE_RADIO_MAX_POWER_LEVEL));
+            if (unacknowledgedReports_ < UINT8_MAX)
+                ++unacknowledgedReports_;
+            applyPower(afterUnacknowledged(powerLevel_,
+                                           radioFallback_,
+                                           unacknowledgedReports_,
+                                           NODE_RADIO_MAX_POWER_LEVEL));
         }
         return acknowledged && ack.commandPending;
     }
 
     // Measures the resting supply unless the gate holds after a low one.
-    bool supplyAllows(
-        const uint32_t now, uint16_t* const supplyMillivolts = nullptr) {
-        if (supplyGate_.holding(now)) return false;
+    bool supplyAllows(const uint32_t now, uint16_t *const supplyMillivolts = nullptr) {
+        if (supplyGate_.holding(now))
+            return false;
         const uint16_t millivolts = battery_.readMillivolts();
         if (!supplyGate_.measured(now, millivolts)) {
             supplyVoltage_.forget();
@@ -233,12 +238,14 @@ private:
 #endif
             return false;
         }
-        if (supplyMillivolts != nullptr) *supplyMillivolts = millivolts;
+        if (supplyMillivolts != nullptr)
+            *supplyMillivolts = millivolts;
         return true;
     }
 
     void applyPower(const PowerDecision decision) {
-        if (!decision.change) return;
+        if (!decision.change)
+            return;
         powerLevel_ = decision.level;
         radioFallback_ = decision.fallback;
         radio_.setPowerLevel(decision.level);
@@ -251,29 +258,63 @@ private:
     // command that was then applied and answered.
     bool runCommandSession() {
         WatchdogWindow watchdog;
-        if (!radio_.ensureConfigured()) return false;
+        if (!radio_.ensureConfigured())
+            return false;
         const uint8_t gatewayId = commissioning_.config().gatewayId;
-        uint8_t ready[13]; size_t readySize; uint32_t counter;
-        if (!commissioning_.sealFrame(security::frames::kCommandReadyHeader,nullptr,0,0,
-                                       ready,sizeof(ready),readySize,counter)) return false;
+        uint8_t ready[13];
+        size_t readySize;
+        uint32_t counter;
+        if (!commissioning_.sealFrame(security::frames::kCommandReadyHeader,
+                                      nullptr,
+                                      0,
+                                      0,
+                                      ready,
+                                      sizeof(ready),
+                                      readySize,
+                                      counter))
+            return false;
         uint8_t frame[22];
         for (uint8_t attempt = 0; attempt < kSessionAttempts; ++attempt) {
-            radio_.send(gatewayId, ready,static_cast<uint8_t>(readySize));
-            const uint8_t size = radio_.receiveFrame(
-                kSessionWindowMs, gatewayId, frame, sizeof(frame));
-            if (!size) continue;
+            radio_.send(gatewayId, ready, static_cast<uint8_t>(readySize));
+            const uint8_t size =
+                radio_.receiveFrame(kSessionWindowMs, gatewayId, frame, sizeof(frame));
+            if (!size)
+                continue;
             const auto transport = radio_.receivedTransport();
             if (transport.control == 0x80) {
                 security::Ack ack;
-                if (!commissioning_.receiveAck(counter,transport,frame,size,ack)) continue;
-                if (ack.hasChallenge) { radio_.sleep(); return false; }
-                if (ack.hasCounterFloor && !commissioning_.sealFrame(security::frames::kCommandReadyHeader,
-                    nullptr,0,0,ready,sizeof(ready),readySize,counter)) { radio_.sleep(); return false; }
+                if (!commissioning_.receiveAck(counter, transport, frame, size, ack))
+                    continue;
+                if (ack.hasChallenge) {
+                    radio_.sleep();
+                    return false;
+                }
+                if (ack.hasCounterFloor &&
+                    !commissioning_.sealFrame(security::frames::kCommandReadyHeader,
+                                              nullptr,
+                                              0,
+                                              0,
+                                              ready,
+                                              sizeof(ready),
+                                              readySize,
+                                              counter)) {
+                    radio_.sleep();
+                    return false;
+                }
                 continue;
             }
-            security::frames::Command decoded; bool hasCommand;
-            if (transport.control != 0 || !security::frames::openCommandReply(commissioning_.context(),
-                commissioning_.config().nodeId,transport,counter,frame,size,decoded,hasCommand)) continue;
+            security::frames::Command decoded;
+            bool hasCommand;
+            if (transport.control != 0 ||
+                !security::frames::openCommandReply(commissioning_.context(),
+                                                    commissioning_.config().nodeId,
+                                                    transport,
+                                                    counter,
+                                                    frame,
+                                                    size,
+                                                    decoded,
+                                                    hasCommand))
+                continue;
             if (!hasCommand) {
 #if defined(NODE_DEBUG)
                 debugLine(F("cmd none"));
@@ -291,19 +332,19 @@ private:
         return false;
     }
 
-    void answerCommand(const security::frames::Command& command) {
+    void answerCommand(const security::frames::Command &command) {
         security::frames::CommandResult result;
         result.commandId = command.commandId;
         result.status = protocol::CommandStatus::Unsupported;
-        if (command.type == static_cast<uint8_t>(protocol::CommandType::ReadInfo)) {
+        if (command.type == static_cast<uint8_t>(protocol::CommandType::ReadInfo))
             readInfo(command, result);
-        } else {
+        else
             profile_.applyCommand(command, result);
-        }
-        uint8_t bytes[security::frames::kMaxCommandPayloadSize]; size_t size;
+        uint8_t bytes[security::frames::kMaxCommandPayloadSize];
+        size_t size;
         const bool sent =
-            security::frames::encodeCommandResult(result,bytes,sizeof(bytes),size) &&
-            commissioning_.sendResult(bytes,size);
+            security::frames::encodeCommandResult(result, bytes, sizeof(bytes), size) &&
+            commissioning_.sendResult(bytes, size);
         radio_.sleep();
 #if defined(NODE_DEBUG)
         Serial.print(sent ? F("cmd ack id=") : F("cmd noack id="));
@@ -318,24 +359,26 @@ private:
 
     // Read-only, so unlike a profile command it records no ID: a redelivery
     // answers with the current identity.
-    static void readInfo(
-        const security::frames::Command& command, security::frames::CommandResult& result) {
+    static void readInfo(const security::frames::Command &command,
+                         security::frames::CommandResult &result) {
         if (command.argumentSize != 0) {
             result.status = protocol::CommandStatus::InvalidArgument;
             return;
         }
-        const protocol::NodeInfo info{
-            Profile::kProfileId, kFirmwareVersion, NODE_RADIO_MAX_POWER_LEVEL};
-        if (!protocol::encodeNodeInfo(info, result.data, sizeof(result.data))) return;
+        const protocol::NodeInfo info{Profile::kProfileId,
+                                      kFirmwareVersion,
+                                      NODE_RADIO_MAX_POWER_LEVEL};
+        if (!protocol::encodeNodeInfo(info, result.data, sizeof(result.data)))
+            return;
         result.status = protocol::CommandStatus::Applied;
         result.dataSize = protocol::kReadInfoResultSize;
     }
 
-    Profile& profile_;
-    NodeRadio& radio_;
-    CommissioningService& commissioning_;
-    LowPowerClock& clock_;
-    ProvisioningButton& button_;
+    Profile &profile_;
+    NodeRadio &radio_;
+    CommissioningService &commissioning_;
+    LowPowerClock &clock_;
+    ProvisioningButton &button_;
     BatteryMonitor battery_;
     LoadedSupplyVoltage supplyVoltage_;
     SupplyGate supplyGate_{NODE_MIN_TRANSMIT_MILLIVOLTS};
@@ -353,5 +396,5 @@ private:
     StartStatus radioStart_ = StartStatus::RadioFailed;
 };
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

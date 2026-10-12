@@ -14,7 +14,7 @@ constexpr uint8_t kPitPeriod = RTC_PERIOD_CYC256_gc;
 #endif
 
 volatile uint32_t elapsedMs = 0;
-}
+} // namespace
 
 ISR(RTC_PIT_vect) {
     RTC.PITINTFLAGS = RTC_PI_bm;
@@ -29,7 +29,8 @@ void LowPowerClock::begin() {
 #if !defined(NODE_DEBUG)
     TCA0.SPLIT.CTRLA &= ~TCA_SPLIT_ENABLE_bm;
 #endif
-    while (RTC.STATUS != 0) {}
+    while (RTC.STATUS != 0) {
+    }
     RTC.CLKSEL = RTC_CLKSEL_INT1K_gc;
     RTC.PITINTCTRL = RTC_PI_bm;
     RTC.PITCTRLA = kPitPeriod | RTC_PITEN_bm;
@@ -54,5 +55,5 @@ void LowPowerClock::sleepUntilInterrupt() const {
 #endif
 }
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

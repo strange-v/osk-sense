@@ -6,8 +6,12 @@ namespace radiosensors::node::stack_monitor {
 #error "NODE_STACK_DIAGNOSTICS requires NODE_DEBUG serial output"
 #endif
 void report();
-struct Scope { ~Scope() { report(); } };
+struct Scope {
+    ~Scope() {
+        report();
+    }
+};
 #else
 struct Scope {};
 #endif
-}  // namespace radiosensors::node::stack_monitor
+} // namespace radiosensors::node::stack_monitor

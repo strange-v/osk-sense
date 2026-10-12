@@ -24,8 +24,7 @@
 namespace {
 using namespace radiosensors;
 
-constexpr uint16_t kProfileId =
-    protocol::profileIdValue(protocol::ProfileId::Voltage);
+constexpr uint16_t kProfileId = protocol::profileIdValue(protocol::ProfileId::Voltage);
 
 // The sweep does not use sensors or UART.
 constexpr uint8_t kUnusedPins[] = {
@@ -46,23 +45,24 @@ node::CommissioningService commissioning(radio, kProfileId);
 uint8_t powerLevel = NODE_POWER_SWEEP_FIRST_LEVEL;
 #if defined(NODE_POWER_SWEEP_BUTTON_LEVEL)
 constexpr uint32_t kReportIntervalMs =
-    static_cast<uint32_t>(NODE_POWER_SWEEP_INTERVAL_TICKS) *
-    node::LowPowerClock::kTickMs;
+    static_cast<uint32_t>(NODE_POWER_SWEEP_INTERVAL_TICKS) * node::LowPowerClock::kTickMs;
 uint32_t lastTransmissionAt = 0;
 bool buttonDown = false;
 
-void onButtonEdge() {}
+void onButtonEdge() {
+}
 
 void updatePowerLevelFromButton() {
     const bool pressed = digitalRead(NODE_BUTTON_PIN) == LOW;
-    if (pressed == buttonDown) return;
+    if (pressed == buttonDown)
+        return;
     delay(20);
-    if ((digitalRead(NODE_BUTTON_PIN) == LOW) != pressed) return;
+    if ((digitalRead(NODE_BUTTON_PIN) == LOW) != pressed)
+        return;
     buttonDown = pressed;
     if (pressed) {
-        powerLevel = powerLevel == NODE_POWER_SWEEP_LAST_LEVEL
-            ? NODE_POWER_SWEEP_FIRST_LEVEL
-            : powerLevel + 1;
+        powerLevel = powerLevel == NODE_POWER_SWEEP_LAST_LEVEL ? NODE_POWER_SWEEP_FIRST_LEVEL
+                                                               : powerLevel + 1;
     }
 }
 #else
@@ -76,10 +76,9 @@ bool sweepFinished = false;
 
 void transmitAtCurrentLevel() {
     radio.setPowerLevel(powerLevel);
-    const protocol::TelemetryPrefix prefix{
-        battery.readMillivolts(),
-        protocol::encodeRadioState(powerLevel, false),
-        protocol::kNoDownlinkRssi};
+    const protocol::TelemetryPrefix prefix{battery.readMillivolts(),
+                                           protocol::encodeRadioState(powerLevel, false),
+                                           protocol::kNoDownlinkRssi};
     uint8_t frame[protocol::kVoltageTelemetrySize];
     if (protocol::encodeVoltageTelemetry(prefix, frame, sizeof(frame)) !=
         protocol::TelemetryCodecStatus::Ok) {
@@ -88,10 +87,11 @@ void transmitAtCurrentLevel() {
 
     security::Ack ack;
     int8_t ackRssi = protocol::kNoDownlinkRssi;
-    commissioning.sendReport(
-        frame,
-        static_cast<uint8_t>(sizeof(frame)), node::kTelemetryAttempts, ack,
-        ackRssi);
+    commissioning.sendReport(frame,
+                             static_cast<uint8_t>(sizeof(frame)),
+                             node::kTelemetryAttempts,
+                             ack,
+                             ackRssi);
     // Match the production transaction, which samples loaded supply after
     // every transmission even though this diagnostic does not retain it.
     battery.readMillivolts();
@@ -100,14 +100,13 @@ void transmitAtCurrentLevel() {
 #if !defined(NODE_POWER_SWEEP_BUTTON_LEVEL)
 void transmitNextLevel() {
     transmitAtCurrentLevel();
-    if (powerLevel == NODE_POWER_SWEEP_LAST_LEVEL) {
+    if (powerLevel == NODE_POWER_SWEEP_LAST_LEVEL)
         sweepFinished = true;
-    } else {
+    else
         ++powerLevel;
-    }
 }
 #endif
-}
+} // namespace
 
 void setup() {
     node::disableUnusedPins(kUnusedPins);
@@ -116,8 +115,7 @@ void setup() {
     attachInterrupt(digitalPinToInterrupt(NODE_BUTTON_PIN), onButtonEdge, CHANGE);
 #endif
     clock.begin();
-    sweepEnabled = commissioning.begin() == node::StartStatus::Ready &&
-        commissioning.active();
+    sweepEnabled = commissioning.begin() == node::StartStatus::Ready && commissioning.active();
 }
 
 void loop() {
@@ -131,9 +129,11 @@ void loop() {
     clock.sleepUntilInterrupt();
 #else
     clock.sleepUntilInterrupt();
-    if (!sweepEnabled || sweepFinished) return;
+    if (!sweepEnabled || sweepFinished)
+        return;
 
-    if (--ticksUntilTransmission != 0) return;
+    if (--ticksUntilTransmission != 0)
+        return;
     ticksUntilTransmission = NODE_POWER_SWEEP_INTERVAL_TICKS;
     transmitNextLevel();
 #endif

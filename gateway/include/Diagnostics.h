@@ -6,7 +6,6 @@ namespace gateway::diagnostics {
 
 bool beginWatchdog();
 void feedWatchdog();
-const char* resetReason();
+const char *resetReason();
 
-}  // namespace gateway::diagnostics
-
+} // namespace gateway::diagnostics

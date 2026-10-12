@@ -62,42 +62,40 @@ enum class InfoStatus : uint8_t {
 };
 
 class NodeRegistry {
-public:
+  public:
     NodeRegistry();
 
     size_t size() const;
-    const NodeRecord* records() const;
-    const NodeRecord* findByUid(const uint8_t* deviceUid) const;
-    const NodeRecord* findByNodeId(uint8_t nodeId) const;
+    const NodeRecord *records() const;
+    const NodeRecord *findByUid(const uint8_t *deviceUid) const;
+    const NodeRecord *findByNodeId(uint8_t nodeId) const;
 
     bool disable(uint8_t nodeId);
     bool remove(uint8_t nodeId);
-    RenameStatus rename(uint8_t nodeId, const char* displayName, size_t length);
+    RenameStatus rename(uint8_t nodeId, const char *displayName, size_t length);
     // A fixed level must be within the node's ceiling.
     PowerPolicyStatus setPowerPolicy(uint8_t nodeId, uint8_t policy);
     // Replaces the identity an active node reported in ReadInfo. A fixed
     // power level above a lowered ceiling returns to automatic control.
-    InfoStatus updateInfo(
-        uint8_t nodeId, const uint8_t* deviceUid, const protocol::NodeInfo& info);
+    InfoStatus updateInfo(uint8_t nodeId, const uint8_t *deviceUid, const protocol::NodeInfo &info);
 
-    bool restore(const NodeRecord* records, size_t count);
+    bool restore(const NodeRecord *records, size_t count);
     // Commits authenticated transaction metadata together with its exact reply and keys.
-    bool setPairing(const security::pairing::Record& pairing, uint32_t generation,
-                    uint8_t replaySlot);
+    bool
+    setPairing(const security::pairing::Record &pairing, uint32_t generation, uint8_t replaySlot);
 
-private:
+  private:
     NodeRecord records_[kMaxNodes];
     size_t count_;
 
-    static bool uidEquals(const uint8_t* left, const uint8_t* right);
-    static bool firmwareEquals(
-        const protocol::FirmwareVersion& left,
-        const protocol::FirmwareVersion& right);
-    NodeRecord* findMutableByUid(const uint8_t* deviceUid);
-    NodeRecord* findMutableByNodeId(uint8_t nodeId);
+    static bool uidEquals(const uint8_t *left, const uint8_t *right);
+    static bool firmwareEquals(const protocol::FirmwareVersion &left,
+                               const protocol::FirmwareVersion &right);
+    NodeRecord *findMutableByUid(const uint8_t *deviceUid);
+    NodeRecord *findMutableByNodeId(uint8_t nodeId);
 };
 
-bool validDisplayName(const char* value, size_t length);
+bool validDisplayName(const char *value, size_t length);
 
-}  // namespace registry
-}  // namespace radiosensors
+} // namespace registry
+} // namespace radiosensors

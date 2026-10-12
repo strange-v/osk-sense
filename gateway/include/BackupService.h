@@ -8,23 +8,24 @@ namespace gateway::backup {
 
 // Excludes concurrent export and import. Holds nothing when another is running.
 class Operation {
-public:
+  public:
     Operation();
     ~Operation();
-    Operation(const Operation&) = delete;
-    Operation& operator=(const Operation&) = delete;
+    Operation(const Operation &) = delete;
+    Operation &operator=(const Operation &) = delete;
 
-    explicit operator bool() const { return held_; }
+    explicit operator bool() const {
+        return held_;
+    }
 
-private:
+  private:
     bool held_;
 };
 
 bool busy();
-bool capture(Snapshot& snapshot);
+bool capture(Snapshot &snapshot);
 bool cleanGateway();
-bool restore(
-    const Snapshot& snapshot,
-    const radiosensors::gateway_storage::AuthenticationData& admin);
+bool restore(const Snapshot &snapshot,
+             const radiosensors::gateway_storage::AuthenticationData &admin);
 
-}  // namespace gateway::backup
+} // namespace gateway::backup

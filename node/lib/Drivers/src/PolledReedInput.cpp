@@ -18,7 +18,7 @@ bool PolledReedInput::readOnce() {
     return high;
 }
 
-bool PolledReedInput::sample(bool& rawHigh) {
+bool PolledReedInput::sample(bool &rawHigh) {
     pinMode(pin_, INPUT_PULLUP);
     delayMicroseconds(kSettleMicroseconds);
 
@@ -38,10 +38,11 @@ bool PolledReedInput::sample(bool& rawHigh) {
     }
 
     sleep();
-    if (equalSamples < kStableSamples) return false;
+    if (equalSamples < kStableSamples)
+        return false;
     rawHigh = candidate;
     return true;
 }
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

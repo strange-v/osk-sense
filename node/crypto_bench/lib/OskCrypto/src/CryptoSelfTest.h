@@ -11,48 +11,204 @@ namespace crypto {
 // SP 800-38C example 1, RFC 3610 packet vector 1.
 // Returns a bit mask of failed checks; zero means every check passed.
 inline uint16_t selfTest() {
-    static const uint8_t kFipsKey[16] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
-    static const uint8_t kFipsPlain[16] = {
-        0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-        0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-    static const uint8_t kFipsCipher[16] = {
-        0x69, 0xc4, 0xe0, 0xd8, 0x6a, 0x7b, 0x04, 0x30,
-        0xd8, 0xcd, 0xb7, 0x80, 0x70, 0xb4, 0xc5, 0x5a};
-    static const uint8_t kKey[16] = {
-        0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
-        0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
+    static const uint8_t kFipsKey[16] = {0x00,
+                                         0x01,
+                                         0x02,
+                                         0x03,
+                                         0x04,
+                                         0x05,
+                                         0x06,
+                                         0x07,
+                                         0x08,
+                                         0x09,
+                                         0x0a,
+                                         0x0b,
+                                         0x0c,
+                                         0x0d,
+                                         0x0e,
+                                         0x0f};
+    static const uint8_t kFipsPlain[16] = {0x00,
+                                           0x11,
+                                           0x22,
+                                           0x33,
+                                           0x44,
+                                           0x55,
+                                           0x66,
+                                           0x77,
+                                           0x88,
+                                           0x99,
+                                           0xaa,
+                                           0xbb,
+                                           0xcc,
+                                           0xdd,
+                                           0xee,
+                                           0xff};
+    static const uint8_t kFipsCipher[16] = {0x69,
+                                            0xc4,
+                                            0xe0,
+                                            0xd8,
+                                            0x6a,
+                                            0x7b,
+                                            0x04,
+                                            0x30,
+                                            0xd8,
+                                            0xcd,
+                                            0xb7,
+                                            0x80,
+                                            0x70,
+                                            0xb4,
+                                            0xc5,
+                                            0x5a};
+    static const uint8_t kKey[16] = {0x2b,
+                                     0x7e,
+                                     0x15,
+                                     0x16,
+                                     0x28,
+                                     0xae,
+                                     0xd2,
+                                     0xa6,
+                                     0xab,
+                                     0xf7,
+                                     0x15,
+                                     0x88,
+                                     0x09,
+                                     0xcf,
+                                     0x4f,
+                                     0x3c};
     static const uint8_t kMessage[64] = {
-        0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96,
-        0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93, 0x17, 0x2a,
-        0xae, 0x2d, 0x8a, 0x57, 0x1e, 0x03, 0xac, 0x9c,
-        0x9e, 0xb7, 0x6f, 0xac, 0x45, 0xaf, 0x8e, 0x51,
-        0x30, 0xc8, 0x1c, 0x46, 0xa3, 0x5c, 0xe4, 0x11,
-        0xe5, 0xfb, 0xc1, 0x19, 0x1a, 0x0a, 0x52, 0xef,
-        0xf6, 0x9f, 0x24, 0x45, 0xdf, 0x4f, 0x9b, 0x17,
-        0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10};
-    static const uint8_t kCtrCounter[16] = {
-        0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
-        0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff};
-    static const uint8_t kCtrCipher[16] = {
-        0x87, 0x4d, 0x61, 0x91, 0xb6, 0x20, 0xe3, 0x26,
-        0x1b, 0xef, 0x68, 0x64, 0x99, 0x0d, 0xb6, 0xce};
-    static const uint8_t kK1[16] = {
-        0xfb, 0xee, 0xd6, 0x18, 0x35, 0x71, 0x33, 0x66,
-        0x7c, 0x85, 0xe0, 0x8f, 0x72, 0x36, 0xa8, 0xde};
-    static const uint8_t kK2[16] = {
-        0xf7, 0xdd, 0xac, 0x30, 0x6a, 0xe2, 0x66, 0xcc,
-        0xf9, 0x0b, 0xc1, 0x1e, 0xe4, 0x6d, 0x51, 0x3b};
-    static const uint8_t kTags[4][16] = {
-        {0xbb, 0x1d, 0x69, 0x29, 0xe9, 0x59, 0x37, 0x28,
-         0x7f, 0xa3, 0x7d, 0x12, 0x9b, 0x75, 0x67, 0x46},
-        {0x07, 0x0a, 0x16, 0xb4, 0x6b, 0x4d, 0x41, 0x44,
-         0xf7, 0x9b, 0xdd, 0x9d, 0xd0, 0x4a, 0x28, 0x7c},
-        {0xdf, 0xa6, 0x67, 0x47, 0xde, 0x9a, 0xe6, 0x30,
-         0x30, 0xca, 0x32, 0x61, 0x14, 0x97, 0xc8, 0x27},
-        {0x51, 0xf0, 0xbe, 0xbf, 0x7e, 0x3b, 0x9d, 0x92,
-         0xfc, 0x49, 0x74, 0x17, 0x79, 0x36, 0x3c, 0xfe}};
+        0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e, 0x11, 0x73,
+        0x93, 0x17, 0x2a, 0xae, 0x2d, 0x8a, 0x57, 0x1e, 0x03, 0xac, 0x9c, 0x9e, 0xb7,
+        0x6f, 0xac, 0x45, 0xaf, 0x8e, 0x51, 0x30, 0xc8, 0x1c, 0x46, 0xa3, 0x5c, 0xe4,
+        0x11, 0xe5, 0xfb, 0xc1, 0x19, 0x1a, 0x0a, 0x52, 0xef, 0xf6, 0x9f, 0x24, 0x45,
+        0xdf, 0x4f, 0x9b, 0x17, 0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10};
+    static const uint8_t kCtrCounter[16] = {0xf0,
+                                            0xf1,
+                                            0xf2,
+                                            0xf3,
+                                            0xf4,
+                                            0xf5,
+                                            0xf6,
+                                            0xf7,
+                                            0xf8,
+                                            0xf9,
+                                            0xfa,
+                                            0xfb,
+                                            0xfc,
+                                            0xfd,
+                                            0xfe,
+                                            0xff};
+    static const uint8_t kCtrCipher[16] = {0x87,
+                                           0x4d,
+                                           0x61,
+                                           0x91,
+                                           0xb6,
+                                           0x20,
+                                           0xe3,
+                                           0x26,
+                                           0x1b,
+                                           0xef,
+                                           0x68,
+                                           0x64,
+                                           0x99,
+                                           0x0d,
+                                           0xb6,
+                                           0xce};
+    static const uint8_t kK1[16] = {0xfb,
+                                    0xee,
+                                    0xd6,
+                                    0x18,
+                                    0x35,
+                                    0x71,
+                                    0x33,
+                                    0x66,
+                                    0x7c,
+                                    0x85,
+                                    0xe0,
+                                    0x8f,
+                                    0x72,
+                                    0x36,
+                                    0xa8,
+                                    0xde};
+    static const uint8_t kK2[16] = {0xf7,
+                                    0xdd,
+                                    0xac,
+                                    0x30,
+                                    0x6a,
+                                    0xe2,
+                                    0x66,
+                                    0xcc,
+                                    0xf9,
+                                    0x0b,
+                                    0xc1,
+                                    0x1e,
+                                    0xe4,
+                                    0x6d,
+                                    0x51,
+                                    0x3b};
+    static const uint8_t kTags[4][16] = {{0xbb,
+                                          0x1d,
+                                          0x69,
+                                          0x29,
+                                          0xe9,
+                                          0x59,
+                                          0x37,
+                                          0x28,
+                                          0x7f,
+                                          0xa3,
+                                          0x7d,
+                                          0x12,
+                                          0x9b,
+                                          0x75,
+                                          0x67,
+                                          0x46},
+                                         {0x07,
+                                          0x0a,
+                                          0x16,
+                                          0xb4,
+                                          0x6b,
+                                          0x4d,
+                                          0x41,
+                                          0x44,
+                                          0xf7,
+                                          0x9b,
+                                          0xdd,
+                                          0x9d,
+                                          0xd0,
+                                          0x4a,
+                                          0x28,
+                                          0x7c},
+                                         {0xdf,
+                                          0xa6,
+                                          0x67,
+                                          0x47,
+                                          0xde,
+                                          0x9a,
+                                          0xe6,
+                                          0x30,
+                                          0x30,
+                                          0xca,
+                                          0x32,
+                                          0x61,
+                                          0x14,
+                                          0x97,
+                                          0xc8,
+                                          0x27},
+                                         {0x51,
+                                          0xf0,
+                                          0xbe,
+                                          0xbf,
+                                          0x7e,
+                                          0x3b,
+                                          0x9d,
+                                          0x92,
+                                          0xfc,
+                                          0x49,
+                                          0x74,
+                                          0x17,
+                                          0x79,
+                                          0x36,
+                                          0x3c,
+                                          0xfe}};
     static const uint8_t kTagLengths[4] = {0, 16, 40, 64};
 
     uint16_t failed = 0;
@@ -62,30 +218,43 @@ inline uint16_t selfTest() {
     aesExpandKey(aes, kFipsKey);
     memcpy(block, kFipsPlain, 16);
     aesEncrypt(aes, block);
-    if (memcmp(block, kFipsCipher, 16) != 0) failed |= 0x01;
+    if (memcmp(block, kFipsCipher, 16) != 0)
+        failed |= 0x01;
 
     aesExpandKey(aes, kKey);
     memcpy(block, kMessage, 16);
     ctrApply(aes, kCtrCounter, block, 16);
-    if (memcmp(block, kCtrCipher, 16) != 0) failed |= 0x02;
+    if (memcmp(block, kCtrCipher, 16) != 0)
+        failed |= 0x02;
 
     Cmac cmac;
     cmacInit(cmac, kKey);
-    if (memcmp(cmac.k1, kK1, 16) != 0 || memcmp(cmac.k2, kK2, 16) != 0) {
+    if (memcmp(cmac.k1, kK1, 16) != 0 || memcmp(cmac.k2, kK2, 16) != 0)
         failed |= 0x04;
-    }
     for (uint8_t i = 0; i < 4; ++i) {
         cmacCompute(cmac, kMessage, kTagLengths[i], block);
-        if (memcmp(block, kTags[i], 16) != 0) failed |= static_cast<uint16_t>(0x08 << i);
+        if (memcmp(block, kTags[i], 16) != 0)
+            failed |= static_cast<uint16_t>(0x08 << i);
     }
 
-    static const uint8_t kCcm1Key[16] = {
-        0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
-        0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f};
-    static const uint8_t kCcm1Nonce[7] = {
-        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16};
-    static const uint8_t kCcm1Aad[8] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
+    static const uint8_t kCcm1Key[16] = {0x40,
+                                         0x41,
+                                         0x42,
+                                         0x43,
+                                         0x44,
+                                         0x45,
+                                         0x46,
+                                         0x47,
+                                         0x48,
+                                         0x49,
+                                         0x4a,
+                                         0x4b,
+                                         0x4c,
+                                         0x4d,
+                                         0x4e,
+                                         0x4f};
+    static const uint8_t kCcm1Nonce[7] = {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16};
+    static const uint8_t kCcm1Aad[8] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
     static const uint8_t kCcm1Plain[4] = {0x20, 0x21, 0x22, 0x23};
     static const uint8_t kCcm1Cipher[4] = {0x71, 0x62, 0x01, 0x5b};
     static const uint8_t kCcm1Tag[4] = {0x4d, 0xac, 0x25, 0x5d};
@@ -93,35 +262,56 @@ inline uint16_t selfTest() {
     uint8_t ccmTag[8];
     aesExpandKey(aes, kCcm1Key);
     memcpy(ccmData, kCcm1Plain, sizeof(kCcm1Plain));
-    ccmSeal(aes, kCcm1Nonce, sizeof(kCcm1Nonce), kCcm1Aad, sizeof(kCcm1Aad),
-            ccmData, sizeof(kCcm1Plain), ccmTag, 4);
-    if (memcmp(ccmData, kCcm1Cipher, 4) != 0 || memcmp(ccmTag, kCcm1Tag, 4) != 0) {
+    ccmSeal(aes,
+            kCcm1Nonce,
+            sizeof(kCcm1Nonce),
+            kCcm1Aad,
+            sizeof(kCcm1Aad),
+            ccmData,
+            sizeof(kCcm1Plain),
+            ccmTag,
+            4);
+    if (memcmp(ccmData, kCcm1Cipher, 4) != 0 || memcmp(ccmTag, kCcm1Tag, 4) != 0)
         failed |= 0x80;
-    }
 
-    static const uint8_t kCcm2Key[16] = {
-        0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7,
-        0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf};
-    static const uint8_t kCcm2Nonce[13] = {
-        0x00, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00,
-        0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5};
-    static const uint8_t kCcm2Cipher[23] = {
-        0x58, 0x8c, 0x97, 0x9a, 0x61, 0xc6, 0x63, 0xd2,
-        0xf0, 0x66, 0xd0, 0xc2, 0xc0, 0xf9, 0x89, 0x80,
-        0x6d, 0x5f, 0x6b, 0x61, 0xda, 0xc3, 0x84};
-    static const uint8_t kCcm2Tag[8] = {
-        0x17, 0xe8, 0xd1, 0x2c, 0xfd, 0xf9, 0x26, 0xe0};
+    static const uint8_t kCcm2Key[16] = {0xc0,
+                                         0xc1,
+                                         0xc2,
+                                         0xc3,
+                                         0xc4,
+                                         0xc5,
+                                         0xc6,
+                                         0xc7,
+                                         0xc8,
+                                         0xc9,
+                                         0xca,
+                                         0xcb,
+                                         0xcc,
+                                         0xcd,
+                                         0xce,
+                                         0xcf};
+    static const uint8_t kCcm2Nonce[13] =
+        {0x00, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00, 0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5};
+    static const uint8_t kCcm2Cipher[23] = {0x58, 0x8c, 0x97, 0x9a, 0x61, 0xc6, 0x63, 0xd2,
+                                            0xf0, 0x66, 0xd0, 0xc2, 0xc0, 0xf9, 0x89, 0x80,
+                                            0x6d, 0x5f, 0x6b, 0x61, 0xda, 0xc3, 0x84};
+    static const uint8_t kCcm2Tag[8] = {0x17, 0xe8, 0xd1, 0x2c, 0xfd, 0xf9, 0x26, 0xe0};
     aesExpandKey(aes, kCcm2Key);
-    for (uint8_t i = 0; i < sizeof(ccmData); ++i) {
+    for (uint8_t i = 0; i < sizeof(ccmData); ++i)
         ccmData[i] = static_cast<uint8_t>(0x08 + i);
-    }
-    ccmSeal(aes, kCcm2Nonce, sizeof(kCcm2Nonce), kCcm1Aad, sizeof(kCcm1Aad),
-            ccmData, sizeof(ccmData), ccmTag, 8);
-    if (memcmp(ccmData, kCcm2Cipher, 23) != 0 || memcmp(ccmTag, kCcm2Tag, 8) != 0) {
+    ccmSeal(aes,
+            kCcm2Nonce,
+            sizeof(kCcm2Nonce),
+            kCcm1Aad,
+            sizeof(kCcm1Aad),
+            ccmData,
+            sizeof(ccmData),
+            ccmTag,
+            8);
+    if (memcmp(ccmData, kCcm2Cipher, 23) != 0 || memcmp(ccmTag, kCcm2Tag, 8) != 0)
         failed |= 0x100;
-    }
     return failed;
 }
 
-}  // namespace crypto
-}  // namespace osk
+} // namespace crypto
+} // namespace osk

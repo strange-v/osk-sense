@@ -17,14 +17,14 @@ enum class State : uint8_t {
 };
 
 void begin();
-void addRoutes(AsyncWebServer& server);
+void addRoutes(AsyncWebServer &server);
 void prepareForFilesystemUpdate();
 void recoverAfterFailedFilesystemUpdate();
-bool handlePageRequest(AsyncWebServerRequest* request);
+bool handlePageRequest(AsyncWebServerRequest *request);
 State state();
-const char* stateName();
-const char* version();
-const char* requiredFirmware();
-void sendRecoveryPage(AsyncWebServerRequest* request);
+const char *stateName();
+const char *version();
+const char *requiredFirmware();
+void sendRecoveryPage(AsyncWebServerRequest *request);
 
-}  // namespace gateway::web_ui
+} // namespace gateway::web_ui

@@ -29,7 +29,9 @@ describe('copyText', () => {
   })
 
   it('reports failure when the browser refuses to copy', () => {
-    stubCommand(() => { throw new Error('denied') })
+    stubCommand(() => {
+      throw new Error('denied')
+    })
     expect(copyText('secret')).toBe(false)
     expect(document.querySelector('textarea')).toBeNull()
   })

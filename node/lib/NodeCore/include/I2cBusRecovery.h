@@ -14,8 +14,7 @@ namespace node {
 //   void pullSdaLow();  void releaseSda();
 //   bool sclHigh();     bool sdaHigh();
 //   void halfPeriod();  // half an SCL period
-template <typename Bus>
-bool recoverI2cBus(Bus& bus) {
+template <typename Bus> bool recoverI2cBus(Bus &bus) {
     // A target finishes the byte it is sending in at most nine clocks: eight
     // data bits and the acknowledgement.
     static constexpr uint8_t kMaximumClocks = 9;
@@ -23,8 +22,7 @@ bool recoverI2cBus(Bus& bus) {
     bus.releaseSda();
     bus.releaseScl();
     bus.halfPeriod();
-    for (uint8_t clock = 0; clock < kMaximumClocks && !bus.sdaHigh();
-         ++clock) {
+    for (uint8_t clock = 0; clock < kMaximumClocks && !bus.sdaHigh(); ++clock) {
         bus.pullSclLow();
         bus.halfPeriod();
         bus.releaseScl();
@@ -43,5 +41,5 @@ bool recoverI2cBus(Bus& bus) {
     return bus.sclHigh() && bus.sdaHigh();
 }
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

@@ -12,35 +12,41 @@ namespace {
 using namespace radiosensors::gateway_storage;
 
 class NvsSlotStorage final : public SlotStorage {
-public:
-    NvsSlotStorage(const char* nameSpace, const char* slotA, const char* slotB)
-        : nameSpace_(nameSpace), keys_{slotA, slotB} {}
+  public:
+    NvsSlotStorage(const char *nameSpace, const char *slotA, const char *slotB)
+        : nameSpace_(nameSpace), keys_{slotA, slotB} {
+    }
 
-    bool begin() { return preferences_.begin(nameSpace_, false); }
+    bool begin() {
+        return preferences_.begin(nameSpace_, false);
+    }
 
     bool exists(uint8_t slot) override {
         return slot < 2 && preferences_.getBytesLength(keys_[slot]) != 0;
     }
 
-    bool read(uint8_t slot, uint8_t* output, size_t capacity, size_t& size) override {
+    bool read(uint8_t slot, uint8_t *output, size_t capacity, size_t &size) override {
         size = 0;
-        if (slot >= 2 || output == nullptr) return false;
+        if (slot >= 2 || output == nullptr)
+            return false;
         const size_t storedSize = preferences_.getBytesLength(keys_[slot]);
-        if (storedSize == 0 || storedSize > capacity) return false;
+        if (storedSize == 0 || storedSize > capacity)
+            return false;
         const size_t readSize = preferences_.getBytes(keys_[slot], output, storedSize);
-        if (readSize != storedSize) return false;
+        if (readSize != storedSize)
+            return false;
         size = readSize;
         return true;
     }
 
-    bool write(uint8_t slot, const uint8_t* data, size_t size) override {
+    bool write(uint8_t slot, const uint8_t *data, size_t size) override {
         return slot < 2 && data != nullptr &&
-            preferences_.putBytes(keys_[slot], data, size) == size;
+               preferences_.putBytes(keys_[slot], data, size) == size;
     }
 
-private:
-    const char* nameSpace_;
-    const char* keys_[2];
+  private:
+    const char *nameSpace_;
+    const char *keys_[2];
     Preferences preferences_;
 };
 
@@ -56,11 +62,15 @@ InstallationSecrets currentSecrets{};
 SemaphoreHandle_t mutex = nullptr;
 bool initialized = false;
 
-template<typename Model, typename Store>
-SaveStatus saveLocked(Store& store, Model& current, const Model& value,
-                      bool (*equal)(const Model&, const Model&)) {
-    if (equal(current, value)) return SaveStatus::NoChange;
-    if (!store.save(value)) return SaveStatus::StorageError;
+template <typename Model, typename Store>
+SaveStatus saveLocked(Store &store,
+                      Model &current,
+                      const Model &value,
+                      bool (*equal)(const Model &, const Model &)) {
+    if (equal(current, value))
+        return SaveStatus::NoChange;
+    if (!store.save(value))
+        return SaveStatus::StorageError;
     current = value;
     return SaveStatus::Ok;
 }
@@ -72,13 +82,14 @@ bool bootstrapSecrets() {
     // Give the record a usable network id from the very first boot: the
     // default struct is zero-filled, and zero would otherwise be reported by
     // /health and handed to the radio on a gateway that has not been set up.
-    do currentSecrets.operationalNetworkId = static_cast<uint8_t>(esp_random());
+    do
+        currentSecrets.operationalNetworkId = static_cast<uint8_t>(esp_random());
     while (currentSecrets.operationalNetworkId == 0);
 
     return secretStore.save(currentSecrets);
 }
 
-}  // namespace
+} // namespace
 
 bool begin() {
     mutex = xSemaphoreCreateMutex();
@@ -94,8 +105,7 @@ bool begin() {
     const LoadStatus settingsSource = settingsStore.load(currentSettings);
     const LoadStatus authSource = authStore.load(currentAuthentication);
     const LoadStatus secretSource = secretStore.load(currentSecrets);
-    if (settingsSource == LoadStatus::Corrupt ||
-        authSource == LoadStatus::Corrupt ||
+    if (settingsSource == LoadStatus::Corrupt || authSource == LoadStatus::Corrupt ||
         secretSource == LoadStatus::Corrupt) {
         Serial.println("Gateway storage contains data but no valid snapshot");
         return false;
@@ -106,18 +116,19 @@ bool begin() {
     }
 
     initialized = true;
-    Serial.printf(
-        "Gateway storage ready: settings=%lu/%s auth=%lu/%s secrets=%lu/%s\n",
-        static_cast<unsigned long>(settingsStore.generation()),
-        settingsSource == LoadStatus::Loaded ? "nvs" : "defaults",
-        static_cast<unsigned long>(authStore.generation()),
-        authSource == LoadStatus::Loaded ? "nvs" : "defaults",
-        static_cast<unsigned long>(secretStore.generation()),
-        secretSource == LoadStatus::Loaded ? "nvs" : "bootstrap");
+    Serial.printf("Gateway storage ready: settings=%lu/%s auth=%lu/%s secrets=%lu/%s\n",
+                  static_cast<unsigned long>(settingsStore.generation()),
+                  settingsSource == LoadStatus::Loaded ? "nvs" : "defaults",
+                  static_cast<unsigned long>(authStore.generation()),
+                  authSource == LoadStatus::Loaded ? "nvs" : "defaults",
+                  static_cast<unsigned long>(secretStore.generation()),
+                  secretSource == LoadStatus::Loaded ? "nvs" : "bootstrap");
     return true;
 }
 
-bool ready() { return initialized; }
+bool ready() {
+    return initialized;
+}
 
 GatewaySettings settings() {
     if (!initialized || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
@@ -144,29 +155,33 @@ InstallationSecrets secrets() {
 }
 
 uint32_t settingsGeneration() {
-    if (!initialized || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return 0;
+    if (!initialized || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
+        return 0;
     const uint32_t value = settingsStore.generation();
     xSemaphoreGive(mutex);
     return value;
 }
 
 uint32_t authenticationGeneration() {
-    if (!initialized || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return 0;
+    if (!initialized || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
+        return 0;
     const uint32_t value = authStore.generation();
     xSemaphoreGive(mutex);
     return value;
 }
 
 uint32_t secretsGeneration() {
-    if (!initialized || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return 0;
+    if (!initialized || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
+        return 0;
     const uint32_t value = secretStore.generation();
     xSemaphoreGive(mutex);
     return value;
 }
 
-SaveStatus saveSettings(const GatewaySettings& value) {
+SaveStatus saveSettings(const GatewaySettings &value) {
     recovery::Guard guard;
-    if (!guard || recovery::blocked() || !initialized) return SaveStatus::NotInitialized;
+    if (!guard || recovery::blocked() || !initialized)
+        return SaveStatus::NotInitialized;
     uint8_t encoded[kSettingsSnapshotSize]{};
     if (encodeSettings(value, 0, encoded, sizeof(encoded)) != CodecStatus::Ok)
         return SaveStatus::Invalid;
@@ -176,22 +191,24 @@ SaveStatus saveSettings(const GatewaySettings& value) {
     return result;
 }
 
-SaveStatus saveAuthentication(const AuthenticationData& value) {
+SaveStatus saveAuthentication(const AuthenticationData &value) {
     recovery::Guard guard;
-    if (!guard || recovery::blocked() || !initialized) return SaveStatus::NotInitialized;
+    if (!guard || recovery::blocked() || !initialized)
+        return SaveStatus::NotInitialized;
     uint8_t encoded[kAuthSnapshotSize]{};
     if (encodeAuthentication(value, 0, encoded, sizeof(encoded)) != CodecStatus::Ok)
         return SaveStatus::Invalid;
     xSemaphoreTake(mutex, portMAX_DELAY);
-    const SaveStatus result = saveLocked(
-        authStore, currentAuthentication, value, authenticationEqual);
+    const SaveStatus result =
+        saveLocked(authStore, currentAuthentication, value, authenticationEqual);
     xSemaphoreGive(mutex);
     return result;
 }
 
-SaveStatus saveSecrets(const InstallationSecrets& value) {
+SaveStatus saveSecrets(const InstallationSecrets &value) {
     recovery::Guard guard;
-    if (!guard || recovery::blocked() || !initialized) return SaveStatus::NotInitialized;
+    if (!guard || recovery::blocked() || !initialized)
+        return SaveStatus::NotInitialized;
     uint8_t encoded[kSecretsSnapshotSize]{};
     if (encodeSecrets(value, 0, encoded, sizeof(encoded)) != CodecStatus::Ok)
         return SaveStatus::Invalid;
@@ -208,4 +225,4 @@ SaveStatus saveSecrets(const InstallationSecrets& value) {
     return result;
 }
 
-}  // namespace gateway::configuration_store
+} // namespace gateway::configuration_store

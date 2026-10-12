@@ -20,7 +20,9 @@ export function storedLocale(): LocaleCode | null {
 }
 
 export function preferredLocale(): LocaleCode {
-  const browser = SUPPORTED_LOCALES.find((entry) => navigator.language.toLowerCase().startsWith(entry.code))
+  const browser = SUPPORTED_LOCALES.find((entry) =>
+    navigator.language.toLowerCase().startsWith(entry.code),
+  )
   return storedLocale() ?? browser?.code ?? 'en'
 }
 

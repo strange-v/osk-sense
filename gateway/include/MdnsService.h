@@ -5,4 +5,4 @@ namespace gateway::mdns_service {
 void begin();
 void loop();
 
-}  // namespace gateway::mdns_service
+} // namespace gateway::mdns_service

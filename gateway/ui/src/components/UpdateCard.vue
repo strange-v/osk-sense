@@ -50,60 +50,128 @@ async function check() {
   try {
     status.value = await api.checkUpdate()
     await follow()
-  } catch (error) { failure.value = errorCode(error) }
+  } catch (error) {
+    failure.value = errorCode(error)
+  }
 }
 
 async function install() {
   failure.value = ''
   let previousBootId = ''
-  try { previousBootId = (await api.probe()).boot_id } catch { /* any answer then counts as back */ }
+  try {
+    previousBootId = (await api.probe()).boot_id
+  } catch {
+    /* any answer then counts as back */
+  }
   try {
     status.value = await api.installUpdate()
     await follow(previousBootId)
-  } catch (error) { failure.value = errorCode(error) }
+  } catch (error) {
+    failure.value = errorCode(error)
+  }
 }
 
 onMounted(async () => {
   try {
     status.value = await api.poll.update()
     await follow()
-  } catch (error) { failure.value = errorCode(error) }
+  } catch (error) {
+    failure.value = errorCode(error)
+  }
 })
-onBeforeUnmount(() => { active = false })
+onBeforeUnmount(() => {
+  active = false
+})
 </script>
 
 <template>
   <section class="panel admin-card">
     <header class="panel-heading">
-      <div><h2>{{ $t('update.title') }}</h2><p>{{ $t('update.intro') }}</p></div>
+      <div>
+        <h2>{{ $t('update.title') }}</h2>
+        <p>{{ $t('update.intro') }}</p>
+      </div>
     </header>
     <dl class="simple-details">
-      <div><dt>{{ $t('update.installed') }}</dt><dd>{{ status?.current_version ?? '—' }}</dd></div>
+      <div>
+        <dt>{{ $t('update.installed') }}</dt>
+        <dd>{{ status?.current_version ?? '—' }}</dd>
+      </div>
     </dl>
-    <p v-if="status?.pending_verify" class="update-hint">{{ $t('update.onTrial') }}</p>
+    <p
+      v-if="status?.pending_verify"
+      class="update-hint"
+    >
+      {{ $t('update.onTrial') }}
+    </p>
 
-    <div v-if="restarting" class="panel-message">
+    <div
+      v-if="restarting"
+      class="panel-message"
+    >
       <span class="loader"></span>
       <strong>{{ $t('update.restarting') }}</strong>
       <p>{{ $t('update.restartingHint') }}</p>
     </div>
     <template v-else-if="status?.state === 'installing'">
-      <progress class="update-progress" max="100" :value="status.progress"></progress>
+      <progress
+        class="update-progress"
+        max="100"
+        :value="status.progress"
+      ></progress>
       <p role="status">{{ $t('update.installing', { progress: status.progress }) }}</p>
     </template>
     <template v-else>
-      <div v-if="failure" class="notice error" role="alert">{{ $t(`error.${failure}`) }}</div>
-      <div v-else-if="status?.state === 'failed'" class="notice error" role="alert">{{ $t('update.failed', { reason: reason(status.error) }) }}</div>
-      <div v-else-if="status?.state === 'up_to_date'" class="notice success" role="status">{{ $t('update.upToDate') }}</div>
+      <div
+        v-if="failure"
+        class="notice error"
+        role="alert"
+      >
+        {{ $t(`error.${failure}`) }}
+      </div>
+      <div
+        v-else-if="status?.state === 'failed'"
+        class="notice error"
+        role="alert"
+      >
+        {{ $t('update.failed', { reason: reason(status.error) }) }}
+      </div>
+      <div
+        v-else-if="status?.state === 'up_to_date'"
+        class="notice success"
+        role="status"
+      >
+        {{ $t('update.upToDate') }}
+      </div>
       <template v-if="status?.state === 'available'">
-        <div class="notice success" role="status">
+        <div
+          class="notice success"
+          role="status"
+        >
           {{ $t('update.available', { version: status.available_version }) }}
-          <a :href="RELEASES + status.available_version" target="_blank" rel="noopener">{{ $t('update.notes') }}</a>
+          <a
+            :href="RELEASES + status.available_version"
+            target="_blank"
+            rel="noopener"
+            >{{ $t('update.notes') }}</a
+          >
         </div>
         <p class="update-hint">{{ $t('update.installHint') }}</p>
-        <button class="button primary" type="button" @click="install">{{ $t('update.install') }}</button>
+        <button
+          class="button primary"
+          type="button"
+          @click="install"
+        >
+          {{ $t('update.install') }}
+        </button>
       </template>
-      <button v-else class="button secondary" type="button" :disabled="status?.state === 'checking'" @click="check">
+      <button
+        v-else
+        class="button secondary"
+        type="button"
+        :disabled="status?.state === 'checking'"
+        @click="check"
+      >
         {{ status?.state === 'checking' ? $t('update.checking') : $t('update.check') }}
       </button>
     </template>

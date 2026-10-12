@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import type { GatewayUser } from '../api/types'
-import { canAddUser, isLastEnabledAdmin, isValidPassword, isValidUsername, userDraftError } from './users'
+import {
+  canAddUser,
+  isLastEnabledAdmin,
+  isValidPassword,
+  isValidUsername,
+  userDraftError,
+} from './users'
 
-const user = (over: Partial<GatewayUser> & { id: number }): GatewayUser =>
-  ({ username: `u${over.id}`, role: 'viewer', enabled: true, ...over })
+const user = (over: Partial<GatewayUser> & { id: number }): GatewayUser => ({
+  username: `u${over.id}`,
+  role: 'viewer',
+  enabled: true,
+  ...over,
+})
 
 const admin = user({ id: 1, username: 'admin', role: 'admin' })
 const viewer = user({ id: 2, username: 'viewer' })
@@ -15,7 +25,15 @@ describe('isValidUsername', () => {
     }
   })
   it('rejects anything outside 1..32 lowercase ASCII, digits, . _ -', () => {
-    for (const name of ['', 'a'.repeat(33), 'Admin', 'user name', 'user@host', 'кирилиця', 'user+1']) {
+    for (const name of [
+      '',
+      'a'.repeat(33),
+      'Admin',
+      'user name',
+      'user@host',
+      'кирилиця',
+      'user+1',
+    ]) {
       expect(isValidUsername(name)).toBe(false)
     }
   })
@@ -32,10 +50,10 @@ describe('isValidPassword', () => {
   // Cyrillic is two bytes per character, so character count misleads in both
   // directions -- which is the whole reason this is measured in bytes.
   it('measures UTF-8 bytes rather than characters', () => {
-    expect(isValidPassword('при')).toBe(false)      // 3 chars, 6 bytes: too short
-    expect(isValidPassword('парол')).toBe(true)     // 5 chars, 10 bytes: long enough
-    expect(isValidPassword('я'.repeat(64))).toBe(true)   // 64 chars, 128 bytes
-    expect(isValidPassword('я'.repeat(65))).toBe(false)  // 65 chars, 130 bytes
+    expect(isValidPassword('при')).toBe(false) // 3 chars, 6 bytes: too short
+    expect(isValidPassword('парол')).toBe(true) // 5 chars, 10 bytes: long enough
+    expect(isValidPassword('я'.repeat(64))).toBe(true) // 64 chars, 128 bytes
+    expect(isValidPassword('я'.repeat(65))).toBe(false) // 65 chars, 130 bytes
   })
 })
 
@@ -66,29 +84,62 @@ describe('canAddUser', () => {
 })
 
 describe('userDraftError', () => {
-  const draft = (over: Partial<Parameters<typeof userDraftError>[0]> = {}) =>
-    ({ username: 'newuser', password: 'password1', role: 'viewer' as const, enabled: true, ...over })
+  const draft = (over: Partial<Parameters<typeof userDraftError>[0]> = {}) => ({
+    username: 'newuser',
+    password: 'password1',
+    role: 'viewer' as const,
+    enabled: true,
+    ...over,
+  })
 
   it('accepts a valid new user', () => {
     expect(userDraftError(draft(), [admin])).toBe('')
   })
   it('rejects a duplicate username, but not the name the record already has', () => {
     expect(userDraftError(draft({ username: 'admin' }), [admin, viewer])).toBe('username_taken')
-    expect(userDraftError(draft({ username: 'admin', password: '', role: 'admin' }), [admin, viewer], admin)).toBe('')
+    expect(
+      userDraftError(
+        draft({ username: 'admin', password: '', role: 'admin' }),
+        [admin, viewer],
+        admin,
+      ),
+    ).toBe('')
   })
   it('requires a password when adding and not when editing', () => {
     expect(userDraftError(draft({ password: '' }), [admin])).toBe('invalid_password')
-    expect(userDraftError(draft({ username: 'viewer', password: '' }), [admin, viewer], viewer)).toBe('')
+    expect(
+      userDraftError(draft({ username: 'viewer', password: '' }), [admin, viewer], viewer),
+    ).toBe('')
   })
   it('validates a password that was typed during an edit', () => {
-    expect(userDraftError(draft({ username: 'viewer', password: 'short' }), [admin, viewer], viewer)).toBe('invalid_password')
+    expect(
+      userDraftError(draft({ username: 'viewer', password: 'short' }), [admin, viewer], viewer),
+    ).toBe('invalid_password')
   })
   it('refuses to demote or disable the last enabled admin', () => {
-    expect(userDraftError(draft({ username: 'admin', password: '', role: 'viewer' }), [admin, viewer], admin)).toBe('last_admin_required')
-    expect(userDraftError(draft({ username: 'admin', password: '', role: 'admin', enabled: false }), [admin, viewer], admin)).toBe('last_admin_required')
+    expect(
+      userDraftError(
+        draft({ username: 'admin', password: '', role: 'viewer' }),
+        [admin, viewer],
+        admin,
+      ),
+    ).toBe('last_admin_required')
+    expect(
+      userDraftError(
+        draft({ username: 'admin', password: '', role: 'admin', enabled: false }),
+        [admin, viewer],
+        admin,
+      ),
+    ).toBe('last_admin_required')
   })
   it('allows demoting an admin while another enabled admin remains', () => {
     const second = user({ id: 3, username: 'admin2', role: 'admin' })
-    expect(userDraftError(draft({ username: 'admin', password: '', role: 'viewer' }), [admin, second], admin)).toBe('')
+    expect(
+      userDraftError(
+        draft({ username: 'admin', password: '', role: 'viewer' }),
+        [admin, second],
+        admin,
+      ),
+    ).toBe('')
   })
 })

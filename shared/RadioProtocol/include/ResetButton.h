@@ -7,7 +7,7 @@ namespace radiosensors {
 // Feed debounced levels. A reset needs a 10-second hold, a release, and a
 // second press within 5 seconds; a short press acts on release.
 class ResetButton {
-public:
+  public:
     enum class Action { None, ShortPress, ConfirmReset };
 
     static constexpr uint32_t kShortPressMs = 1000;
@@ -15,9 +15,8 @@ public:
     static constexpr uint32_t kConfirmWindowMs = 5000;
 
     Action update(const bool pressed, const uint32_t now) {
-        if (waiting_ && static_cast<uint32_t>(now - releasedAt_) >= kConfirmWindowMs) {
+        if (waiting_ && static_cast<uint32_t>(now - releasedAt_) >= kConfirmWindowMs)
             waiting_ = false;
-        }
         if (pressed != pressed_) {
             pressed_ = pressed;
             if (pressed) {
@@ -39,20 +38,24 @@ public:
                 return Action::ShortPress;
             }
         }
-        if (pressed_ && !suppressRelease_ &&
-            static_cast<uint32_t>(now - pressedAt_) >= kHoldMs) {
+        if (pressed_ && !suppressRelease_ && static_cast<uint32_t>(now - pressedAt_) >= kHoldMs)
             armed_ = true;
-        }
         return Action::None;
     }
 
-    bool confirming() const { return armed_ || waiting_; }
+    bool confirming() const {
+        return armed_ || waiting_;
+    }
     // Held long enough; the release is still pending.
-    bool armed() const { return armed_; }
+    bool armed() const {
+        return armed_;
+    }
     // Released after the hold; the confirming press is awaited.
-    bool waiting() const { return waiting_; }
+    bool waiting() const {
+        return waiting_;
+    }
 
-private:
+  private:
     bool pressed_ = false;
     bool armed_ = false;
     bool waiting_ = false;
@@ -61,4 +64,4 @@ private:
     uint32_t releasedAt_ = 0;
 };
 
-}  // namespace radiosensors
+} // namespace radiosensors

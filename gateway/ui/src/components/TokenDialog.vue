@@ -19,7 +19,9 @@ const failure = ref('')
 const problem = computed(() => tokenDraftError(draft, props.tokens))
 // The gateway accepts duplicate names, so this is a warning, not a block --
 // but two identical rows in the list are impossible to tell apart later.
-const duplicate = computed(() => draft.name !== '' && findTokenNamed(props.tokens, draft.name) !== undefined)
+const duplicate = computed(
+  () => draft.name !== '' && findTokenNamed(props.tokens, draft.name) !== undefined,
+)
 
 async function create() {
   if (problem.value) return
@@ -36,23 +38,58 @@ async function create() {
 </script>
 
 <template>
-  <Modal :title="$t('tokens.addTitle')" @close="emit('close')">
+  <Modal
+    :title="$t('tokens.addTitle')"
+    @close="emit('close')"
+  >
     <div class="form-stack">
       <label>
         <span>{{ $t('tokens.name') }}</span>
-        <input v-model.trim="draft.name" :maxlength="TOKEN_NAME_MAX_BYTES" autocapitalize="none" autocomplete="off" spellcheck="false">
+        <input
+          v-model.trim="draft.name"
+          :maxlength="TOKEN_NAME_MAX_BYTES"
+          autocapitalize="none"
+          autocomplete="off"
+          spellcheck="false"
+        />
         <small>{{ $t('tokens.nameHint') }}</small>
       </label>
 
       <p class="scope-note">{{ $t('tokens.grantNote') }}</p>
 
-      <div v-if="problem" class="notice">{{ $t(`tokens.problem.${problem}`) }}</div>
-      <div v-else-if="duplicate" class="notice">{{ $t('tokens.duplicateName') }}</div>
-      <div v-if="failure" class="notice error">{{ $t(`error.${failure}`) }}</div>
+      <div
+        v-if="problem"
+        class="notice"
+      >
+        {{ $t(`tokens.problem.${problem}`) }}
+      </div>
+      <div
+        v-else-if="duplicate"
+        class="notice"
+      >
+        {{ $t('tokens.duplicateName') }}
+      </div>
+      <div
+        v-if="failure"
+        class="notice error"
+      >
+        {{ $t(`error.${failure}`) }}
+      </div>
 
       <div class="modal-actions">
-        <button class="button secondary" type="button" @click="emit('close')">{{ $t('common.cancel') }}</button>
-        <button class="button primary" :disabled="busy || problem !== ''" type="button" @click="create">
+        <button
+          class="button secondary"
+          type="button"
+          @click="emit('close')"
+        >
+          {{ $t('common.cancel') }}
+        </button>
+        <button
+          class="button primary"
+          :disabled="busy || problem !== ''"
+          type="button"
+          @click="create"
+        >
           {{ busy ? $t('tokens.creating') : $t('tokens.create') }}
         </button>
       </div>
@@ -61,5 +98,9 @@ async function create() {
 </template>
 
 <style scoped>
-.scope-note { margin: 0; color: var(--ink-soft); font-size: var(--text-sm); }
+.scope-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
 </style>

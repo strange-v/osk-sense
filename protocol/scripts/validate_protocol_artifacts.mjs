@@ -18,9 +18,24 @@ assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema')
 const integerTypes = {
   uint8: { bytes: 1, min: 0, max: 0xff, read: (buffer, offset) => buffer.readUInt8(offset) },
   int8: { bytes: 1, min: -0x80, max: 0x7f, read: (buffer, offset) => buffer.readInt8(offset) },
-  int16_le: { bytes: 2, min: -0x8000, max: 0x7fff, read: (buffer, offset) => buffer.readInt16LE(offset) },
-  uint16_le: { bytes: 2, min: 0, max: 0xffff, read: (buffer, offset) => buffer.readUInt16LE(offset) },
-  uint32_le: { bytes: 4, min: 0, max: 0xffffffff, read: (buffer, offset) => buffer.readUInt32LE(offset) },
+  int16_le: {
+    bytes: 2,
+    min: -0x8000,
+    max: 0x7fff,
+    read: (buffer, offset) => buffer.readInt16LE(offset),
+  },
+  uint16_le: {
+    bytes: 2,
+    min: 0,
+    max: 0xffff,
+    read: (buffer, offset) => buffer.readUInt16LE(offset),
+  },
+  uint32_le: {
+    bytes: 4,
+    min: 0,
+    max: 0xffffffff,
+    read: (buffer, offset) => buffer.readUInt32LE(offset),
+  },
   uint64_le: {
     bytes: 8,
     min: 0n,
@@ -59,7 +74,10 @@ function validateField(field) {
   assert(type, `unsupported encoding ${field.encoding}`)
   let usedBits = 0
   for (const bit of field.bits ?? []) {
-    assert(type.min === 0 && bit.mask <= type.max, `${field.name}.${bit.name} mask exceeds its type`)
+    assert(
+      type.min === 0 && bit.mask <= type.max,
+      `${field.name}.${bit.name} mask exceeds its type`,
+    )
     assert((usedBits & bit.mask) === 0, `${field.name}.${bit.name} overlaps another bit field`)
     usedBits |= bit.mask
   }
@@ -68,8 +86,10 @@ function validateField(field) {
   }
   if (field.valid_raw) {
     assert(field.valid_raw.min <= field.valid_raw.max, `${field.name} has an inverted range`)
-    assert(field.valid_raw.min >= type.min && field.valid_raw.max <= type.max,
-      `${field.name} range exceeds its type`)
+    assert(
+      field.valid_raw.min >= type.min && field.valid_raw.max <= type.max,
+      `${field.name} range exceeds its type`,
+    )
   }
   const sentinel = typeSentinel(field)
   if (sentinel !== undefined) {
@@ -79,13 +99,16 @@ function validateField(field) {
 
 function validateLayout(fields, size, reservedPrefix = 0) {
   const occupied = new Set(Array.from({ length: reservedPrefix }, (_, index) => index))
-  unique(fields.flatMap((field) => field.bits ? [field.name, ...field.bits.map((bit) => bit.name)] : [field.name]),
-    'field names')
+  unique(
+    fields.flatMap((field) =>
+      field.bits ? [field.name, ...field.bits.map((bit) => bit.name)] : [field.name],
+    ),
+    'field names',
+  )
   for (const field of fields) {
     validateField(field)
-    const length = field.encoding === 'bytes' && field.length_from !== undefined
-      ? 0
-      : byteLength(field)
+    const length =
+      field.encoding === 'bytes' && field.length_from !== undefined ? 0 : byteLength(field)
     assert(field.offset + length <= size, `${field.name} exceeds frame size`)
     for (let offset = field.offset; offset < field.offset + length; ++offset) {
       assert(!occupied.has(offset), `${field.name} overlaps byte ${offset}`)
@@ -109,18 +132,24 @@ function readField(buffer, field, decodedByName) {
 
 function fieldValue(raw, field) {
   if (raw === typeSentinel(field)) return null
-  if (field.allowed_raw) assert(field.allowed_raw.includes(raw), `${field.name} has an invalid value`)
+  if (field.allowed_raw)
+    assert(field.allowed_raw.includes(raw), `${field.name} has an invalid value`)
   if (field.valid_raw) {
-    assert(raw >= field.valid_raw.min && raw <= field.valid_raw.max,
-      `${field.name} is outside its valid range`)
+    assert(
+      raw >= field.valid_raw.min && raw <= field.valid_raw.max,
+      `${field.name} is outside its valid range`,
+    )
   }
-  return field.scale ? raw * field.scale.numerator / field.scale.denominator : raw
+  return field.scale ? (raw * field.scale.numerator) / field.scale.denominator : raw
 }
 
 const telemetry = manifest.telemetry
 const profiles = new Map(telemetry.profiles.map((profile) => [profile.id, profile]))
 unique([...profiles.keys()], 'profile IDs')
-unique(telemetry.profiles.map((profile) => profile.name), 'profile names')
+unique(
+  telemetry.profiles.map((profile) => profile.name),
+  'profile names',
+)
 const telemetrySemantics = new Map()
 for (const profile of telemetry.profiles) {
   const fields = [...telemetry.common_fields, ...profile.fields]
@@ -178,36 +207,62 @@ for (const vector of vectors.invalid_telemetry) {
   assert.throws(() => decodeTelemetry(vector), { message: vector.error }, vector.name)
 }
 for (const profile of telemetry.profiles) {
-  assert(vectors.telemetry.some((vector) => vector.profile_id === profile.id),
-    `profile ${profile.id} has no golden vector`)
+  assert(
+    vectors.telemetry.some((vector) => vector.profile_id === profile.id),
+    `profile ${profile.id} has no golden vector`,
+  )
 }
 
 const frameKinds = new Map(manifest.radio.frame_kinds.map((kind) => [kind.name, kind]))
 const ackFlags = manifest.radio.telemetry_ack_flags
-unique(ackFlags.map((flag) => flag.mask), 'telemetry ACK flag masks')
-unique(ackFlags.map((flag) => flag.name), 'telemetry ACK flag names')
+unique(
+  ackFlags.map((flag) => flag.mask),
+  'telemetry ACK flag masks',
+)
+unique(
+  ackFlags.map((flag) => flag.name),
+  'telemetry ACK flag names',
+)
 
 const commands = manifest.commands
 assert.equal(commands.command.header, frameKinds.get('command').header)
 assert.equal(commands.result.header, frameKinds.get('command_result').header)
-unique(commands.statuses.map((status) => status.value), 'command status values')
-unique(commands.statuses.map((status) => status.name), 'command status names')
+unique(
+  commands.statuses.map((status) => status.value),
+  'command status values',
+)
+unique(
+  commands.statuses.map((status) => status.name),
+  'command status names',
+)
 const appliedStatus = commands.statuses.find((status) => status.name === 'applied')
 assert(appliedStatus, 'command statuses must define applied')
 const commandTypes = new Map(commands.types.map((type) => [type.type, type]))
 unique([...commandTypes.keys()], 'command types')
-unique(commands.types.map((type) => type.name), 'command type names')
+unique(
+  commands.types.map((type) => type.name),
+  'command type names',
+)
 
 const layoutSize = (fields) => fields.reduce((size, field) => size + byteLength(field), 0)
 for (const frame of [commands.command, commands.result]) {
   validateLayout(frame.fields, commands.envelope_size, 1)
-  assert.equal(layoutSize(frame.fields) + 1, commands.envelope_size,
-    'command envelope fields must fill the envelope')
+  assert.equal(
+    layoutSize(frame.fields) + 1,
+    commands.envelope_size,
+    'command envelope fields must fill the envelope',
+  )
 }
 for (const type of commands.types) {
-  for (const [frame, fields] of [[commands.command, type.arguments], [commands.result, type.result]]) {
+  for (const [frame, fields] of [
+    [commands.command, type.arguments],
+    [commands.result, type.result],
+  ]) {
     for (const field of fields) {
-      assert(field.offset >= commands.envelope_size, `${type.name}.${field.name} overlaps the envelope`)
+      assert(
+        field.offset >= commands.envelope_size,
+        `${type.name}.${field.name} overlaps the envelope`,
+      )
     }
     validateLayout([...frame.fields, ...fields], commands.envelope_size + layoutSize(fields), 1)
   }
@@ -235,12 +290,17 @@ function decodeCommandFrame(vector) {
     assert.equal(decoded.command_type, type.type, `${vector.name} has the wrong command type`)
     payload = type.arguments
   } else {
-    assert(commands.statuses.some((status) => status.value === decoded.status),
-      `${vector.name} has an unknown status`)
+    assert(
+      commands.statuses.some((status) => status.value === decoded.status),
+      `${vector.name} has an unknown status`,
+    )
     payload = decoded.status === appliedStatus.value ? type.result : []
   }
-  assert.equal(buffer.length, commands.envelope_size + layoutSize(payload),
-    `${vector.name} has the wrong size`)
+  assert.equal(
+    buffer.length,
+    commands.envelope_size + layoutSize(payload),
+    `${vector.name} has the wrong size`,
+  )
   for (const field of payload) {
     decoded[field.name] = readField(buffer, field, decoded)
     fieldValue(decoded[field.name], field)
@@ -253,16 +313,22 @@ for (const vector of vectors.commands) {
 }
 for (const type of commands.types) {
   for (const frame of ['command', 'command_result']) {
-    assert(vectors.commands.some((vector) =>
-      vector.command_type === type.type && vector.frame === frame),
-    `${type.name} has no golden ${frame} vector`)
+    assert(
+      vectors.commands.some(
+        (vector) => vector.command_type === type.type && vector.frame === frame,
+      ),
+      `${type.name} has no golden ${frame} vector`,
+    )
   }
 }
 
 const stream = manifest.gateway_stream
 const messages = new Map(stream.messages.map((message) => [message.kind, message]))
 unique([...messages.keys()], 'stream message kinds')
-unique(stream.messages.map((message) => message.name), 'stream message names')
+unique(
+  stream.messages.map((message) => message.name),
+  'stream message names',
+)
 for (const message of stream.messages) {
   const minimumSize = message.size.fixed ?? message.size.base
   validateLayout([...stream.common_fields, ...message.fields], minimumSize)
@@ -287,8 +353,12 @@ for (const vector of vectors.gateway_stream) {
   assert.deepEqual(decodeStream(vector), vector.decoded, vector.name)
 }
 for (const message of stream.messages) {
-  assert(vectors.gateway_stream.some((vector) => vector.message === message.name),
-    `${message.name} has no golden vector`)
+  assert(
+    vectors.gateway_stream.some((vector) => vector.message === message.name),
+    `${message.name} has no golden vector`,
+  )
 }
 
-console.log(`Validated ${profiles.size} profiles, ${vectors.telemetry.length} telemetry vectors, ${commandTypes.size} command types, and ${messages.size} stream messages.`)
+console.log(
+  `Validated ${profiles.size} profiles, ${vectors.telemetry.length} telemetry vectors, ${commandTypes.size} command types, and ${messages.size} stream messages.`,
+)

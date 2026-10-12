@@ -24,10 +24,8 @@ uint32_t settingsGeneration();
 uint32_t authenticationGeneration();
 uint32_t secretsGeneration();
 
-SaveStatus saveSettings(const radiosensors::gateway_storage::GatewaySettings& value);
-SaveStatus saveAuthentication(
-    const radiosensors::gateway_storage::AuthenticationData& value);
-SaveStatus saveSecrets(
-    const radiosensors::gateway_storage::InstallationSecrets& value);
+SaveStatus saveSettings(const radiosensors::gateway_storage::GatewaySettings &value);
+SaveStatus saveAuthentication(const radiosensors::gateway_storage::AuthenticationData &value);
+SaveStatus saveSecrets(const radiosensors::gateway_storage::InstallationSecrets &value);
 
-}  // namespace gateway::configuration_store
+} // namespace gateway::configuration_store

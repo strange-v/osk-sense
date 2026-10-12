@@ -1,8 +1,13 @@
 /* Element-level defaults: reset, typography scale, form controls, focus.
    Nothing here is tied to a particular screen. */
 
-* { box-sizing: border-box; }
-html { min-width: 320px; background: var(--bg); }
+* {
+  box-sizing: border-box;
+}
+html {
+  min-width: 320px;
+  background: var(--bg);
+}
 body {
   margin: 0;
   min-height: 100vh;
@@ -14,25 +19,58 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3 { margin: 0; color: var(--ink); font-weight: 600; line-height: 1.25; }
-h1 { font-size: var(--text-2xl); letter-spacing: -.02em; }
-h2 { font-size: var(--text-lg); }
-h3 { font-size: var(--text-md); }
-p { margin: 0; }
-small { font-size: var(--text-xs); }
-a { color: var(--primary); }
+h1,
+h2,
+h3 {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.25;
+}
+h1 {
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+}
+h2 {
+  font-size: var(--text-lg);
+}
+h3 {
+  font-size: var(--text-md);
+}
+p {
+  margin: 0;
+}
+small {
+  font-size: var(--text-xs);
+}
+a {
+  color: var(--primary);
+}
 
-button, input, textarea, select { font: inherit; color: inherit; }
-button, a { -webkit-tap-highlight-color: transparent; }
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* The default focus treatment, for controls that have no border of their own
    to speak with -- buttons, links, checkboxes. Anything already drawn as a box
    (fields, selects, nav items) overrides this below and shifts a colour it
    already has instead: an outline offset outside a bordered field reads as a
    second, detached box around the first. */
-:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 
-input, textarea {
+input,
+textarea {
   width: 100%;
   min-height: 38px;
   padding: var(--space-2) var(--space-3);
@@ -43,12 +81,31 @@ input, textarea {
   background: var(--bg);
   transition: border-color var(--transition);
 }
-textarea { min-height: 80px; padding-top: var(--space-2); resize: vertical; }
-input::placeholder, textarea::placeholder { color: var(--muted); }
+textarea {
+  min-height: 80px;
+  padding-top: var(--space-2);
+  resize: vertical;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
 /* The field's own border is the focus indicator. */
-input:focus, textarea:focus { border-color: var(--primary); }
-input:focus-visible, textarea:focus-visible, .select:focus-visible { outline: none; border-color: var(--primary); }
-input[type="checkbox"] { width: 16px; min-height: 16px; accent-color: var(--primary); }
+input:focus,
+textarea:focus {
+  border-color: var(--primary);
+}
+input:focus-visible,
+textarea:focus-visible,
+.select:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+}
+input[type='checkbox'] {
+  width: 16px;
+  min-height: 16px;
+  accent-color: var(--primary);
+}
 
 /* The arrow is drawn here rather than by the browser. The native one sits hard
    against the right border and padding does not move it -- the browser places
@@ -78,7 +135,10 @@ input[type="checkbox"] { width: 16px; min-height: 16px; accent-color: var(--prim
   cursor: pointer;
   transition: border-color var(--transition);
 }
-.select:hover, .select:focus { border-color: var(--primary); }
+.select:hover,
+.select:focus {
+  border-color: var(--primary);
+}
 .select.compact {
   width: auto;
   min-height: 32px;
@@ -88,8 +148,13 @@ input[type="checkbox"] { width: 16px; min-height: 16px; accent-color: var(--prim
   font-size: var(--text-sm);
 }
 
-details summary { cursor: pointer; }
+details summary {
+  cursor: pointer;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

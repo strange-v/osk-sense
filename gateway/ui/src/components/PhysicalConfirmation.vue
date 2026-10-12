@@ -8,14 +8,28 @@ import { countdown } from '../utils/format'
 const ENDING_SECONDS = 30
 
 const props = defineProps<{ status: SetupStatus | null }>()
-const open = computed(() => Boolean(props.status?.physical_window_active && !props.status.recovery_required))
+const open = computed(() =>
+  Boolean(props.status?.physical_window_active && !props.status.recovery_required),
+)
 const remaining = computed(() => props.status?.remaining_seconds ?? 0)
 </script>
 
 <template>
-  <div class="physical-status" :class="{ open, ending: open && remaining <= ENDING_SECONDS }">
-    <span class="pulse" aria-hidden="true"></span>
-    <div v-if="open"><strong>{{ $t('setup.physicalOpenTitle') }}</strong><p>{{ $t('setup.physicalOpen', { time: countdown(remaining) }) }}</p></div>
-    <div v-else><strong>{{ $t('setup.physicalTitle') }}</strong><p>{{ $t('setup.physicalClosed') }}</p></div>
+  <div
+    class="physical-status"
+    :class="{ open, ending: open && remaining <= ENDING_SECONDS }"
+  >
+    <span
+      class="pulse"
+      aria-hidden="true"
+    ></span>
+    <div v-if="open">
+      <strong>{{ $t('setup.physicalOpenTitle') }}</strong>
+      <p>{{ $t('setup.physicalOpen', { time: countdown(remaining) }) }}</p>
+    </div>
+    <div v-else>
+      <strong>{{ $t('setup.physicalTitle') }}</strong>
+      <p>{{ $t('setup.physicalClosed') }}</p>
+    </div>
   </div>
 </template>

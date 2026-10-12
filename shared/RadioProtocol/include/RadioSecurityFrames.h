@@ -40,21 +40,41 @@ struct JoinAccept {
 };
 
 // These functions authenticate before decoding and leave output unchanged on failure.
-bool sealJoinRequest(const osk::crypto::Cmac& factoryMac, Transport transport,
-                     const JoinRequest& value, uint8_t* output, size_t capacity);
-bool openJoinRequest(const osk::crypto::Cmac& factoryMac, Transport transport,
-                     const uint8_t* wire, size_t size, JoinRequest& value);
-bool sealJoinAccept(const osk::crypto::Cmac& factoryMac, Transport transport,
-                    const JoinAccept& value, uint8_t* output, size_t capacity);
-bool openJoinAccept(const osk::crypto::Cmac& factoryMac, Transport transport,
-                    const uint8_t* wire, size_t size, JoinAccept& value);
+bool sealJoinRequest(const osk::crypto::Cmac &factoryMac,
+                     Transport transport,
+                     const JoinRequest &value,
+                     uint8_t *output,
+                     size_t capacity);
+bool openJoinRequest(const osk::crypto::Cmac &factoryMac,
+                     Transport transport,
+                     const uint8_t *wire,
+                     size_t size,
+                     JoinRequest &value);
+bool sealJoinAccept(const osk::crypto::Cmac &factoryMac,
+                    Transport transport,
+                    const JoinAccept &value,
+                    uint8_t *output,
+                    size_t capacity);
+bool openJoinAccept(const osk::crypto::Cmac &factoryMac,
+                    Transport transport,
+                    const uint8_t *wire,
+                    size_t size,
+                    JoinAccept &value);
 // Salt participates in the MAC but is not transmitted in confirm or complete.
-bool sealJoinProof(const osk::crypto::Cmac& sessionMac, Transport transport,
-                   const JoinIdentity& value, const uint8_t (&salt)[kSaltSize],
-                   bool complete, uint8_t* output, size_t capacity);
-bool openJoinProof(const osk::crypto::Cmac& sessionMac, Transport transport,
-                   const uint8_t* wire, size_t size, const uint8_t (&salt)[kSaltSize],
-                   bool complete, JoinIdentity& value);
+bool sealJoinProof(const osk::crypto::Cmac &sessionMac,
+                   Transport transport,
+                   const JoinIdentity &value,
+                   const uint8_t (&salt)[kSaltSize],
+                   bool complete,
+                   uint8_t *output,
+                   size_t capacity);
+bool openJoinProof(const osk::crypto::Cmac &sessionMac,
+                   Transport transport,
+                   const uint8_t *wire,
+                   size_t size,
+                   const uint8_t (&salt)[kSaltSize],
+                   bool complete,
+                   JoinIdentity &value);
 
 struct Command {
     uint16_t commandId = 0;
@@ -71,15 +91,23 @@ struct CommandResult {
 
 // Payloads only: the authenticated frame counter binds the session.
 // Command ready and No command have empty payloads.
-bool encodeCommand(const Command& value, uint8_t* output, size_t capacity, size_t& size);
-bool decodeCommand(const uint8_t* payload, size_t size, Command& value);
-bool encodeCommandResult(const CommandResult& value, uint8_t* output, size_t capacity, size_t& size);
-bool decodeCommandResult(const uint8_t* payload, size_t size, CommandResult& value);
+bool encodeCommand(const Command &value, uint8_t *output, size_t capacity, size_t &size);
+bool decodeCommand(const uint8_t *payload, size_t size, Command &value);
+bool encodeCommandResult(const CommandResult &value,
+                         uint8_t *output,
+                         size_t capacity,
+                         size_t &size);
+bool decodeCommandResult(const uint8_t *payload, size_t size, CommandResult &value);
 // Accepts only a reply to the current Command ready, including a valid old tag.
-bool openCommandReply(const Context& context, uint8_t nodeId, Transport transport,
-                      uint32_t readyCounter, uint8_t* wire, size_t size,
-                      Command& command, bool& hasCommand);
+bool openCommandReply(const Context &context,
+                      uint8_t nodeId,
+                      Transport transport,
+                      uint32_t readyCounter,
+                      uint8_t *wire,
+                      size_t size,
+                      Command &command,
+                      bool &hasCommand);
 
-}  // namespace frames
-}  // namespace security
-}  // namespace radiosensors
+} // namespace frames
+} // namespace security
+} // namespace radiosensors

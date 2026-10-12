@@ -1,0 +1,5 @@
+**/node_modules/
+**/.pio/
+**/data/
+protocol/generated/
+**/package-lock.json

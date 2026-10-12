@@ -14,7 +14,7 @@ constexpr size_t kTagSize = 16;
 constexpr size_t kMaxFile = kHeaderSize + kMaxPayload + kTagSize;
 constexpr uint32_t kIterations = 100000;
 
-void wipe(void* data, size_t size);
+void wipe(void *data, size_t size);
 
 struct Snapshot {
     radiosensors::gateway_storage::GatewaySettings settings{};
@@ -29,15 +29,15 @@ struct Snapshot {
     }
 };
 
-bool encode(const Snapshot& snapshot, std::string& json);
-bool decode(const char* json, size_t size, Snapshot& snapshot);
-void gatewayId(const Snapshot& snapshot, char output[33]);
-bool encrypt(
-    const Snapshot& snapshot, const char* password, size_t length,
-    std::string& file);
-bool decrypt(
-    const uint8_t* file, size_t size, const char* password, size_t length,
-    Snapshot& snapshot);
-bool validPassword(const char* password, size_t length);
+bool encode(const Snapshot &snapshot, std::string &json);
+bool decode(const char *json, size_t size, Snapshot &snapshot);
+void gatewayId(const Snapshot &snapshot, char output[33]);
+bool encrypt(const Snapshot &snapshot, const char *password, size_t length, std::string &file);
+bool decrypt(const uint8_t *file,
+             size_t size,
+             const char *password,
+             size_t length,
+             Snapshot &snapshot);
+bool validPassword(const char *password, size_t length);
 
-}  // namespace gateway::backup
+} // namespace gateway::backup

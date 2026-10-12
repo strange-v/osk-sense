@@ -33,35 +33,41 @@ constexpr BaseType_t kTaskCore = 1;
 constexpr size_t kNodeIdSlots = radiosensors::registry::kLastNodeId + 1;
 
 class NvsSlotStorage final : public SlotStorage {
-public:
-    NvsSlotStorage(const char* nameSpace, const char* slotA, const char* slotB)
-        : nameSpace_(nameSpace), keys_{slotA, slotB} {}
+  public:
+    NvsSlotStorage(const char *nameSpace, const char *slotA, const char *slotB)
+        : nameSpace_(nameSpace), keys_{slotA, slotB} {
+    }
 
-    bool begin() { return preferences_.begin(nameSpace_, false); }
+    bool begin() {
+        return preferences_.begin(nameSpace_, false);
+    }
 
     bool exists(uint8_t slot) override {
         return slot < 2 && preferences_.getBytesLength(keys_[slot]) != 0;
     }
 
-    bool read(uint8_t slot, uint8_t* output, size_t capacity, size_t& size) override {
+    bool read(uint8_t slot, uint8_t *output, size_t capacity, size_t &size) override {
         size = 0;
-        if (slot >= 2 || output == nullptr) return false;
+        if (slot >= 2 || output == nullptr)
+            return false;
         const size_t storedSize = preferences_.getBytesLength(keys_[slot]);
-        if (storedSize == 0 || storedSize > capacity) return false;
+        if (storedSize == 0 || storedSize > capacity)
+            return false;
         const size_t readSize = preferences_.getBytes(keys_[slot], output, storedSize);
-        if (readSize != storedSize) return false;
+        if (readSize != storedSize)
+            return false;
         size = readSize;
         return true;
     }
 
-    bool write(uint8_t slot, const uint8_t* data, size_t size) override {
+    bool write(uint8_t slot, const uint8_t *data, size_t size) override {
         return slot < 2 && data != nullptr &&
-            preferences_.putBytes(keys_[slot], data, size) == size;
+               preferences_.putBytes(keys_[slot], data, size) == size;
     }
 
-private:
-    const char* nameSpace_;
-    const char* keys_[2];
+  private:
+    const char *nameSpace_;
+    const char *keys_[2];
     Preferences preferences_;
 };
 
@@ -107,11 +113,12 @@ void count(uint32_t Counters::*field) {
 }
 
 bool lock() {
-    return initialized && mutex != nullptr &&
-        xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE;
+    return initialized && mutex != nullptr && xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE;
 }
 
-void unlock() { xSemaphoreGive(mutex); }
+void unlock() {
+    xSemaphoreGive(mutex);
+}
 
 // The book state readers may see without the mutex. Call with the mutex held
 // after every change of `book`.
@@ -119,14 +126,14 @@ void publishLockFreeView() {
     uint32_t words[4]{};
     uint8_t pending = 0;
     for (size_t index = 0; index < book.count; ++index) {
-        const CommandRecord& record = book.records[index];
-        if (record.state != CommandState::Pending) continue;
+        const CommandRecord &record = book.records[index];
+        if (record.state != CommandState::Pending)
+            continue;
         words[record.nodeId / 32U] |= 1UL << (record.nodeId % 32U);
         ++pending;
     }
-    for (size_t index = 0; index < 4; ++index) {
+    for (size_t index = 0; index < 4; ++index)
         pendingNodeIds[index].store(words[index], std::memory_order_release);
-    }
     publishedGeneration.store(store.generation(), std::memory_order_release);
     publishedRecords.store(book.count, std::memory_order_release);
     publishedPending.store(pending, std::memory_order_release);
@@ -134,7 +141,8 @@ void publishLockFreeView() {
 
 // Call with the mutex held.
 bool commitCandidate() {
-    if (!store.save(candidate)) return false;
+    if (!store.save(candidate))
+        return false;
     book = candidate;
     publishLockFreeView();
     return true;
@@ -142,18 +150,23 @@ bool commitCandidate() {
 
 uint16_t randomCommandId() {
     uint16_t value = 0;
-    while (value == 0) value = static_cast<uint16_t>(esp_random());
+    while (value == 0)
+        value = static_cast<uint16_t>(esp_random());
     return value;
 }
 
-void sendNoCommand(const radio::ReceivedFrame& ready) {
+void sendNoCommand(const radio::ReceivedFrame &ready) {
     if (radio::sendCommandReply(ready, frames::kNoCommandHeader, nullptr, 0))
         count(&Counters::noCommandReplies);
 }
 
-void handleCommandReady(const radio::ReceivedFrame& received) {
-    if (received.size != 0) { count(&Counters::rejectedFrames); return; }
-    if (!received.retryCommandReady) count(&Counters::sessions);
+void handleCommandReady(const radio::ReceivedFrame &received) {
+    if (received.size != 0) {
+        count(&Counters::rejectedFrames);
+        return;
+    }
+    if (!received.retryCommandReady)
+        count(&Counters::sessions);
     const uint8_t nodeId = static_cast<uint8_t>(received.senderId);
     // The node is listening: answer an empty session without taking a lock.
     if (!hasPending(nodeId)) {
@@ -168,10 +181,9 @@ void handleCommandReady(const radio::ReceivedFrame& received) {
     frames::Command command;
     bool deliver = false;
     if (lock()) {
-        const CommandRecord* const record = command_book::find(book, nodeId);
-        deliver = registered && record != nullptr &&
-            record->state == CommandState::Pending &&
-            memcmp(record->deviceUid, deviceUid, sizeof(deviceUid)) == 0;
+        const CommandRecord *const record = command_book::find(book, nodeId);
+        deliver = registered && record != nullptr && record->state == CommandState::Pending &&
+                  memcmp(record->deviceUid, deviceUid, sizeof(deviceUid)) == 0;
         if (deliver) {
             command.commandId = record->commandId;
             command.type = record->type;
@@ -183,25 +195,29 @@ void handleCommandReady(const radio::ReceivedFrame& received) {
         }
         unlock();
     }
-    uint8_t payload[frames::kMaxCommandPayloadSize]; size_t size = 0;
+    uint8_t payload[frames::kMaxCommandPayloadSize];
+    size_t size = 0;
     if (!deliver || !frames::encodeCommand(command, payload, sizeof(payload), size)) {
         sendNoCommand(received);
         return;
     }
-    if (!radio::sendCommandReply(received, frames::kCommandHeader, payload, size)) return;
+    if (!radio::sendCommandReply(received, frames::kCommandHeader, payload, size))
+        return;
     count(&Counters::delivered);
-    Serial.printf(
-        "Command delivered: node=%u id=%u type=%u\n",
-        nodeId, command.commandId, command.type);
+    Serial.printf("Command delivered: node=%u id=%u type=%u\n",
+                  nodeId,
+                  command.commandId,
+                  command.type);
 }
 
 // Call with the mutex held, for a result matching the latest delivery. The
 // registry is written before the command completes, so a failed write leaves
 // the command pending and the node answers it again in a later session.
-bool applyReadInfo(
-    const uint8_t nodeId, const uint8_t* const deviceUid,
-    const frames::CommandResult& result, bool& profileChanged) {
-    const CommandRecord* const record = command_book::find(book, nodeId);
+bool applyReadInfo(const uint8_t nodeId,
+                   const uint8_t *const deviceUid,
+                   const frames::CommandResult &result,
+                   bool &profileChanged) {
+    const CommandRecord *const record = command_book::find(book, nodeId);
     if (record == nullptr || record->state != CommandState::Pending ||
         record->commandId != result.commandId ||
         record->type != static_cast<uint8_t>(protocol::CommandType::ReadInfo) ||
@@ -225,7 +241,7 @@ bool applyReadInfo(
     return true;
 }
 
-void handleCommandResult(const radio::ReceivedFrame& received) {
+void handleCommandResult(const radio::ReceivedFrame &received) {
     frames::CommandResult result;
     if (!frames::decodeCommandResult(received.data, received.size, result)) {
         count(&Counters::rejectedFrames);
@@ -236,13 +252,13 @@ void handleCommandResult(const radio::ReceivedFrame& received) {
     uint16_t profileId = 0;
     recovery::Guard guard;
     if (!guard || recovery::blocked() ||
-        !registry_store::activeFrameIdentity(nodeId, received.salt, deviceUid, profileId) || !lock()) {
+        !registry_store::activeFrameIdentity(nodeId, received.salt, deviceUid, profileId) ||
+        !lock()) {
         count(&Counters::rejectedFrames);
         return;
     }
     const Delivery delivery = deliveries[nodeId];
-    if (delivery.commandId != result.commandId ||
-        received.counter <= delivery.readyCounter ||
+    if (delivery.commandId != result.commandId || received.counter <= delivery.readyCounter ||
         memcmp(delivery.salt, received.salt, sizeof(received.salt)) != 0) {
         unlock();
         count(&Counters::rejectedFrames);
@@ -254,46 +270,53 @@ void handleCommandResult(const radio::ReceivedFrame& received) {
         return;
     }
     candidate = book;
-    const command_book::CompleteStatus status = command_book::complete(
-        candidate, deviceUid, nodeId, result.commandId, result.status,
-        result.data, result.dataSize, time_service::unixTimeMs());
+    const command_book::CompleteStatus status = command_book::complete(candidate,
+                                                                       deviceUid,
+                                                                       nodeId,
+                                                                       result.commandId,
+                                                                       result.status,
+                                                                       result.data,
+                                                                       result.dataSize,
+                                                                       time_service::unixTimeMs());
     bool recorded = false;
     switch (status) {
-        case command_book::CompleteStatus::Completed:
-            recorded = commitCandidate();
-            count(recorded ? &Counters::resultsRecorded : &Counters::storageErrors);
-            break;
-        case command_book::CompleteStatus::Retry:
-            break;
-        case command_book::CompleteStatus::NotPending:
-            count(&Counters::duplicateResults);
-            break;
-        case command_book::CompleteStatus::InvalidResult:
-            count(&Counters::rejectedFrames);
-            break;
+    case command_book::CompleteStatus::Completed:
+        recorded = commitCandidate();
+        count(recorded ? &Counters::resultsRecorded : &Counters::storageErrors);
+        break;
+    case command_book::CompleteStatus::Retry:
+        break;
+    case command_book::CompleteStatus::NotPending:
+        count(&Counters::duplicateResults);
+        break;
+    case command_book::CompleteStatus::InvalidResult:
+        count(&Counters::rejectedFrames);
+        break;
     }
     unlock();
     // The cached frame was decoded under the previous profile.
-    if (profileChanged) telemetry_store::erase(nodeId);
-    Serial.printf(
-        "Command result: node=%u id=%u status=%u recorded=%s\n",
-        nodeId, result.commandId, static_cast<unsigned>(result.status),
-        recorded ? "yes" : "no");
+    if (profileChanged)
+        telemetry_store::erase(nodeId);
+    Serial.printf("Command result: node=%u id=%u status=%u recorded=%s\n",
+                  nodeId,
+                  result.commandId,
+                  static_cast<unsigned>(result.status),
+                  recorded ? "yes" : "no");
 }
 
-void task(void*) {
+void task(void *) {
     for (;;) {
         radio::ReceivedFrame received{};
-        if (!radio::receiveSessionFrame(received, portMAX_DELAY)) continue;
-        if (received.kind == protocol::FrameKind::CommandReady) {
+        if (!radio::receiveSessionFrame(received, portMAX_DELAY))
+            continue;
+        if (received.kind == protocol::FrameKind::CommandReady)
             handleCommandReady(received);
-        } else if (received.kind == protocol::FrameKind::CommandResult) {
+        else if (received.kind == protocol::FrameKind::CommandResult)
             handleCommandResult(received);
-        }
     }
 }
 
-}  // namespace
+} // namespace
 
 bool begin(const bool radioReady) {
     mutex = xSemaphoreCreateMutex();
@@ -308,20 +331,24 @@ bool begin(const bool radioReady) {
     const LoadStatus status = store.load(book);
     // A new sequence starts at a random ID, so it is unlikely to meet an ID a
     // node recorded under a previous installation.
-    if (status != LoadStatus::Loaded) book.nextCommandId = randomCommandId();
+    if (status != LoadStatus::Loaded)
+        book.nextCommandId = randomCommandId();
     publishLockFreeView();
     initialized = true;
     Serial.printf(
         "Command book ready: records=%u generation=%lu source=%s\n",
         static_cast<unsigned>(book.count),
         static_cast<unsigned long>(store.generation()),
-        status == LoadStatus::Loaded
-            ? "nvs"
-            : (status == LoadStatus::Empty ? "empty" : "corrupt"));
-    if (!radioReady) return true;
-    if (xTaskCreatePinnedToCore(
-            task, "commands", kTaskStackSize, nullptr, kTaskPriority,
-            &taskHandle, kTaskCore) != pdPASS) {
+        status == LoadStatus::Loaded ? "nvs" : (status == LoadStatus::Empty ? "empty" : "corrupt"));
+    if (!radioReady)
+        return true;
+    if (xTaskCreatePinnedToCore(task,
+                                "commands",
+                                kTaskStackSize,
+                                nullptr,
+                                kTaskPriority,
+                                &taskHandle,
+                                kTaskCore) != pdPASS) {
         Serial.println("Command task creation failed");
         return false;
     }
@@ -333,46 +360,52 @@ bool hasPending(const uint8_t nodeId) {
         nodeId > radiosensors::registry::kLastNodeId) {
         return false;
     }
-    const uint32_t word =
-        pendingNodeIds[nodeId / 32U].load(std::memory_order_acquire);
+    const uint32_t word = pendingNodeIds[nodeId / 32U].load(std::memory_order_acquire);
     return (word & (1UL << (nodeId % 32U))) != 0;
 }
 
-QueueResult queue(
-    const uint8_t nodeId, const protocol::CommandType type,
-    const uint8_t* const arguments, const size_t argumentSize, Entry& queued) {
-    if (!initialized) return QueueResult::NotInitialized;
+QueueResult queue(const uint8_t nodeId,
+                  const protocol::CommandType type,
+                  const uint8_t *const arguments,
+                  const size_t argumentSize,
+                  Entry &queued) {
+    if (!initialized)
+        return QueueResult::NotInitialized;
     uint8_t deviceUid[protocol::kDeviceUidSize]{};
     uint16_t profileId = 0;
-    if (!registry_store::activeIdentity(nodeId, deviceUid, profileId)) {
+    if (!registry_store::activeIdentity(nodeId, deviceUid, profileId))
         return QueueResult::NodeNotFound;
-    }
-    if (!protocol::profileSupportsCommand(profileId, type)) {
+    if (!protocol::profileSupportsCommand(profileId, type))
         return QueueResult::Unsupported;
-    }
     recovery::Guard guard;
-    if (!guard || recovery::blocked() || !lock()) return QueueResult::NotInitialized;
+    if (!guard || recovery::blocked() || !lock())
+        return QueueResult::NotInitialized;
     candidate = book;
     uint16_t commandId = 0;
     QueueResult result = QueueResult::StorageError;
-    switch (command_book::queue(
-        candidate, deviceUid, nodeId, static_cast<uint8_t>(type), arguments,
-        argumentSize, time_service::unixTimeMs(), commandId)) {
-        case command_book::QueueStatus::Queued:
-            result = commitCandidate() ? QueueResult::Queued : QueueResult::StorageError;
-            break;
-        case command_book::QueueStatus::Busy:
-            result = QueueResult::Busy;
-            break;
-        case command_book::QueueStatus::InvalidNode:
-            result = QueueResult::NodeNotFound;
-            break;
-        case command_book::QueueStatus::InvalidArguments:
-            result = QueueResult::InvalidArguments;
-            break;
-        case command_book::QueueStatus::CapacityReached:
-            result = QueueResult::CapacityReached;
-            break;
+    switch (command_book::queue(candidate,
+                                deviceUid,
+                                nodeId,
+                                static_cast<uint8_t>(type),
+                                arguments,
+                                argumentSize,
+                                time_service::unixTimeMs(),
+                                commandId)) {
+    case command_book::QueueStatus::Queued:
+        result = commitCandidate() ? QueueResult::Queued : QueueResult::StorageError;
+        break;
+    case command_book::QueueStatus::Busy:
+        result = QueueResult::Busy;
+        break;
+    case command_book::QueueStatus::InvalidNode:
+        result = QueueResult::NodeNotFound;
+        break;
+    case command_book::QueueStatus::InvalidArguments:
+        result = QueueResult::InvalidArguments;
+        break;
+    case command_book::QueueStatus::CapacityReached:
+        result = QueueResult::CapacityReached;
+        break;
     }
     if (result == QueueResult::Queued) {
         queued.record = *command_book::find(book, nodeId);
@@ -385,46 +418,50 @@ QueueResult queue(
 
 CancelResult cancel(const uint8_t nodeId) {
     recovery::Guard guard;
-    if (!guard || recovery::blocked() || !lock()) return CancelResult::NotInitialized;
+    if (!guard || recovery::blocked() || !lock())
+        return CancelResult::NotInitialized;
     candidate = book;
     CancelResult result = CancelResult::NotFound;
-    if (command_book::cancel(candidate, nodeId)) {
+    if (command_book::cancel(candidate, nodeId))
         result = commitCandidate() ? CancelResult::Cancelled : CancelResult::StorageError;
-    }
     unlock();
     return result;
 }
 
 bool removeNode(const uint8_t nodeId) {
     recovery::Guard guard;
-    if (!guard || recovery::blocked() || !lock()) return false;
+    if (!guard || recovery::blocked() || !lock())
+        return false;
     candidate = book;
     bool removed = command_book::removeNode(candidate, nodeId) && commitCandidate();
-    if (nodeId < kNodeIdSlots) deliveries[nodeId] = Delivery{};
+    if (nodeId < kNodeIdSlots)
+        deliveries[nodeId] = Delivery{};
     unlock();
     return removed;
 }
 
 bool clear() {
     recovery::Guard guard;
-    if (!guard || recovery::blocked() || !lock()) return false;
+    if (!guard || recovery::blocked() || !lock())
+        return false;
     candidate = book;
     command_book::clear(candidate);
     const bool cleared = book.count == 0 || commitCandidate();
-    for (Delivery& delivery : deliveries) delivery = Delivery{};
+    for (Delivery &delivery : deliveries)
+        delivery = Delivery{};
     unlock();
     return cleared;
 }
 
-bool list(Listing& value) {
-    if (!lock()) return false;
+bool list(Listing &value) {
+    if (!lock())
+        return false;
     value.count = book.count;
     for (size_t index = 0; index < book.count; ++index) {
-        const CommandRecord& record = book.records[index];
+        const CommandRecord &record = book.records[index];
         value.entries[index].record = record;
-        value.entries[index].delivered =
-            record.state == CommandState::Pending &&
-            deliveries[record.nodeId].commandId == record.commandId;
+        value.entries[index].delivered = record.state == CommandState::Pending &&
+                                         deliveries[record.nodeId].commandId == record.commandId;
     }
     unlock();
     return true;
@@ -452,4 +489,4 @@ Snapshot snapshot() {
     return value;
 }
 
-}  // namespace gateway::commands
+} // namespace gateway::commands

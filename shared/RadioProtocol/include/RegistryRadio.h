@@ -25,20 +25,34 @@ struct OpenedFrame {
 // ready retries without a cached reply reach consumers; replies are bound to
 // the counter and the current pairing salt.
 class RadioAdapter {
-public:
-    RadioAdapter(PairingAdapter& pairing, replay::Guard& guard) : pairing_(pairing), guard_(guard) {}
+  public:
+    RadioAdapter(PairingAdapter &pairing, replay::Guard &guard) : pairing_(pairing), guard_(guard) {
+    }
     void restart();
-    void retainActiveSlots(const NodeRegistry& nodes);
-    size_t historyBytes() const { return allocatedHistories_ * sizeof(replay::AcceptanceHistory); }
-    ReceiveStatus receive(security::Transport transport, uint8_t* wire, size_t size,
-                          uint64_t uptimeSeconds, bool telemetrySpace, bool sessionSpace,
-                          OpenedFrame& frame);
-    bool reply(uint8_t nodeId, const uint8_t* salt, uint32_t readyCounter,
-               uint8_t header, const uint8_t* payload, size_t size,
-               uint8_t* output, size_t capacity, size_t& outputSize);
-private:
-    PairingAdapter& pairing_;
-    replay::Guard& guard_;
+    void retainActiveSlots(const NodeRegistry &nodes);
+    size_t historyBytes() const {
+        return allocatedHistories_ * sizeof(replay::AcceptanceHistory);
+    }
+    ReceiveStatus receive(security::Transport transport,
+                          uint8_t *wire,
+                          size_t size,
+                          uint64_t uptimeSeconds,
+                          bool telemetrySpace,
+                          bool sessionSpace,
+                          OpenedFrame &frame);
+    bool reply(uint8_t nodeId,
+               const uint8_t *salt,
+               uint32_t readyCounter,
+               uint8_t header,
+               const uint8_t *payload,
+               size_t size,
+               uint8_t *output,
+               size_t capacity,
+               size_t &outputSize);
+
+  private:
+    PairingAdapter &pairing_;
+    replay::Guard &guard_;
     security::Context context_;
     size_t allocatedHistories_ = 0;
     struct History {
@@ -47,6 +61,6 @@ private:
     } histories_[replay::kNodeSlots];
 };
 
-}  // namespace registry
-}  // namespace radiosensors
+} // namespace registry
+} // namespace radiosensors
 #endif

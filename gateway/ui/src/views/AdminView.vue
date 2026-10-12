@@ -26,15 +26,27 @@ async function signedOut() {
 }
 
 onMounted(async () => {
-  try { health.value = await api.status() } catch (error) { failure.value = errorCode(error) }
+  try {
+    health.value = await api.status()
+  } catch (error) {
+    failure.value = errorCode(error)
+  }
 })
 </script>
 
 <template>
   <div class="page">
-    <div class="page-heading"><div><h1>{{ $t('admin.title') }}</h1><p>{{ $t('admin.subtitle') }}</p></div></div>
+    <div class="page-heading">
+      <div>
+        <h1>{{ $t('admin.title') }}</h1>
+        <p>{{ $t('admin.subtitle') }}</p>
+      </div>
+    </div>
 
-    <div v-masonry class="admin-grid">
+    <div
+      v-masonry
+      class="admin-grid"
+    >
       <UsersCard @signed-out="signedOut" />
 
       <TokensCard />
@@ -45,17 +57,41 @@ onMounted(async () => {
 
       <section class="panel admin-card">
         <header class="panel-heading">
-          <div><h2>{{ $t('radioReset.card') }}</h2><p>{{ $t('radioReset.cardHint') }}</p></div>
+          <div>
+            <h2>{{ $t('radioReset.card') }}</h2>
+            <p>{{ $t('radioReset.cardHint') }}</p>
+          </div>
         </header>
         <dl class="simple-details">
-          <div><dt>{{ $t('status.networkId') }}</dt><dd>{{ health?.radio.network_id ?? '—' }}</dd></div>
-          <div><dt>{{ $t('nodes.registered') }}</dt><dd>{{ health?.registry.records ?? '—' }}</dd></div>
+          <div>
+            <dt>{{ $t('status.networkId') }}</dt>
+            <dd>{{ health?.radio.network_id ?? '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ $t('nodes.registered') }}</dt>
+            <dd>{{ health?.registry.records ?? '—' }}</dd>
+          </div>
         </dl>
-        <div v-if="failure" class="notice error">{{ $t(`error.${failure}`) }}</div>
-        <button class="button danger-text" type="button" @click="showRadioReset = true">{{ $t('radioReset.action') }}</button>
+        <div
+          v-if="failure"
+          class="notice error"
+        >
+          {{ $t(`error.${failure}`) }}
+        </div>
+        <button
+          class="button danger-text"
+          type="button"
+          @click="showRadioReset = true"
+        >
+          {{ $t('radioReset.action') }}
+        </button>
       </section>
     </div>
 
-    <RadioResetDialog v-if="showRadioReset" :node-count="health?.registry.records ?? 0" @close="showRadioReset = false" />
+    <RadioResetDialog
+      v-if="showRadioReset"
+      :node-count="health?.registry.records ?? 0"
+      @close="showRadioReset = false"
+    />
   </div>
 </template>

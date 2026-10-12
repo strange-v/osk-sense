@@ -24,41 +24,45 @@ constexpr SBox makeSBox() {
         q = static_cast<uint8_t>(q ^ (q << 1));
         q = static_cast<uint8_t>(q ^ (q << 2));
         q = static_cast<uint8_t>(q ^ (q << 4));
-        if (q & 0x80) q = static_cast<uint8_t>(q ^ 0x09);
-        box.value[p] = static_cast<uint8_t>(
-            q ^ rotl8(q, 1) ^ rotl8(q, 2) ^ rotl8(q, 3) ^ rotl8(q, 4) ^ 0x63);
+        if (q & 0x80)
+            q = static_cast<uint8_t>(q ^ 0x09);
+        box.value[p] =
+            static_cast<uint8_t>(q ^ rotl8(q, 1) ^ rotl8(q, 2) ^ rotl8(q, 3) ^ rotl8(q, 4) ^ 0x63);
     } while (p != 1);
     box.value[0] = 0x63;
     return box;
 }
 
 constexpr SBox kSBox = makeSBox();
-inline uint8_t sbox(uint8_t x) { return kSBox.value[x]; }
+inline uint8_t sbox(uint8_t x) {
+    return kSBox.value[x];
+}
 
 inline uint8_t xtime(const uint8_t x) {
     // Shifting a uint8_t copy keeps AVR code in one register.
     uint8_t doubled = x;
     doubled <<= 1;
-    if (x & 0x80) doubled ^= 0x1B;
+    if (x & 0x80)
+        doubled ^= 0x1B;
     return doubled;
 }
 
-void xorBlock(uint8_t* target, const uint8_t* source) {
-    for (uint8_t i = 0; i < kBlockSize; ++i) target[i] ^= source[i];
+void xorBlock(uint8_t *target, const uint8_t *source) {
+    for (uint8_t i = 0; i < kBlockSize; ++i)
+        target[i] ^= source[i];
 }
 
-void doubleBlock(uint8_t* out, const uint8_t* in) {
+void doubleBlock(uint8_t *out, const uint8_t *in) {
     const uint8_t carry = (in[0] & 0x80) ? 0x87 : 0;
-    for (uint8_t i = 0; i < kBlockSize - 1; ++i) {
+    for (uint8_t i = 0; i < kBlockSize - 1; ++i)
         out[i] = static_cast<uint8_t>((in[i] << 1) | (in[i + 1] >> 7));
-    }
     out[kBlockSize - 1] = static_cast<uint8_t>((in[kBlockSize - 1] << 1) ^ carry);
 }
 
-}  // namespace
+} // namespace
 
-void aesExpandKey(Aes128& aes, const uint8_t key[kBlockSize]) {
-    uint8_t* rk = aes.roundKeys;
+void aesExpandKey(Aes128 &aes, const uint8_t key[kBlockSize]) {
+    uint8_t *rk = aes.roundKeys;
     memcpy(rk, key, kBlockSize);
     uint8_t rcon = 1;
     for (uint8_t i = kBlockSize; i < sizeof(aes.roundKeys); i += 4) {
@@ -81,17 +85,17 @@ void aesExpandKey(Aes128& aes, const uint8_t key[kBlockSize]) {
     }
 }
 
-
 // One pass per round: each output column reads its four shifted bytes
 // through the S-box, mixes them, and adds the round key, so the state is
 // loaded and stored once per round instead of once per step.
-void aesEncrypt(const Aes128& aes, uint8_t block[kBlockSize]) {
-    const uint8_t* rk = aes.roundKeys;
+void aesEncrypt(const Aes128 &aes, uint8_t block[kBlockSize]) {
+    const uint8_t *rk = aes.roundKeys;
     uint8_t first[kBlockSize];
     uint8_t second[kBlockSize];
-    uint8_t* s = first;
-    uint8_t* t = second;
-    for (uint8_t i = 0; i < kBlockSize; ++i) s[i] = block[i] ^ rk[i];
+    uint8_t *s = first;
+    uint8_t *t = second;
+    for (uint8_t i = 0; i < kBlockSize; ++i)
+        s[i] = block[i] ^ rk[i];
     for (uint8_t round = 1; round < 10; ++round) {
         rk += kBlockSize;
         for (uint8_t c = 0; c < kBlockSize; c += 4) {
@@ -106,16 +110,15 @@ void aesEncrypt(const Aes128& aes, uint8_t block[kBlockSize]) {
             t[c + 3] = a3 ^ all ^ xtime(a3 ^ a0) ^ rk[c + 3];
         }
 
-        uint8_t* swap = s;
+        uint8_t *swap = s;
         s = t;
         t = swap;
     }
     rk += kBlockSize;
-    for (uint8_t i = 0; i < kBlockSize; ++i) {
+    for (uint8_t i = 0; i < kBlockSize; ++i)
         block[i] = sbox(s[(i * 5) & 15]) ^ rk[i];
-    }
 }
-void cmacInit(Cmac& cmac, const uint8_t key[kBlockSize]) {
+void cmacInit(Cmac &cmac, const uint8_t key[kBlockSize]) {
     aesExpandKey(cmac.aes, key);
     uint8_t l[kBlockSize]{};
     aesEncrypt(cmac.aes, l);
@@ -123,9 +126,7 @@ void cmacInit(Cmac& cmac, const uint8_t key[kBlockSize]) {
     doubleBlock(cmac.k2, cmac.k1);
 }
 
-void cmacCompute(
-    const Cmac& cmac, const uint8_t* message, size_t length,
-    uint8_t tag[kBlockSize]) {
+void cmacCompute(const Cmac &cmac, const uint8_t *message, size_t length, uint8_t tag[kBlockSize]) {
     memset(tag, 0, kBlockSize);
     while (length > kBlockSize) {
         xorBlock(tag, message);
@@ -133,24 +134,27 @@ void cmacCompute(
         message += kBlockSize;
         length -= kBlockSize;
     }
-    const uint8_t* subkey = cmac.k1;
+    const uint8_t *subkey = cmac.k1;
     if (length < kBlockSize) {
         tag[length] ^= 0x80;
         subkey = cmac.k2;
     }
-    for (uint8_t i = 0; i < length; ++i) tag[i] ^= message[i];
+    for (uint8_t i = 0; i < length; ++i)
+        tag[i] ^= message[i];
     xorBlock(tag, subkey);
     aesEncrypt(cmac.aes, tag);
 }
 
-void ctrApply(
-    const Aes128& aes, const uint8_t counterBlock[kBlockSize], uint8_t* data,
-    const uint8_t length) {
+void ctrApply(const Aes128 &aes,
+              const uint8_t counterBlock[kBlockSize],
+              uint8_t *data,
+              const uint8_t length) {
     uint8_t stream[kBlockSize];
     memcpy(stream, counterBlock, kBlockSize);
     aesEncrypt(aes, stream);
-    for (uint8_t i = 0; i < length && i < kBlockSize; ++i) data[i] ^= stream[i];
+    for (uint8_t i = 0; i < length && i < kBlockSize; ++i)
+        data[i] ^= stream[i];
 }
 
-}  // namespace crypto
-}  // namespace osk
+} // namespace crypto
+} // namespace osk

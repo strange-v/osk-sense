@@ -2,9 +2,16 @@ import { describe, expect, it } from 'vitest'
 import type { ApiToken, Health } from '../api/types'
 import { canStreamTelemetry, clientState, offersSetup } from './clients'
 
-const health = (clients: number) => ({ websocket: { clients, connections: 1, messages_sent: 10, messages_dropped: 0 } } as Health)
-const token = (over: Partial<ApiToken> = {}): ApiToken =>
-  ({ id: 1, name: 'Home Assistant', enabled: true, created_at_ms: 1_700_000_000_000, scopes: ['telemetry:read'], ...over })
+const health = (clients: number) =>
+  ({ websocket: { clients, connections: 1, messages_sent: 10, messages_dropped: 0 } }) as Health
+const token = (over: Partial<ApiToken> = {}): ApiToken => ({
+  id: 1,
+  name: 'Home Assistant',
+  enabled: true,
+  created_at_ms: 1_700_000_000_000,
+  scopes: ['telemetry:read'],
+  ...over,
+})
 
 describe('canStreamTelemetry', () => {
   it('requires the scope the WebSocket handshake requires', () => {

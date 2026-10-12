@@ -16,8 +16,7 @@ void begin();
 void loop();
 bool enabled();
 State state();
-const char* stateName();
+const char *stateName();
 uint8_t progressPercent();
 
-}  // namespace gateway::ota
-
+} // namespace gateway::ota

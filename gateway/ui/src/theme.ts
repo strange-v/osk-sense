@@ -20,10 +20,15 @@ export function applyTheme(preference: ThemePreference) {
   else root.setAttribute('data-theme', preference)
 
   // Keep the browser chrome (mobile address bar) in step with the page.
-  const resolved = preference === 'auto'
-    ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
-    : preference
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[resolved])
+  const resolved =
+    preference === 'auto'
+      ? matchMedia('(prefers-color-scheme: light)').matches
+        ? 'light'
+        : 'dark'
+      : preference
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', THEME_COLORS[resolved])
 }
 
 export function rememberTheme(preference: ThemePreference) {

@@ -24,10 +24,23 @@ vi.mock('../api/client', async () => {
 import NodeDetail from './NodeDetail.vue'
 
 const node = (over: Partial<GatewayNode> = {}): GatewayNode => ({
-  node_id: 7, device_uid: '0F1E2D3C4B5A69788796', display_name: 'Hall', profile_id: 1, firmware: '2.1.0',
-  state: 'active', last_seen_at_ms: Date.now(), has_telemetry: true, rssi: -70, max_power_level: 5,
-  power_policy: 'auto', tx_power_target: 3, tx_power_level: 3, radio_fallback: false,
-  downlink_rssi: -72, supply_mv: 2987, ...over,
+  node_id: 7,
+  device_uid: '0F1E2D3C4B5A69788796',
+  display_name: 'Hall',
+  profile_id: 1,
+  firmware: '2.1.0',
+  state: 'active',
+  last_seen_at_ms: Date.now(),
+  has_telemetry: true,
+  rssi: -70,
+  max_power_level: 5,
+  power_policy: 'auto',
+  tx_power_target: 3,
+  tx_power_level: 3,
+  radio_fallback: false,
+  downlink_rssi: -72,
+  supply_mv: 2987,
+  ...over,
 })
 
 async function mountCard(target = node()) {
@@ -44,7 +57,9 @@ async function mountCard(target = node()) {
 
 type Card = Awaited<ReturnType<typeof mountCard>>
 const heading = (wrapper: Card) => wrapper.get('.modal-header h2').text()
-const startEditing = async (wrapper: Card) => { await wrapper.get('.title-view .icon-button').trigger('click') }
+const startEditing = async (wrapper: Card) => {
+  await wrapper.get('.title-view .icon-button').trigger('click')
+}
 
 beforeEach(() => {
   state.admin.value = true
@@ -74,10 +89,16 @@ describe('NodeDetail', () => {
   })
 
   it('shows every value it does not have yet the same way, as a dash', async () => {
-    const wrapper = await mountCard(node({
-      has_telemetry: false, last_seen_at_ms: undefined, tx_power_level: undefined, rssi: undefined, downlink_rssi: undefined,
-      supply_mv: undefined,
-    }))
+    const wrapper = await mountCard(
+      node({
+        has_telemetry: false,
+        last_seen_at_ms: undefined,
+        tx_power_level: undefined,
+        rssi: undefined,
+        downlink_rssi: undefined,
+        supply_mv: undefined,
+      }),
+    )
     const values = wrapper.findAll('.simple-details dd').map((value) => value.text())
     // Voltage, last seen, both directions of the link, and the transmit level.
     expect(values.filter((value) => value === '—')).toHaveLength(5)
@@ -134,7 +155,9 @@ describe('NodeDetail', () => {
     // Cyrillic costs two bytes a letter: 30 letters would be 60 bytes.
     await wrapper.get('.title-edit input').setValue('я'.repeat(30))
 
-    expect((wrapper.get('.title-edit input').element as HTMLInputElement).value).toBe('я'.repeat(24))
+    expect((wrapper.get('.title-edit input').element as HTMLInputElement).value).toBe(
+      'я'.repeat(24),
+    )
     expect(wrapper.get('.title-edit button').attributes('disabled')).toBeUndefined()
   })
 

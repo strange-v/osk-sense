@@ -10,12 +10,12 @@ The settings, authentication, installation-secret and command stores each own tw
 
 Every snapshot begins with:
 
-| Offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 4 | Store-specific ASCII magic |
-| 4 | 2 | Store-specific schema version |
-| 6 | 4 | Wrapping generation |
-| 10 | 2 | Exact total encoded size including CRC |
+| Offset | Bytes | Field                                  |
+| -----: | ----: | -------------------------------------- |
+|      0 |     4 | Store-specific ASCII magic             |
+|      4 |     2 | Store-specific schema version          |
+|      6 |     4 | Wrapping generation                    |
+|     10 |     2 | Exact total encoded size including CRC |
 
 The final four bytes are CRC32 over every preceding byte, encoded little-endian. Loading validates both slots and selects the newer valid wrapping generation using a positive signed 32-bit difference. An absent store loads documented defaults at generation zero; it does not write merely because the gateway booted.
 
@@ -27,13 +27,13 @@ Generation advances only after a durable semantic change. Re-saving identical co
 NVS namespace: `radio-bound`; key: `bounds`;
 magic: `RSRB`; schema: `3`; exact size: 288 bytes.
 
-| Offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 12 | Common header with schema 3 |
-| 12 | 8 | Presence bitmap for 64 registry slots |
-| 20 | 8 | Bound-present bitmap, a subset of presence |
-| 28 | 256 | 64 upper bounds H, 4 bytes each |
-| 284 | 4 | CRC32 |
+| Offset | Bytes | Field                                      |
+| -----: | ----: | ------------------------------------------ |
+|      0 |    12 | Common header with schema 3                |
+|     12 |     8 | Presence bitmap for 64 registry slots      |
+|     20 |     8 | Bound-present bitmap, a subset of presence |
+|     28 |   256 | 64 upper bounds H, 4 bytes each            |
+|    284 |     4 | CRC32                                      |
 
 Presence without a bound marks fresh keys with no accepted frame. Absent and
 unbounded records have H = 0. The blob must validate before any stored bound
@@ -55,18 +55,18 @@ forgets that slot before fresh-key initialization.
 
 NVS namespace: `gateway-config`; slot keys: `config_a`, `config_b`; magic: `RSGC`; exact schema-2 size: 248 bytes.
 
-| Offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 12 | Common snapshot header |
-| 12 | 1 | Flags |
-| 13 | 1 | Hostname byte length, `0..32` |
-| 14 | 1 | NTP server count, `0..3` |
-| 15 | 1 | Reserved, zero |
-| 16 | 2 | Node-pairing window seconds |
-| 18 | 2 | Initial-admin setup window seconds |
-| 20 | 32 | Hostname ASCII bytes, zero-padded |
-| 52 | 192 | Three fixed 64-byte NTP server entries |
-| 244 | 4 | CRC32 |
+| Offset | Bytes | Field                                  |
+| -----: | ----: | -------------------------------------- |
+|      0 |    12 | Common snapshot header                 |
+|     12 |     1 | Flags                                  |
+|     13 |     1 | Hostname byte length, `0..32`          |
+|     14 |     1 | NTP server count, `0..3`               |
+|     15 |     1 | Reserved, zero                         |
+|     16 |     2 | Node-pairing window seconds            |
+|     18 |     2 | Initial-admin setup window seconds     |
+|     20 |    32 | Hostname ASCII bytes, zero-padded      |
+|     52 |   192 | Three fixed 64-byte NTP server entries |
+|    244 |     4 | CRC32                                  |
 
 Flag bit 0 enables mDNS and bit 1 enables NTP; bits 2..7 are zero. Each NTP entry is one ASCII length byte followed by 63 zero-padded bytes. Entries after `ntp_server_count` are entirely zero. Accepted values are DNS hostnames or textual IP addresses without scheme, path, or port. Empty active entries, embedded NULs, control characters, duplicates, and values longer than 63 bytes are rejected. When NTP is enabled, count is `1..3`; when disabled, a saved list may remain.
 
@@ -80,17 +80,17 @@ NVS namespace: `gateway-auth`; slot keys: `auth_a`, `auth_b`; magic: `RSAU`; exa
 
 It contains four fixed user slots and eight fixed API-token slots. Active records occupy the first counted slots; every remaining slot is zero.
 
-| Offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 12 | Common snapshot header |
-| 12 | 1 | User count, `0..4` |
-| 13 | 1 | API-token count, `0..8` |
-| 14 | 2 | Reserved, zero |
-| 16 | 4 | Next user ID |
-| 20 | 4 | Next token ID |
-| 24 | 368 | Four 92-byte user records |
-| 392 | 640 | Eight 80-byte token records |
-| 1032 | 4 | CRC32 |
+| Offset | Bytes | Field                       |
+| -----: | ----: | --------------------------- |
+|      0 |    12 | Common snapshot header      |
+|     12 |     1 | User count, `0..4`          |
+|     13 |     1 | API-token count, `0..8`     |
+|     14 |     2 | Reserved, zero              |
+|     16 |     4 | Next user ID                |
+|     20 |     4 | Next token ID               |
+|     24 |   368 | Four 92-byte user records   |
+|    392 |   640 | Eight 80-byte token records |
+|   1032 |     4 | CRC32                       |
 
 IDs are nonzero and unique within their record type. Next IDs are never-issued values; deletion does not reuse IDs. Zero is normalized to one before the first allocation. Exhaustion after `UINT32_MAX` is an error rather than silent reuse.
 
@@ -98,17 +98,17 @@ IDs are nonzero and unique within their record type. Next IDs are never-issued v
 
 Exact size: 92 bytes.
 
-| Relative offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 4 | User ID |
-| 4 | 1 | Username length, `1..32` |
-| 5 | 32 | Normalized username, zero-padded ASCII |
-| 37 | 1 | Role |
-| 38 | 1 | Flags |
-| 39 | 1 | Password-hash algorithm |
-| 40 | 4 | PBKDF2 iteration count |
-| 44 | 16 | Random salt |
-| 60 | 32 | Password hash |
+| Relative offset | Bytes | Field                                  |
+| --------------: | ----: | -------------------------------------- |
+|               0 |     4 | User ID                                |
+|               4 |     1 | Username length, `1..32`               |
+|               5 |    32 | Normalized username, zero-padded ASCII |
+|              37 |     1 | Role                                   |
+|              38 |     1 | Flags                                  |
+|              39 |     1 | Password-hash algorithm                |
+|              40 |     4 | PBKDF2 iteration count                 |
+|              44 |    16 | Random salt                            |
+|              60 |    32 | Password hash                          |
 
 Role 1 is admin and role 2 is viewer. Flag bit 0 means enabled; other bits are zero. Hash algorithm 1 is PBKDF2-HMAC-SHA256 with 25,000 iterations by default, a 16-byte random salt, and a 32-byte output. The codec accepts 10,000 through 2,000,000 iterations and never silently downgrades a record.
 
@@ -118,15 +118,15 @@ Usernames are lowercase ASCII letters, digits, `.`, `_`, or `-`. Password input 
 
 Exact size: 80 bytes.
 
-| Relative offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 4 | Token ID |
-| 4 | 1 | Display-name byte length, `1..32` |
-| 5 | 32 | Display-name UTF-8 bytes, zero-padded |
-| 37 | 1 | Flags |
-| 38 | 2 | Scope bitmask |
-| 40 | 8 | Creation time, UTC Unix milliseconds or zero |
-| 48 | 32 | SHA-256 of the raw token |
+| Relative offset | Bytes | Field                                        |
+| --------------: | ----: | -------------------------------------------- |
+|               0 |     4 | Token ID                                     |
+|               4 |     1 | Display-name byte length, `1..32`            |
+|               5 |    32 | Display-name UTF-8 bytes, zero-padded        |
+|              37 |     1 | Flags                                        |
+|              38 |     2 | Scope bitmask                                |
+|              40 |     8 | Creation time, UTC Unix milliseconds or zero |
+|              48 |    32 | SHA-256 of the raw token                     |
 
 Flag bit 0 means enabled. Scope bit 0 means `telemetry:read`, the only scope: it covers both the node registry and the telemetry stream. An active record carries at least one scope; all other flag and scope bits are zero. The raw token is 32 cryptographically random bytes shown once as unpadded base64url. Only its digest is stored and verification uses constant-time comparison.
 
@@ -136,13 +136,13 @@ Flag bit 0 means enabled. Scope bit 0 means `telemetry:read`, the only scope: it
 
 NVS namespace: `gateway-secrets`; slot keys: `secret_a`, `secret_b`; magic: `RSGS`; exact schema-3 size: 51 bytes.
 
-| Offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 12 | Common snapshot header with schema 3 |
-| 12 | 2 | Flags |
-| 14 | 1 | Operational RFM69 network ID, `1..255` |
-| 15 | 32 | Gateway device secret |
-| 47 | 4 | CRC32 |
+| Offset | Bytes | Field                                  |
+| -----: | ----: | -------------------------------------- |
+|      0 |    12 | Common snapshot header with schema 3   |
+|     12 |     2 | Flags                                  |
+|     14 |     1 | Operational RFM69 network ID, `1..255` |
+|     15 |    32 | Gateway device secret                  |
+|     47 |     4 | CRC32                                  |
 
 Flag bit 0 marks a configured radio network and bit 1 a present device secret; other bits are zero. An absent device secret is encoded as zero bytes. Per-node radio keys live in the registry.
 
@@ -160,44 +160,44 @@ This snapshot holds no commissioning profile. Every node has a unique factory co
 
 NVS namespace: `node-reg`; key: `registry`; magic: `RSNR`; schema version 4; maximum size 12,560 bytes. Capacity: 64 records. Serialization and read-back scratch memory are allocated off the ESP32 task stack.
 
-| ID | Use |
-| ---: | --- |
-| 0 | Unprovisioned node during commissioning |
-| 1..99 | Persistent node IDs, lowest unused ID allocated first |
-| 100 | Gateway |
-| 101..254 | Reserved |
-| 255 | Broadcast |
+|       ID | Use                                                   |
+| -------: | ----------------------------------------------------- |
+|        0 | Unprovisioned node during commissioning               |
+|    1..99 | Persistent node IDs, lowest unused ID allocated first |
+|      100 | Gateway                                               |
+| 101..254 | Reserved                                              |
+|      255 | Broadcast                                             |
 
 Pending, active, and disabled records retain their ID. Only explicit removal releases it.
 
 Each stored record is 196 bytes:
 
-| Relative offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 10 | Fixed tinyAVR factory UID |
-| 10 | 1 | Node ID |
-| 11 | 2 | Profile ID, little-endian; zero invalid |
-| 13 | 3 | Firmware major, minor, patch |
-| 16 | 1 | State: 1 pending, 2 active, 3 disabled |
-| 17 | 4 | Commissioning nonce; low counter word of a V3 nonce |
-| 21 | 1 | Display-name byte length, `0..48` |
-| 22 | 48 | Display name, UTF-8, zero-padded |
-| 70 | 1 | Transmit power ceiling from Join request, `0..31` |
-| 71 | 1 | Power policy: 0 automatic; `N + 1` fixed level `N` |
-| 72 | 1 | Stable replay slot, `0..63`; 255 means no V3 transaction |
-| 73 | 123 | `PairingTransaction` snapshot, including full LE64 nonce, exact request/accept and both derived keys; zero without a V3 transaction |
+| Relative offset | Bytes | Field                                                                                                                               |
+| --------------: | ----: | ----------------------------------------------------------------------------------------------------------------------------------- |
+|               0 |    10 | Fixed tinyAVR factory UID                                                                                                           |
+|              10 |     1 | Node ID                                                                                                                             |
+|              11 |     2 | Profile ID, little-endian; zero invalid                                                                                             |
+|              13 |     3 | Firmware major, minor, patch                                                                                                        |
+|              16 |     1 | State: 1 pending, 2 active, 3 disabled                                                                                              |
+|              17 |     4 | Commissioning nonce; low counter word of a V3 nonce                                                                                 |
+|              21 |     1 | Display-name byte length, `0..48`                                                                                                   |
+|              22 |    48 | Display name, UTF-8, zero-padded                                                                                                    |
+|              70 |     1 | Transmit power ceiling from Join request, `0..31`                                                                                   |
+|              71 |     1 | Power policy: 0 automatic; `N + 1` fixed level `N`                                                                                  |
+|              72 |     1 | Stable replay slot, `0..63`; 255 means no V3 transaction                                                                            |
+|              73 |   123 | `PairingTransaction` snapshot, including full LE64 nonce, exact request/accept and both derived keys; zero without a V3 transaction |
 
 Runtime last-seen time, RSSI, telemetry, radio power control state, and counters are not persisted.
 
-| Snapshot offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 4 | Magic `RSNR` |
-| 4 | 2 | Schema version |
-| 6 | 4 | Generation |
-| 10 | 1 | Record count |
-| 11 | 1 | Reserved, zero |
-| 12 | `count * 196` | Records |
-| end | 4 | CRC32 over preceding bytes |
+| Snapshot offset |         Bytes | Field                      |
+| --------------: | ------------: | -------------------------- |
+|               0 |             4 | Magic `RSNR`               |
+|               4 |             2 | Schema version             |
+|               6 |             4 | Generation                 |
+|              10 |             1 | Record count               |
+|              11 |             1 | Reserved, zero             |
+|              12 | `count * 196` | Records                    |
+|             end |             4 | CRC32 over preceding bytes |
 
 The state flow is `absent -> pending -> active`; explicit management may set `disabled` or remove a record. Active or disabled records cannot be replaced through pairing. `RegistryPairing` authenticates before reserving a UID, persists one immutable reply per transaction and rejects retired counter words. V3 confirmation prepares the replay slot before committing Active. Matching repeated confirmation returns `JOIN_COMPLETE` without any registry or bound write.
 
@@ -238,31 +238,31 @@ NVS namespace: `node-cmd`; slot keys: `commands_a`, `commands_b`; magic: `RSCB`;
 
 The book holds at most 16 records, one per node: its pending command, or the result of its last command. Queuing replaces the node's record; when the book is full, the oldest result is evicted, and a book of 16 pending commands refuses another. Both command slots fit under 2 KiB. The 64 KiB NVS partition holds the registry, its journal replacement and the other installation stores.
 
-| Offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 12 | Common snapshot header |
-| 12 | 1 | Record count, `0..16` |
-| 13 | 1 | Reserved, zero |
-| 14 | 2 | Next command ID, nonzero |
-| 16 | 800 | Sixteen fixed 50-byte records, oldest first |
-| 816 | 4 | CRC32 |
+| Offset | Bytes | Field                                       |
+| -----: | ----: | ------------------------------------------- |
+|      0 |    12 | Common snapshot header                      |
+|     12 |     1 | Record count, `0..16`                       |
+|     13 |     1 | Reserved, zero                              |
+|     14 |     2 | Next command ID, nonzero                    |
+|     16 |   800 | Sixteen fixed 50-byte records, oldest first |
+|    816 |     4 | CRC32                                       |
 
 Each record:
 
-| Relative offset | Bytes | Field |
-| ---: | ---: | --- |
-| 0 | 10 | Factory UID of the node the command is for |
-| 10 | 1 | Node ID, `1..99`, unique in the book |
-| 11 | 2 | Command ID, nonzero |
-| 13 | 1 | Command type |
-| 14 | 1 | Argument length |
-| 15 | 8 | Arguments, zero-padded |
-| 23 | 1 | State: 1 pending, 2 completed |
-| 24 | 1 | Result status; zero while pending |
-| 25 | 1 | Result data length; zero while pending |
-| 26 | 8 | Result data, zero-padded |
-| 34 | 8 | Queued at, UTC Unix milliseconds or zero |
-| 42 | 8 | Completed at, UTC Unix milliseconds or zero |
+| Relative offset | Bytes | Field                                       |
+| --------------: | ----: | ------------------------------------------- |
+|               0 |    10 | Factory UID of the node the command is for  |
+|              10 |     1 | Node ID, `1..99`, unique in the book        |
+|              11 |     2 | Command ID, nonzero                         |
+|              13 |     1 | Command type                                |
+|              14 |     1 | Argument length                             |
+|              15 |     8 | Arguments, zero-padded                      |
+|              23 |     1 | State: 1 pending, 2 completed               |
+|              24 |     1 | Result status; zero while pending           |
+|              25 |     1 | Result data length; zero while pending      |
+|              26 |     8 | Result data, zero-padded                    |
+|              34 |     8 | Queued at, UTC Unix milliseconds or zero    |
+|              42 |     8 | Completed at, UTC Unix milliseconds or zero |
 
 Types, argument layouts, statuses, and result lengths follow [PROTOCOL.md](../protocol/PROTOCOL.md); a completed record never holds `storage_failure`. Records after the count are entirely zero. The UID binds a command to one physical node: a record whose UID differs from the node's current registration is never delivered and is replaced by the next command for that node ID.
 

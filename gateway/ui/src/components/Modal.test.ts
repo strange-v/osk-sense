@@ -7,11 +7,12 @@ import { describe, expect, it } from 'vitest'
 import { en } from '../i18n/en'
 import Modal from './Modal.vue'
 
-const mountModal = (busy?: string) => mount(Modal, {
-  props: { title: 'Dialog', busy },
-  slots: { default: '<input class="field">' },
-  global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })] },
-})
+const mountModal = (busy?: string) =>
+  mount(Modal, {
+    props: { title: 'Dialog', busy },
+    slots: { default: '<input class="field">' },
+    global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })] },
+  })
 
 describe('Modal', () => {
   it('closes on a click on the backdrop', async () => {

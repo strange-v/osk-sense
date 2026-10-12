@@ -10,7 +10,10 @@ export function masonrySpan(height: number, gap: number, row = MASONRY_ROW_PX): 
   return Math.max(1, Math.ceil((height + gap) / row))
 }
 
-interface MasonryState { resize: ResizeObserver; mutation: MutationObserver }
+interface MasonryState {
+  resize: ResizeObserver
+  mutation: MutationObserver
+}
 const states = new WeakMap<HTMLElement, MasonryState>()
 
 function layout(grid: HTMLElement) {

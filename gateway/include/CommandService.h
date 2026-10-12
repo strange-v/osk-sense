@@ -52,14 +52,16 @@ struct Snapshot {
 bool begin(bool radioReady);
 // Lock-free: the radio task asks it for every telemetry acknowledgement.
 bool hasPending(uint8_t nodeId);
-QueueResult queue(
-    uint8_t nodeId, radiosensors::protocol::CommandType type,
-    const uint8_t* arguments, size_t argumentSize, Entry& queued);
+QueueResult queue(uint8_t nodeId,
+                  radiosensors::protocol::CommandType type,
+                  const uint8_t *arguments,
+                  size_t argumentSize,
+                  Entry &queued);
 CancelResult cancel(uint8_t nodeId);
 bool removeNode(uint8_t nodeId);
 bool clear();
-bool list(Listing& value);
+bool list(Listing &value);
 Snapshot snapshot();
 uint32_t stackFreeBytes();
 
-}  // namespace gateway::commands
+} // namespace gateway::commands

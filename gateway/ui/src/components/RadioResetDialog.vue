@@ -21,7 +21,9 @@ const failure = ref('')
 
 const invalidId = computed(() => {
   if (!networkId.value) return false
-  return !/^\d+$/.test(networkId.value) || Number(networkId.value) < 1 || Number(networkId.value) > 255
+  return (
+    !/^\d+$/.test(networkId.value) || Number(networkId.value) < 1 || Number(networkId.value) > 255
+  )
 })
 
 async function reset() {
@@ -48,31 +50,69 @@ async function reset() {
 </script>
 
 <template>
-  <Modal :title="$t('radioReset.title')" @close="restarting ? undefined : emit('close')">
-    <div v-if="restarting" class="panel-message">
+  <Modal
+    :title="$t('radioReset.title')"
+    @close="restarting ? undefined : emit('close')"
+  >
+    <div
+      v-if="restarting"
+      class="panel-message"
+    >
       <span class="loader"></span>
       <strong>{{ $t('radioReset.restarting') }}</strong>
       <p>{{ $t('radioReset.restartingHint') }}</p>
     </div>
 
-    <div v-else class="form-stack">
+    <div
+      v-else
+      class="form-stack"
+    >
       <p class="pairing-instructions">{{ $t('radioReset.intro') }}</p>
 
       <div class="notice error">
-        <span>{{ nodeCount ? $t('radioReset.consequence', { count: nodeCount }) : $t('radioReset.consequenceEmpty') }}</span>
+        <span>{{
+          nodeCount
+            ? $t('radioReset.consequence', { count: nodeCount })
+            : $t('radioReset.consequenceEmpty')
+        }}</span>
       </div>
 
       <label>
         <span>{{ $t('radioReset.networkId') }}</span>
-        <input v-model.trim="networkId" inputmode="numeric" maxlength="3" placeholder="Auto">
-        <small :class="{ invalid: invalidId }">{{ invalidId ? $t('validation.networkId') : $t('radioReset.networkIdHint') }}</small>
+        <input
+          v-model.trim="networkId"
+          inputmode="numeric"
+          maxlength="3"
+          placeholder="Auto"
+        />
+        <small :class="{ invalid: invalidId }">{{
+          invalidId ? $t('validation.networkId') : $t('radioReset.networkIdHint')
+        }}</small>
       </label>
 
-      <div v-if="failure" class="notice error">{{ $t(`error.${failure}`) }}</div>
+      <div
+        v-if="failure"
+        class="notice error"
+      >
+        {{ $t(`error.${failure}`) }}
+      </div>
 
       <div class="modal-actions">
-        <button class="button secondary" type="button" @click="emit('close')">{{ $t('common.cancel') }}</button>
-        <button class="button danger" :disabled="working || invalidId" type="button" @click="reset">{{ working ? $t('radioReset.working') : $t('radioReset.confirm') }}</button>
+        <button
+          class="button secondary"
+          type="button"
+          @click="emit('close')"
+        >
+          {{ $t('common.cancel') }}
+        </button>
+        <button
+          class="button danger"
+          :disabled="working || invalidId"
+          type="button"
+          @click="reset"
+        >
+          {{ working ? $t('radioReset.working') : $t('radioReset.confirm') }}
+        </button>
       </div>
     </div>
   </Modal>

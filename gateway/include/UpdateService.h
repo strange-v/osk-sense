@@ -21,7 +21,7 @@ struct Status {
     char availableVersion[release::kMaxVersionLength + 1]{};
     uint8_t progress = 0;
     // Constant error code of the last failed step, empty otherwise.
-    const char* error = "";
+    const char *error = "";
     // The running image is on trial: the bootloader returns to the previous
     // one unless this boot confirms it.
     bool pendingVerify = false;
@@ -37,6 +37,6 @@ bool startInstall();
 // Reinstalls the Web UI of the running firmware's release, then restarts.
 bool startUiRepair();
 Status status();
-const char* stateName(State state);
+const char *stateName(State state);
 
-}  // namespace gateway::update
+} // namespace gateway::update

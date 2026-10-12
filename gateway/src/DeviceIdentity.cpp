@@ -10,12 +10,11 @@
 namespace gateway::identity {
 namespace {
 
-char gatewayHostname[radiosensors::gateway_storage::kHostnameSize + 1] =
-    "osk-hub-uninitialized";
+char gatewayHostname[radiosensors::gateway_storage::kHostnameSize + 1] = "osk-hub-uninitialized";
 char stableGatewayId[kIdentityCharacters + 1]{};
 char currentBootId[kIdentityCharacters + 1]{};
 
-void encodeHex(const uint8_t* bytes, const size_t size, char* output) {
+void encodeHex(const uint8_t *bytes, const size_t size, char *output) {
     static constexpr char digits[] = "0123456789abcdef";
     for (size_t index = 0; index < size; ++index) {
         output[index * 2] = digits[bytes[index] >> 4];
@@ -27,13 +26,13 @@ void encodeHex(const uint8_t* bytes, const size_t size, char* output) {
 void createGatewayId(const uint8_t mac[6]) {
     static constexpr char domain[] = "radiosensors-gateway-id-v1";
     constexpr size_t domainSize = sizeof(domain) - 1;
-    uint8_t material[domainSize +
-        radiosensors::gateway_storage::kDeviceSecretSize]{};
+    uint8_t material[domainSize + radiosensors::gateway_storage::kDeviceSecretSize]{};
     memcpy(material, domain, domainSize);
     size_t materialSize = domainSize;
     const auto secrets = configuration_store::secrets();
     if (configuration_store::ready() && secrets.deviceSecretPresent) {
-        memcpy(material + materialSize, secrets.deviceSecret,
+        memcpy(material + materialSize,
+               secrets.deviceSecret,
                radiosensors::gateway_storage::kDeviceSecretSize);
         materialSize += radiosensors::gateway_storage::kDeviceSecretSize;
     } else {
@@ -47,7 +46,7 @@ void createGatewayId(const uint8_t mac[6]) {
     memset(digest, 0, sizeof(digest));
 }
 
-}  // namespace
+} // namespace
 
 // Read once, at boot. The name reaches DNS through mDNS and DHCP through
 // ETH.setHostname(), and the latter is only applied while Ethernet starts, so
@@ -59,19 +58,23 @@ void begin() {
         snprintf(gatewayHostname, sizeof(gatewayHostname), "osk-hub-unknown");
         memset(mac, 0, sizeof(mac));
     } else {
-        snprintf(
-            gatewayHostname,
-            sizeof(gatewayHostname),
-            "osk-hub-%02x%02x%02x%02x%02x%02x",
-            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        snprintf(gatewayHostname,
+                 sizeof(gatewayHostname),
+                 "osk-hub-%02x%02x%02x%02x%02x%02x",
+                 mac[0],
+                 mac[1],
+                 mac[2],
+                 mac[3],
+                 mac[4],
+                 mac[5]);
     }
     // An empty setting keeps the MAC-derived name, so a gateway is reachable
     // before anyone has chosen one and after a settings erase.
     const auto settings = configuration_store::settings();
     if (settings.hostnameLength != 0) {
         const size_t length = settings.hostnameLength < sizeof(gatewayHostname) - 1
-            ? settings.hostnameLength
-            : sizeof(gatewayHostname) - 1;
+                                  ? settings.hostnameLength
+                                  : sizeof(gatewayHostname) - 1;
         memcpy(gatewayHostname, settings.hostname, length);
         gatewayHostname[length] = '\0';
     }
@@ -82,12 +85,16 @@ void begin() {
     memset(bootBytes, 0, sizeof(bootBytes));
 }
 
-const char* hostname() {
+const char *hostname() {
     return gatewayHostname;
 }
 
-const char* gatewayId() { return stableGatewayId; }
+const char *gatewayId() {
+    return stableGatewayId;
+}
 
-const char* bootId() { return currentBootId; }
+const char *bootId() {
+    return currentBootId;
+}
 
-}  // namespace gateway::identity
+} // namespace gateway::identity

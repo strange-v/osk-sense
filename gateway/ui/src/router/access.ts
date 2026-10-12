@@ -12,10 +12,12 @@ export interface RouteAccessApi {
   session: typeof api.session
 }
 
-export type RouteAccessResult = true | {
-  path: string
-  query?: Record<string, string>
-}
+export type RouteAccessResult =
+  | true
+  | {
+      path: string
+      query?: Record<string, string>
+    }
 
 export async function resolveRouteAccess(
   target: RouteAccessTarget,

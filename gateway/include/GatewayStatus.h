@@ -27,6 +27,6 @@ void closeSetup();
 bool closePairing();
 bool openPairing();
 void indicate(Indication indication, uint32_t durationMs = 0);
-const char* indicationName();
+const char *indicationName();
 
-}  // namespace gateway::status
+} // namespace gateway::status

@@ -1,11 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import type { ApiToken } from '../api/types'
-import { TOKEN_LIMIT, canAddToken, findTokenNamed, isValidTokenName, tokenDraftError } from './tokens'
+import {
+  TOKEN_LIMIT,
+  canAddToken,
+  findTokenNamed,
+  isValidTokenName,
+  tokenDraftError,
+} from './tokens'
 
-const token = (over: Partial<ApiToken> & { id: number }): ApiToken =>
-  ({ name: `t${over.id}`, enabled: true, created_at_ms: 1_700_000_000_000, scopes: ['telemetry:read'], ...over })
+const token = (over: Partial<ApiToken> & { id: number }): ApiToken => ({
+  name: `t${over.id}`,
+  enabled: true,
+  created_at_ms: 1_700_000_000_000,
+  scopes: ['telemetry:read'],
+  ...over,
+})
 
-const fill = (count: number) => Array.from({ length: count }, (_, index) => token({ id: index + 1 }))
+const fill = (count: number) =>
+  Array.from({ length: count }, (_, index) => token({ id: index + 1 }))
 
 describe('isValidTokenName', () => {
   it('accepts 1..32 UTF-8 bytes', () => {

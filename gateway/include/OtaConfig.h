@@ -13,5 +13,4 @@ namespace gateway::ota::config {
 constexpr char password[] = GATEWAY_OTA_PASSWORD;
 constexpr bool enabled = sizeof(password) > 1;
 
-}  // namespace gateway::ota::config
-
+} // namespace gateway::ota::config

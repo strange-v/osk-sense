@@ -22,5 +22,5 @@ constexpr uint16_t profileIdValue(const ProfileId profile) {
     return static_cast<uint16_t>(profile);
 }
 
-}  // namespace protocol
-}  // namespace radiosensors
+} // namespace protocol
+} // namespace radiosensors

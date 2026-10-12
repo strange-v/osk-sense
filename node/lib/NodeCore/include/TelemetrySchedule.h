@@ -9,41 +9,35 @@ constexpr uint32_t kEventNodeKeepAliveMs = 60UL * 60UL * 1000UL;
 constexpr uint32_t kCounterMinimumReportMs = 60UL * 1000UL;
 
 class ClimateReportPolicy {
-public:
+  public:
     static ClimateReportPolicy fixed(const uint32_t intervalMs) {
         return ClimateReportPolicy(intervalMs, intervalMs, 0);
     }
 
-    static ClimateReportPolicy adaptive(
-        const uint32_t chargedIntervalMs,
-        const uint32_t lowChargeIntervalMs,
-        const uint16_t lowChargeThresholdMv) {
-        return ClimateReportPolicy(
-            chargedIntervalMs, lowChargeIntervalMs, lowChargeThresholdMv);
+    static ClimateReportPolicy adaptive(const uint32_t chargedIntervalMs,
+                                        const uint32_t lowChargeIntervalMs,
+                                        const uint16_t lowChargeThresholdMv) {
+        return ClimateReportPolicy(chargedIntervalMs, lowChargeIntervalMs, lowChargeThresholdMv);
     }
 
     uint32_t intervalForMillivolts(const uint16_t supplyMillivolts) const {
-        return supplyMillivolts > lowChargeThresholdMv_
-            ? chargedIntervalMs_
-            : lowChargeIntervalMs_;
+        return supplyMillivolts > lowChargeThresholdMv_ ? chargedIntervalMs_ : lowChargeIntervalMs_;
     }
 
-private:
-    ClimateReportPolicy(
-        const uint32_t chargedIntervalMs,
-        const uint32_t lowChargeIntervalMs,
-        const uint16_t lowChargeThresholdMv)
-        : chargedIntervalMs_(chargedIntervalMs),
-          lowChargeIntervalMs_(lowChargeIntervalMs),
-          lowChargeThresholdMv_(lowChargeThresholdMv) {}
+  private:
+    ClimateReportPolicy(const uint32_t chargedIntervalMs,
+                        const uint32_t lowChargeIntervalMs,
+                        const uint16_t lowChargeThresholdMv)
+        : chargedIntervalMs_(chargedIntervalMs), lowChargeIntervalMs_(lowChargeIntervalMs),
+          lowChargeThresholdMv_(lowChargeThresholdMv) {
+    }
 
     uint32_t chargedIntervalMs_;
     uint32_t lowChargeIntervalMs_;
     uint16_t lowChargeThresholdMv_;
 };
 
-inline bool intervalElapsed(
-    const uint32_t now, const uint32_t since, const uint32_t interval) {
+inline bool intervalElapsed(const uint32_t now, const uint32_t since, const uint32_t interval) {
     return static_cast<uint32_t>(now - since) >= interval;
 }
 
@@ -51,9 +45,9 @@ inline bool intervalElapsed(
 // for the supply voltage it measured, so a node that loses the gateway while
 // its charge falls still slows down.
 class ClimateReportSchedule {
-public:
-    explicit ClimateReportSchedule(const ClimateReportPolicy policy)
-        : policy_(policy) {}
+  public:
+    explicit ClimateReportSchedule(const ClimateReportPolicy policy) : policy_(policy) {
+    }
 
     bool due(const uint32_t now) const {
         return !hasAttempt_ || intervalElapsed(now, lastAttempt_, intervalMs_);
@@ -67,7 +61,7 @@ public:
         return intervalMs_;
     }
 
-private:
+  private:
     ClimateReportPolicy policy_;
     uint32_t intervalMs_ = 0;
     uint32_t lastAttempt_ = 0;
@@ -75,13 +69,13 @@ private:
 };
 
 class RollingKeepAlive {
-public:
-    explicit RollingKeepAlive(const uint32_t intervalMs)
-        : intervalMs_(intervalMs) {}
+  public:
+    explicit RollingKeepAlive(const uint32_t intervalMs) : intervalMs_(intervalMs) {
+    }
 
     bool due(const uint32_t now) const {
         return !hasSuccessfulTransmission_ ||
-            intervalElapsed(now, lastSuccessfulTransmission_, intervalMs_);
+               intervalElapsed(now, lastSuccessfulTransmission_, intervalMs_);
     }
 
     void transmissionSucceeded(const uint32_t now) {
@@ -89,19 +83,21 @@ public:
         hasSuccessfulTransmission_ = true;
     }
 
-    void setInterval(const uint32_t intervalMs) { intervalMs_ = intervalMs; }
+    void setInterval(const uint32_t intervalMs) {
+        intervalMs_ = intervalMs;
+    }
 
-private:
+  private:
     uint32_t intervalMs_;
     uint32_t lastSuccessfulTransmission_ = 0;
     bool hasSuccessfulTransmission_ = false;
 };
 
 class BinaryReportSchedule {
-public:
-    explicit BinaryReportSchedule(
-        const uint32_t intervalMs = kEventNodeKeepAliveMs)
-        : keepAlive_(intervalMs) {}
+  public:
+    explicit BinaryReportSchedule(const uint32_t intervalMs = kEventNodeKeepAliveMs)
+        : keepAlive_(intervalMs) {
+    }
 
     void stateChanged() {
         stateChanged_ = true;
@@ -125,18 +121,20 @@ public:
         keepAlive_.transmissionSucceeded(now);
     }
 
-private:
+  private:
     RollingKeepAlive keepAlive_;
     bool stateChanged_ = false;
     bool urgent_ = false;
 };
 
 class CounterReportSchedule {
-public:
-    CounterReportSchedule()
-        : keepAlive_(kEventNodeKeepAliveMs) {}
+  public:
+    CounterReportSchedule() : keepAlive_(kEventNodeKeepAliveMs) {
+    }
 
-    void pulseRecorded() { countChanged_ = true; }
+    void pulseRecorded() {
+        countChanged_ = true;
+    }
 
     void countSet() {
         countChanged_ = true;
@@ -152,9 +150,8 @@ public:
 
     bool due(const uint32_t now) const {
         return immediateReportPending_ || keepAlive_.due(now) ||
-            (countChanged_ && hasSuccessfulTransmission_ &&
-             intervalElapsed(
-                 now, lastSuccessfulTransmission_, kCounterMinimumReportMs));
+               (countChanged_ && hasSuccessfulTransmission_ &&
+                intervalElapsed(now, lastSuccessfulTransmission_, kCounterMinimumReportMs));
     }
 
     void transmissionSucceeded(const uint32_t now) {
@@ -165,7 +162,7 @@ public:
         keepAlive_.transmissionSucceeded(now);
     }
 
-private:
+  private:
     RollingKeepAlive keepAlive_;
     uint32_t lastSuccessfulTransmission_ = 0;
     bool hasSuccessfulTransmission_ = false;
@@ -178,11 +175,14 @@ private:
 // minutes, and hourly once the gateway has been silent for a day, which spares
 // the battery of a node whose gateway is gone for good.
 class RadioRetryBackoff {
-public:
+  public:
     // For an image whose report schedule already paces its retries.
-    static RadioRetryBackoff none() { return RadioRetryBackoff(false); }
+    static RadioRetryBackoff none() {
+        return RadioRetryBackoff(false);
+    }
 
-    RadioRetryBackoff() : RadioRetryBackoff(true) {}
+    RadioRetryBackoff() : RadioRetryBackoff(true) {
+    }
 
     bool allowed(const uint32_t now) const {
         return !enabled_ || !waiting_ || intervalElapsed(now, failedAt_, delayMs_);
@@ -202,21 +202,24 @@ public:
             failureLevel_ = 0;
             silentForDay_ = false;
         } else {
-            if (failureLevel_ < kLastLevel) ++failureLevel_;
+            if (failureLevel_ < kLastLevel)
+                ++failureLevel_;
             // Latched: the elapsed time wraps after 49 days.
-            if (intervalElapsed(now, firstFailedAt_, kSilentDayMs)) {
+            if (intervalElapsed(now, firstFailedAt_, kSilentDayMs))
                 silentForDay_ = true;
-            }
         }
         failedAt_ = now;
         delayMs_ = silentForDay_ ? kSilentDayDelayMs : delays[failureLevel_];
         waiting_ = true;
     }
 
-    void succeeded() { waiting_ = false; }
+    void succeeded() {
+        waiting_ = false;
+    }
 
-private:
-    explicit RadioRetryBackoff(const bool enabled) : enabled_(enabled) {}
+  private:
+    explicit RadioRetryBackoff(const bool enabled) : enabled_(enabled) {
+    }
 
     uint32_t firstFailedAt_ = 0;
     uint32_t failedAt_ = 0;
@@ -232,23 +235,24 @@ private:
 // session per report: at most one per five minutes, and after one the gateway
 // did not answer, the radio retry delays.
 class HintedSessionPolicy {
-public:
+  public:
     static constexpr uint32_t kMinimumIntervalMs = 5UL * 60UL * 1000UL;
 
     bool allowed(const uint32_t now) const {
-        return (!hasSession_ ||
-                intervalElapsed(now, lastSession_, kMinimumIntervalMs)) &&
-            unanswered_.allowed(now);
+        return (!hasSession_ || intervalElapsed(now, lastSession_, kMinimumIntervalMs)) &&
+               unanswered_.allowed(now);
     }
 
     void finished(const uint32_t now, const bool answered) {
         lastSession_ = now;
         hasSession_ = true;
-        if (answered) unanswered_.succeeded();
-        else unanswered_.failed(now);
+        if (answered)
+            unanswered_.succeeded();
+        else
+            unanswered_.failed(now);
     }
 
-private:
+  private:
     RadioRetryBackoff unanswered_;
     uint32_t lastSession_ = 0;
     bool hasSession_ = false;
@@ -260,32 +264,33 @@ private:
 // unconfigured node waits for the button, because the gateway accepts a Join
 // request only inside a pairing window.
 class JoinRetrySchedule {
-public:
+  public:
     static constexpr uint32_t kBurstIntervalMs = 5UL * 60UL * 1000UL;
     static constexpr uint8_t kBurstAttempts = 12;
     static constexpr uint32_t kProvisionalIntervalMs = 60UL * 60UL * 1000UL;
 
     bool due(const uint32_t now, const bool provisional) const {
-        if (!attempted_) return true;
-        if (burstAttempts_ < kBurstAttempts) {
+        if (!attempted_)
+            return true;
+        if (burstAttempts_ < kBurstAttempts)
             return intervalElapsed(now, lastAttempt_, kBurstIntervalMs);
-        }
-        return provisional &&
-            intervalElapsed(now, lastAttempt_, kProvisionalIntervalMs);
+        return provisional && intervalElapsed(now, lastAttempt_, kProvisionalIntervalMs);
     }
 
     void attempted(const uint32_t now, const bool requestedByButton) {
-        if (requestedByButton) burstAttempts_ = 0;
-        if (burstAttempts_ < kBurstAttempts) ++burstAttempts_;
+        if (requestedByButton)
+            burstAttempts_ = 0;
+        if (burstAttempts_ < kBurstAttempts)
+            ++burstAttempts_;
         lastAttempt_ = now;
         attempted_ = true;
     }
 
-private:
+  private:
     uint32_t lastAttempt_ = 0;
     uint8_t burstAttempts_ = 0;
     bool attempted_ = false;
 };
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

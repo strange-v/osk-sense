@@ -9,7 +9,7 @@ namespace {
 
 bool watchdogRegistered = false;
 
-}  // namespace
+} // namespace
 
 bool beginWatchdog() {
     // Arduino initializes the global TWDT before setup(). Reconfiguring it here
@@ -21,48 +21,47 @@ bool beginWatchdog() {
 }
 
 void feedWatchdog() {
-    if (watchdogRegistered) {
+    if (watchdogRegistered)
         esp_task_wdt_reset();
-    }
 }
 
-const char* resetReason() {
+const char *resetReason() {
     switch (esp_reset_reason()) {
-        case ESP_RST_UNKNOWN:
-            return "unknown";
-        case ESP_RST_POWERON:
-            return "power_on";
-        case ESP_RST_EXT:
-            return "external";
-        case ESP_RST_SW:
-            return "software";
-        case ESP_RST_PANIC:
-            return "panic";
-        case ESP_RST_INT_WDT:
-            return "interrupt_watchdog";
-        case ESP_RST_TASK_WDT:
-            return "task_watchdog";
-        case ESP_RST_WDT:
-            return "watchdog";
-        case ESP_RST_DEEPSLEEP:
-            return "deep_sleep";
-        case ESP_RST_BROWNOUT:
-            return "brownout";
-        case ESP_RST_SDIO:
-            return "sdio";
-        case ESP_RST_USB:
-            return "usb";
-        case ESP_RST_JTAG:
-            return "jtag";
-        case ESP_RST_EFUSE:
-            return "efuse";
-        case ESP_RST_PWR_GLITCH:
-            return "power_glitch";
-        case ESP_RST_CPU_LOCKUP:
-            return "cpu_lockup";
-        default:
-            return "other";
+    case ESP_RST_UNKNOWN:
+        return "unknown";
+    case ESP_RST_POWERON:
+        return "power_on";
+    case ESP_RST_EXT:
+        return "external";
+    case ESP_RST_SW:
+        return "software";
+    case ESP_RST_PANIC:
+        return "panic";
+    case ESP_RST_INT_WDT:
+        return "interrupt_watchdog";
+    case ESP_RST_TASK_WDT:
+        return "task_watchdog";
+    case ESP_RST_WDT:
+        return "watchdog";
+    case ESP_RST_DEEPSLEEP:
+        return "deep_sleep";
+    case ESP_RST_BROWNOUT:
+        return "brownout";
+    case ESP_RST_SDIO:
+        return "sdio";
+    case ESP_RST_USB:
+        return "usb";
+    case ESP_RST_JTAG:
+        return "jtag";
+    case ESP_RST_EFUSE:
+        return "efuse";
+    case ESP_RST_PWR_GLITCH:
+        return "power_glitch";
+    case ESP_RST_CPU_LOCKUP:
+        return "cpu_lockup";
+    default:
+        return "other";
     }
 }
 
-}  // namespace gateway::diagnostics
+} // namespace gateway::diagnostics

@@ -18,7 +18,7 @@ uint8_t nodesSeen = 0;
 uint32_t updates = 0;
 uint8_t lastNodeId = 0;
 
-}  // namespace
+} // namespace
 
 bool begin() {
     mutex = xSemaphoreCreateMutex();
@@ -30,21 +30,24 @@ bool begin() {
     return true;
 }
 
-bool accept(const radio::ReceivedFrame& frame) {
-    if (mutex == nullptr || frame.senderId < kFirstNodeId ||
-        frame.senderId > kLastNodeId || frame.size > radio::kMaxPayloadSize) {
+bool accept(const radio::ReceivedFrame &frame) {
+    if (mutex == nullptr || frame.senderId < kFirstNodeId || frame.senderId > kLastNodeId ||
+        frame.size > radio::kMaxPayloadSize) {
         return false;
     }
 
     uint16_t profileId = 0;
-    if (!registry_store::activeFrameIdentity(
-            static_cast<uint8_t>(frame.senderId), frame.salt, nullptr, profileId)) {
+    if (!registry_store::activeFrameIdentity(static_cast<uint8_t>(frame.senderId),
+                                             frame.salt,
+                                             nullptr,
+                                             profileId)) {
         return false;
     }
 
-    if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return false;
+    if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
+        return false;
     const uint8_t nodeId = static_cast<uint8_t>(frame.senderId);
-    Record& record = records[nodeId];
+    Record &record = records[nodeId];
     if (!present[nodeId]) {
         present[nodeId] = true;
         ++nodesSeen;
@@ -61,19 +64,21 @@ bool accept(const radio::ReceivedFrame& frame) {
     return true;
 }
 
-bool find(const uint8_t nodeId, Record& record) {
-    if (mutex == nullptr || nodeId < kFirstNodeId || nodeId > kLastNodeId) {
+bool find(const uint8_t nodeId, Record &record) {
+    if (mutex == nullptr || nodeId < kFirstNodeId || nodeId > kLastNodeId)
         return false;
-    }
-    if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return false;
+    if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
+        return false;
     const bool found = present[nodeId];
-    if (found) record = records[nodeId];
+    if (found)
+        record = records[nodeId];
     xSemaphoreGive(mutex);
     return found;
 }
 
 void clear() {
-    if (mutex == nullptr || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return;
+    if (mutex == nullptr || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
+        return;
     for (uint8_t nodeId = kFirstNodeId; nodeId <= kLastNodeId; ++nodeId) {
         present[nodeId] = false;
         records[nodeId] = Record{};
@@ -85,18 +90,18 @@ void clear() {
 
 void erase(const uint8_t nodeId) {
     if (mutex == nullptr || nodeId < kFirstNodeId || nodeId > kLastNodeId ||
-        xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) return;
+        xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
+        return;
     if (present[nodeId]) {
         present[nodeId] = false;
         records[nodeId] = Record{};
-        if (nodesSeen != 0) --nodesSeen;
+        if (nodesSeen != 0)
+            --nodesSeen;
         if (lastNodeId == nodeId) {
             lastNodeId = 0;
             uint32_t newestSequence = 0;
-            for (uint8_t candidate = kFirstNodeId;
-                 candidate <= kLastNodeId; ++candidate) {
-                if (present[candidate] &&
-                    records[candidate].sequence > newestSequence) {
+            for (uint8_t candidate = kFirstNodeId; candidate <= kLastNodeId; ++candidate) {
+                if (present[candidate] && records[candidate].sequence > newestSequence) {
                     newestSequence = records[candidate].sequence;
                     lastNodeId = candidate;
                 }
@@ -108,15 +113,15 @@ void erase(const uint8_t nodeId) {
 
 Snapshot snapshot() {
     Snapshot result{};
-    if (mutex == nullptr || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) {
+    if (mutex == nullptr || xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE)
         return result;
-    }
     result.nodesSeen = nodesSeen;
     result.updates = updates;
     result.hasLast = lastNodeId != 0 && present[lastNodeId];
-    if (result.hasLast) result.last = records[lastNodeId];
+    if (result.hasLast)
+        result.last = records[lastNodeId];
     xSemaphoreGive(mutex);
     return result;
 }
 
-}  // namespace gateway::telemetry_store
+} // namespace gateway::telemetry_store

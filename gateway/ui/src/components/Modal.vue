@@ -46,18 +46,40 @@ function onBackdropClick(event: MouseEvent) {
 </script>
 
 <template>
-  <div class="modal-backdrop" @pointerdown="onBackdropPointerDown" @click="onBackdropClick">
-    <section class="modal" role="dialog" aria-modal="true" :aria-label="title" :aria-busy="busy ? 'true' : undefined">
+  <div
+    class="modal-backdrop"
+    @pointerdown="onBackdropPointerDown"
+    @click="onBackdropClick"
+  >
+    <section
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="title"
+      :aria-busy="busy ? 'true' : undefined"
+    >
       <header class="modal-header">
-        <slot name="title"><h2>{{ title }}</h2></slot>
-        <button class="icon-button" type="button" :disabled="!!busy" :aria-label="$t('common.close')" @click="emit('close')">
+        <slot name="title"
+          ><h2>{{ title }}</h2></slot
+        >
+        <button
+          class="icon-button"
+          type="button"
+          :disabled="!!busy"
+          :aria-label="$t('common.close')"
+          @click="emit('close')"
+        >
           <Icon name="close" />
         </button>
       </header>
       <div class="modal-body">
         <slot />
       </div>
-      <div v-if="busy" class="modal-mask" role="status">
+      <div
+        v-if="busy"
+        class="modal-mask"
+        role="status"
+      >
         <span class="loader"></span>
         <p>{{ busy }}</p>
       </div>
@@ -66,22 +88,72 @@ function onBackdropClick(event: MouseEvent) {
 </template>
 
 <style scoped>
-.modal-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: var(--space-4); background: #000000a6; }
-.modal { position: relative; width: min(500px, 100%); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-lg); }
-.modal-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); height: 52px; flex: none; padding: 0 var(--space-5); border-bottom: 1px solid var(--line); }
-.modal-header h2 { font-size: var(--text-lg); }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: #000000a6;
+}
+.modal {
+  position: relative;
+  width: min(500px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  height: 52px;
+  flex: none;
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--line);
+}
+.modal-header h2 {
+  font-size: var(--text-lg);
+}
 /* Pull the button out by half its own padding so the glyph, not the invisible
    hit area around it, lines up with the title's edge. */
-.modal-header .icon-button { margin-right: calc(var(--space-2) * -1); }
-.modal-body { padding: var(--space-5); }
+.modal-header .icon-button {
+  margin-right: calc(var(--space-2) * -1);
+}
+.modal-body {
+  padding: var(--space-5);
+}
 /* Covers the panel rather than the viewport, so the title stays readable and
    the dialog does not appear to jump to a different surface. Opaque enough to
    read the label against, sheer enough to keep the context behind it. */
-.modal-mask { position: absolute; inset: 0; z-index: 1; display: grid; align-content: center; justify-items: center; gap: var(--space-1); padding: var(--space-5); background: color-mix(in srgb, var(--surface) 88%, transparent); text-align: center; }
-.modal-mask p { color: var(--ink-soft); font-size: var(--text-sm); }
+.modal-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-5);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  text-align: center;
+}
+.modal-mask p {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
 
 @media (max-width: 640px) {
-  .modal-header { padding-inline: var(--space-4); }
-  .modal-body { padding: var(--space-4); }
+  .modal-header {
+    padding-inline: var(--space-4);
+  }
+  .modal-body {
+    padding: var(--space-4);
+  }
 }
 </style>

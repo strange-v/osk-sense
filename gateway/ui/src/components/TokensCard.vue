@@ -79,34 +79,74 @@ async function remove() {
 
 onMounted(load)
 // Nothing keeps the secret alive past this screen.
-onUnmounted(() => { created.value = null })
+onUnmounted(() => {
+  created.value = null
+})
 </script>
 
 <template>
   <section class="panel admin-card">
     <header class="panel-heading">
-      <div><h2>{{ $t('tokens.title') }}</h2><p>{{ $t('tokens.hint') }}</p></div>
+      <div>
+        <h2>{{ $t('tokens.title') }}</h2>
+        <p>{{ $t('tokens.hint') }}</p>
+      </div>
       <span class="panel-count">{{ tokens.length }} / {{ TOKEN_LIMIT }}</span>
     </header>
 
-    <div v-if="created" class="revealed-token notice">
+    <div
+      v-if="created"
+      class="revealed-token notice"
+    >
       <div>
         <strong>{{ $t('tokens.createdTitle', { name: created.name }) }}</strong>
         <span>{{ $t('tokens.createdWarning') }}</span>
         <code class="generated-token">{{ created.token }}</code>
         <div class="revealed-actions">
-          <button class="button secondary" type="button" @click="copy">{{ copied ? $t('tokens.copied') : $t('tokens.copy') }}</button>
-          <span v-if="copyFailed" class="notice error" role="alert">{{ $t('tokens.copyFailed') }}</span>
-          <button class="button primary" type="button" @click="created = null">{{ $t('tokens.saved') }}</button>
+          <button
+            class="button secondary"
+            type="button"
+            @click="copy"
+          >
+            {{ copied ? $t('tokens.copied') : $t('tokens.copy') }}
+          </button>
+          <span
+            v-if="copyFailed"
+            class="notice error"
+            role="alert"
+            >{{ $t('tokens.copyFailed') }}</span
+          >
+          <button
+            class="button primary"
+            type="button"
+            @click="created = null"
+          >
+            {{ $t('tokens.saved') }}
+          </button>
         </div>
       </div>
     </div>
 
-    <div v-if="loading" class="empty-state"><span class="loader"></span></div>
+    <div
+      v-if="loading"
+      class="empty-state"
+    >
+      <span class="loader"></span>
+    </div>
     <template v-else>
-      <ul v-if="tokens.length" class="token-list">
-        <li v-for="token in tokens" :key="token.id">
-          <span class="token-symbol" aria-hidden="true"><Icon name="key" /></span>
+      <ul
+        v-if="tokens.length"
+        class="token-list"
+      >
+        <li
+          v-for="token in tokens"
+          :key="token.id"
+        >
+          <span
+            class="token-symbol"
+            aria-hidden="true"
+            ><Icon name="key"
+          /></span>
           <span class="token-name">
             <strong>{{ token.name }}</strong>
             <small>{{ dateTime(locale, token.created_at_ms) }}</small>
@@ -118,20 +158,54 @@ onUnmounted(() => { created.value = null })
               :aria-label="$t('tokens.deleteToken', { name: token.name })"
               :title="$t('tokens.delete')"
               @click="removing = token"
-            ><Icon name="delete" /></button>
+            >
+              <Icon name="delete" />
+            </button>
           </span>
         </li>
       </ul>
-      <p v-else class="capacity-note">{{ $t('tokens.empty') }}</p>
+      <p
+        v-else
+        class="capacity-note"
+      >
+        {{ $t('tokens.empty') }}
+      </p>
 
-      <div v-if="failure" class="notice error">{{ $t(`error.${failure}`) }}</div>
-      <p v-if="full" class="capacity-note">{{ $t('tokens.capacity', { limit: TOKEN_LIMIT }) }}</p>
-      <button v-else class="button primary" type="button" @click="adding = true"><Icon name="plus" /> {{ $t('tokens.add') }}</button>
+      <div
+        v-if="failure"
+        class="notice error"
+      >
+        {{ $t(`error.${failure}`) }}
+      </div>
+      <p
+        v-if="full"
+        class="capacity-note"
+      >
+        {{ $t('tokens.capacity', { limit: TOKEN_LIMIT }) }}
+      </p>
+      <button
+        v-else
+        class="button primary"
+        type="button"
+        @click="adding = true"
+      >
+        <Icon name="plus" /> {{ $t('tokens.add') }}
+      </button>
     </template>
 
-    <TokenDialog v-if="adding" :tokens="tokens" @close="adding = false" @created="afterCreate" />
+    <TokenDialog
+      v-if="adding"
+      :tokens="tokens"
+      @close="adding = false"
+      @created="afterCreate"
+    />
 
-    <Modal v-if="removing" :title="$t('tokens.deleteTitle')" :busy="deleteBusy ? $t('tokens.deleting') : undefined" @close="removing = null">
+    <Modal
+      v-if="removing"
+      :title="$t('tokens.deleteTitle')"
+      :busy="deleteBusy ? $t('tokens.deleting') : undefined"
+      @close="removing = null"
+    >
       <div class="form-stack">
         <div class="notice error">
           <span>
@@ -140,8 +214,21 @@ onUnmounted(() => { created.value = null })
           </span>
         </div>
         <div class="modal-actions">
-          <button class="button secondary" type="button" @click="removing = null">{{ $t('common.cancel') }}</button>
-          <button class="button danger" :disabled="deleteBusy" type="button" @click="remove">{{ $t('tokens.delete') }}</button>
+          <button
+            class="button secondary"
+            type="button"
+            @click="removing = null"
+          >
+            {{ $t('common.cancel') }}
+          </button>
+          <button
+            class="button danger"
+            :disabled="deleteBusy"
+            type="button"
+            @click="remove"
+          >
+            {{ $t('tokens.delete') }}
+          </button>
         </div>
       </div>
     </Modal>
@@ -149,7 +236,13 @@ onUnmounted(() => { created.value = null })
 </template>
 
 <style scoped>
-.token-list { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.token-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .token-list li {
   display: flex;
   flex-wrap: wrap;
@@ -157,18 +250,58 @@ onUnmounted(() => { created.value = null })
   gap: var(--space-2) var(--space-3);
   padding: var(--space-2) 0;
 }
-.token-list li + li { box-shadow: 0 -1px 0 var(--line); }
-.token-symbol { width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--radius-md); color: var(--primary); background: var(--primary-soft); }
-.token-name { flex: 1 1 8rem; min-width: 0; display: grid; }
-.token-name strong { font-size: var(--text-md); font-weight: 500; }
-.token-name small { color: var(--muted); font-size: var(--text-xs); }
-.token-actions { display: flex; margin-left: auto; }
-.token-actions .icon-button { width: 30px; height: 30px; font-size: var(--text-md); }
-.capacity-note { color: var(--ink-soft); font-size: var(--text-sm); }
+.token-list li + li {
+  box-shadow: 0 -1px 0 var(--line);
+}
+.token-symbol {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.token-name {
+  flex: 1 1 8rem;
+  min-width: 0;
+  display: grid;
+}
+.token-name strong {
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+.token-name small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.token-actions {
+  display: flex;
+  margin-left: auto;
+}
+.token-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  font-size: var(--text-md);
+}
+.capacity-note {
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
 /* Not a dialog: the secret cannot be recovered, so it must not be possible to
    lose it by clicking beside a modal. */
-.revealed-token { margin-bottom: 0; }
-.revealed-token > div { display: grid; }
-.revealed-token strong { color: var(--warning); }
-.revealed-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.revealed-token {
+  margin-bottom: 0;
+}
+.revealed-token > div {
+  display: grid;
+}
+.revealed-token strong {
+  color: var(--warning);
+}
+.revealed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
 </style>

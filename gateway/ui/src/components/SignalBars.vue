@@ -34,18 +34,48 @@ const level = computed(() => {
 </script>
 
 <template>
-  <span class="signal-bars" :class="{ weak: level <= 1 }" :aria-label="measured ? `${rssi} dBm` : undefined">
-    <i v-for="bar in 4" :key="bar" :class="{ on: bar <= level }"></i>
+  <span
+    class="signal-bars"
+    :class="{ weak: level <= 1 }"
+    :aria-label="measured ? `${rssi} dBm` : undefined"
+  >
+    <i
+      v-for="bar in 4"
+      :key="bar"
+      :class="{ on: bar <= level }"
+    ></i>
   </span>
 </template>
 
 <style scoped>
-.signal-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; color: var(--primary); }
-.signal-bars.weak { color: var(--warning); }
-.signal-bars i { width: 3px; border-radius: 1px; background: var(--line-strong); }
-.signal-bars i.on { background: currentColor; }
-.signal-bars i:nth-child(1) { height: 4px; }
-.signal-bars i:nth-child(2) { height: 7px; }
-.signal-bars i:nth-child(3) { height: 10px; }
-.signal-bars i:nth-child(4) { height: 13px; }
+.signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 13px;
+  color: var(--primary);
+}
+.signal-bars.weak {
+  color: var(--warning);
+}
+.signal-bars i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--line-strong);
+}
+.signal-bars i.on {
+  background: currentColor;
+}
+.signal-bars i:nth-child(1) {
+  height: 4px;
+}
+.signal-bars i:nth-child(2) {
+  height: 7px;
+}
+.signal-bars i:nth-child(3) {
+  height: 10px;
+}
+.signal-bars i:nth-child(4) {
+  height: 13px;
+}
 </style>

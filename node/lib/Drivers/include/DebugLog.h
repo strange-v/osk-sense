@@ -10,18 +10,17 @@
 namespace radiosensors {
 namespace node {
 
-__attribute__((noinline)) inline void debugLine(
-    const __FlashStringHelper* text) {
+__attribute__((noinline)) inline void debugLine(const __FlashStringHelper *text) {
     Serial.println(text);
 }
 
 // Prints `tag` followed by `value` and ends the line.
-__attribute__((noinline)) inline void debugValue(
-    const __FlashStringHelper* tag, const uint32_t value) {
+__attribute__((noinline)) inline void debugValue(const __FlashStringHelper *tag,
+                                                 const uint32_t value) {
     Serial.print(tag);
     Serial.println(value);
 }
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors
 #endif

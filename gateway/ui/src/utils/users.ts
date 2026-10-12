@@ -36,7 +36,12 @@ export function canAddUser(users: GatewayUser[]): boolean {
   return users.length < USER_LIMIT
 }
 
-export type UserDraft = { username: string; password: string; role: 'admin' | 'viewer'; enabled: boolean }
+export type UserDraft = {
+  username: string
+  password: string
+  role: 'admin' | 'viewer'
+  enabled: boolean
+}
 
 // `existing` is undefined when adding. On edit an empty password means "keep
 // the stored one", so it is only validated when something was typed.
@@ -46,12 +51,17 @@ export function userDraftError(
   existing?: GatewayUser,
 ): 'invalid_username' | 'username_taken' | 'invalid_password' | 'last_admin_required' | '' {
   if (!isValidUsername(draft.username)) return 'invalid_username'
-  if (users.some((entry) => entry.username === draft.username && entry.id !== existing?.id)) return 'username_taken'
+  if (users.some((entry) => entry.username === draft.username && entry.id !== existing?.id))
+    return 'username_taken'
   const passwordRequired = existing === undefined
   if (passwordRequired || draft.password.length > 0) {
     if (!isValidPassword(draft.password)) return 'invalid_password'
   }
-  if (existing && isLastEnabledAdmin(users, existing) && (draft.role !== 'admin' || !draft.enabled)) {
+  if (
+    existing &&
+    isLastEnabledAdmin(users, existing) &&
+    (draft.role !== 'admin' || !draft.enabled)
+  ) {
     return 'last_admin_required'
   }
   return ''

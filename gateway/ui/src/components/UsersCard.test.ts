@@ -12,7 +12,12 @@ import type { GatewayUser } from '../api/types'
 const state = vi.hoisted(() => ({ users: [] as GatewayUser[], self: 1 }))
 const gatewayApi = vi.hoisted(() => ({
   users: vi.fn(async () => ({ users: [...state.users] })),
-  createUser: vi.fn(async () => ({ id: 9, username: 'new', role: 'viewer' as const, enabled: true })),
+  createUser: vi.fn(async () => ({
+    id: 9,
+    username: 'new',
+    role: 'viewer' as const,
+    enabled: true,
+  })),
   updateUser: vi.fn(async () => state.users[0]),
   deleteUser: vi.fn(async () => undefined),
 }))
@@ -24,13 +29,19 @@ vi.mock('../api/client', () => ({
 
 import UsersCard from './UsersCard.vue'
 
-const user = (over: Partial<GatewayUser> & { id: number }): GatewayUser =>
-  ({ username: `u${over.id}`, role: 'viewer', enabled: true, ...over })
+const user = (over: Partial<GatewayUser> & { id: number }): GatewayUser => ({
+  username: `u${over.id}`,
+  role: 'viewer',
+  enabled: true,
+  ...over,
+})
 const admin = user({ id: 1, username: 'admin', role: 'admin' })
 const viewer = user({ id: 2, username: 'olena' })
 
 const mountCard = async () => {
-  const wrapper = mount(UsersCard, { global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })] } })
+  const wrapper = mount(UsersCard, {
+    global: { plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })] },
+  })
   await flushPromises()
   return wrapper
 }

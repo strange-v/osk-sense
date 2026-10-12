@@ -8,7 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { en } from '../i18n/en'
 import type { CommandRequest, GatewayNode, NodeCommand } from '../api/types'
 
-const state = vi.hoisted(() => ({ commands: [] as NodeCommand[], admin: null as unknown as Ref<boolean> }))
+const state = vi.hoisted(() => ({
+  commands: [] as NodeCommand[],
+  admin: null as unknown as Ref<boolean>,
+}))
 const gatewayApi = vi.hoisted(() => ({
   commands: vi.fn(),
   poll: { commands: vi.fn() },
@@ -24,12 +27,24 @@ vi.mock('../api/client', async () => {
 import NodeCommands from './NodeCommands.vue'
 
 const node = (over: Partial<GatewayNode> = {}): GatewayNode => ({
-  node_id: 6, device_uid: 'C0FFEE00112233445566', display_name: 'Gas', profile_id: 6,
-  firmware: '0.1.0', state: 'active', has_telemetry: true, ...over,
+  node_id: 6,
+  device_uid: 'C0FFEE00112233445566',
+  display_name: 'Gas',
+  profile_id: 6,
+  firmware: '0.1.0',
+  state: 'active',
+  has_telemetry: true,
+  ...over,
 })
 
 const pending = (over: Partial<NodeCommand> = {}): NodeCommand => ({
-  node_id: 6, command_id: 7, type: 'set_count', arguments: { count: 1234 }, queued_at_ms: 1, state: 'pending', ...over,
+  node_id: 6,
+  command_id: 7,
+  type: 'set_count',
+  arguments: { count: 1234 },
+  queued_at_ms: 1,
+  state: 'pending',
+  ...over,
 })
 
 async function mountCard(target = node()) {
@@ -43,8 +58,13 @@ async function mountCard(target = node()) {
 
 type Card = Awaited<ReturnType<typeof mountCard>>
 const composeButton = (wrapper: Card) => wrapper.find('.commands-head .button')
-const compose = async (wrapper: Card) => { await wrapper.get('.commands-head .button').trigger('click') }
-const tick = async (ms = 3_000) => { await vi.advanceTimersByTimeAsync(ms); await flushPromises() }
+const compose = async (wrapper: Card) => {
+  await wrapper.get('.commands-head .button').trigger('click')
+}
+const tick = async (ms = 3_000) => {
+  await vi.advanceTimersByTimeAsync(ms)
+  await flushPromises()
+}
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -59,7 +79,9 @@ beforeEach(() => {
     state.commands = [created]
     return created
   })
-  gatewayApi.cancelCommand.mockImplementation(async () => { state.commands = [] })
+  gatewayApi.cancelCommand.mockImplementation(async () => {
+    state.commands = []
+  })
 })
 afterEach(() => vi.useRealTimers())
 
@@ -68,8 +90,10 @@ describe('NodeCommands', () => {
     const counter = await mountCard()
     expect(counter.find('input').exists()).toBe(false)
     await compose(counter)
-    expect(counter.findAll('.segmented button').map((button) => button.text()))
-      .toEqual([en.commands.type.set_count, en.commands.type.read_info])
+    expect(counter.findAll('.segmented button').map((button) => button.text())).toEqual([
+      en.commands.type.set_count,
+      en.commands.type.read_info,
+    ])
     expect(counter.get('label span').text()).toBe(en.commands.field.set_count)
 
     const climate = await mountCard(node({ profile_id: 2 }))
@@ -87,15 +111,27 @@ describe('NodeCommands', () => {
     expect(wrapper.get('.command-hint').text()).toBe(en.commands.hint.read_info)
     await wrapper.get('.button.primary').trigger('click')
     await flushPromises()
-    expect(gatewayApi.queueCommand).toHaveBeenCalledWith({ node_id: 6, type: 'read_info', arguments: {} })
+    expect(gatewayApi.queueCommand).toHaveBeenCalledWith({
+      node_id: 6,
+      type: 'read_info',
+      arguments: {},
+    })
 
-    state.commands = [pending({
-      type: 'read_info', arguments: {}, state: 'completed', status: 'applied', completed_at_ms: 2,
-      result: { profile_id: 6, firmware: '1.0.2', max_power_level: 20 },
-    })]
+    state.commands = [
+      pending({
+        type: 'read_info',
+        arguments: {},
+        state: 'completed',
+        status: 'applied',
+        completed_at_ms: 2,
+        result: { profile_id: 6, firmware: '1.0.2', max_power_level: 20 },
+      }),
+    ]
     await tick()
     expect(wrapper.get('.command-line strong').text()).toBe(en.commands.describe.read_info)
-    expect(wrapper.get('.command-hint').text()).toBe('Firmware 1.0.2, profile 6, maximum radio level 20.')
+    expect(wrapper.get('.command-hint').text()).toBe(
+      'Firmware 1.0.2, profile 6, maximum radio level 20.',
+    )
   })
 
   it('refuses a count the node cannot store', async () => {
@@ -116,13 +152,24 @@ describe('NodeCommands', () => {
     await wrapper.get('.button.primary').trigger('click')
     await flushPromises()
 
-    expect(gatewayApi.queueCommand).toHaveBeenCalledWith({ node_id: 6, type: 'set_count', arguments: { count: 1234 } })
+    expect(gatewayApi.queueCommand).toHaveBeenCalledWith({
+      node_id: 6,
+      type: 'set_count',
+      arguments: { count: 1234 },
+    })
     expect(wrapper.get('.command-state').text()).toContain(en.commands.state.pending)
     expect(wrapper.get('.command-hint').text()).toBe(en.commands.pendingHint)
     expect(wrapper.find('input').exists()).toBe(false)
     expect(composeButton(wrapper).exists()).toBe(false)
 
-    state.commands = [pending({ state: 'completed', status: 'applied', completed_at_ms: 2, result: { previous_count: 1200, count: 1234 } })]
+    state.commands = [
+      pending({
+        state: 'completed',
+        status: 'applied',
+        completed_at_ms: 2,
+        result: { previous_count: 1200, count: 1234 },
+      }),
+    ]
     await tick()
 
     expect(wrapper.get('.command-state').text()).toContain(en.commands.status.applied)
@@ -145,7 +192,11 @@ describe('NodeCommands', () => {
     await wrapper.get('input').setValue('12')
     await wrapper.get('input').trigger('keydown', { key: 'Enter' })
     await flushPromises()
-    expect(gatewayApi.queueCommand).toHaveBeenCalledWith({ node_id: 6, type: 'set_count', arguments: { count: 12 } })
+    expect(gatewayApi.queueCommand).toHaveBeenCalledWith({
+      node_id: 6,
+      type: 'set_count',
+      arguments: { count: 12 },
+    })
   })
 
   it('folds the form away without sending', async () => {

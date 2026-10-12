@@ -19,7 +19,6 @@
 namespace gateway::radio {
 namespace {
 
-
 constexpr uint8_t kExpectedVersion = 0x24;
 constexpr uint32_t kTaskStackSize = 8192;
 // Radio FIFO service is the gateway's highest-priority application work.
@@ -43,18 +42,18 @@ constexpr uint8_t kOpModeModeMask = 0x1C;
 
 // RegFrf as RFM69::initialize() writes it for the configured band.
 constexpr uint8_t kExpectedFrf[] = {
-    config::frequencyBand == RF69_315MHZ ? RF_FRFMSB_315
-        : config::frequencyBand == RF69_433MHZ ? RF_FRFMSB_433_92
-        : config::frequencyBand == RF69_868MHZ ? RF_FRFMSB_868
-        : RF_FRFMSB_915,
-    config::frequencyBand == RF69_315MHZ ? RF_FRFMID_315
-        : config::frequencyBand == RF69_433MHZ ? RF_FRFMID_433_92
-        : config::frequencyBand == RF69_868MHZ ? RF_FRFMID_868
-        : RF_FRFMID_915,
-    config::frequencyBand == RF69_315MHZ ? RF_FRFLSB_315
-        : config::frequencyBand == RF69_433MHZ ? RF_FRFLSB_433_92
-        : config::frequencyBand == RF69_868MHZ ? RF_FRFLSB_868
-        : RF_FRFLSB_915,
+    config::frequencyBand == RF69_315MHZ   ? RF_FRFMSB_315
+    : config::frequencyBand == RF69_433MHZ ? RF_FRFMSB_433_92
+    : config::frequencyBand == RF69_868MHZ ? RF_FRFMSB_868
+                                           : RF_FRFMSB_915,
+    config::frequencyBand == RF69_315MHZ   ? RF_FRFMID_315
+    : config::frequencyBand == RF69_433MHZ ? RF_FRFMID_433_92
+    : config::frequencyBand == RF69_868MHZ ? RF_FRFMID_868
+                                           : RF_FRFMID_915,
+    config::frequencyBand == RF69_315MHZ   ? RF_FRFLSB_315
+    : config::frequencyBand == RF69_433MHZ ? RF_FRFLSB_433_92
+    : config::frequencyBand == RF69_868MHZ ? RF_FRFLSB_868
+                                           : RF_FRFLSB_915,
 };
 
 // Configuration registers only the radio task writes. A module that reset
@@ -64,31 +63,31 @@ constexpr uint8_t kExpectedFrf[] = {
 // sequencer passes through FS on its way to RX, so it is checked for RX once
 // the module reports ModeReady.
 constexpr uint8_t kCheckedRegisters[] = {
-    REG_DATAMODUL, REG_BITRATEMSB, REG_BITRATELSB,
-    REG_FDEVMSB, REG_FDEVLSB, REG_FRFMSB, REG_FRFMID, REG_FRFLSB,
-    REG_PALEVEL, REG_OCP, REG_RXBW, REG_DIOMAPPING1, REG_DIOMAPPING2,
-    REG_RSSITHRESH, REG_SYNCCONFIG, REG_SYNCVALUE1, REG_SYNCVALUE2,
-    REG_PACKETCONFIG1, REG_PAYLOADLENGTH, REG_FIFOTHRESH, REG_PACKETCONFIG2,
-    REG_TESTPA1, REG_TESTPA2, REG_TESTDAGC,
+    REG_DATAMODUL,     REG_BITRATEMSB,  REG_BITRATELSB,    REG_FDEVMSB,       REG_FDEVLSB,
+    REG_FRFMSB,        REG_FRFMID,      REG_FRFLSB,        REG_PALEVEL,       REG_OCP,
+    REG_RXBW,          REG_DIOMAPPING1, REG_DIOMAPPING2,   REG_RSSITHRESH,    REG_SYNCCONFIG,
+    REG_SYNCVALUE1,    REG_SYNCVALUE2,  REG_PACKETCONFIG1, REG_PAYLOADLENGTH, REG_FIFOTHRESH,
+    REG_PACKETCONFIG2, REG_TESTPA1,     REG_TESTPA2,       REG_TESTDAGC,
 };
 
 // Exposes the library's pending-interrupt flag, so a missed DIO0 edge can be
 // serviced as if the interrupt had fired.
 class GatewayRfm69 : public RFM69 {
-public:
+  public:
     using RFM69::RFM69;
-    void markInterrupt() { _haveData = true; }
+    void markInterrupt() {
+        _haveData = true;
+    }
     uint8_t control = 0;
-protected:
-    void interruptHook(uint8_t value) override { control = value; }
+
+  protected:
+    void interruptHook(uint8_t value) override {
+        control = value;
+    }
 };
 
 SPIClass radioSpi(config::spiHost);
-GatewayRfm69 rfm69(
-    config::chipSelect,
-    config::interrupt,
-    config::highPower,
-    &radioSpi);
+GatewayRfm69 rfm69(config::chipSelect, config::interrupt, config::highPower, &radioSpi);
 
 std::atomic<State> currentState{State::Stopped};
 std::atomic<Profile> currentProfile{Profile::Operational};
@@ -108,7 +107,13 @@ QueueHandle_t commandCompletionQueue = nullptr;
 SemaphoreHandle_t synchronousCommandMutex = nullptr;
 QueueSetHandle_t radioQueueSet = nullptr;
 
-enum class CommandKind : uint8_t { SetProfile, BeginCommissioning, ApplyInstallation, Send, SessionReply };
+enum class CommandKind : uint8_t {
+    SetProfile,
+    BeginCommissioning,
+    ApplyInstallation,
+    Send,
+    SessionReply
+};
 
 struct RadioCommand {
     CommandKind kind;
@@ -181,15 +186,13 @@ uint32_t lastRegisterCheckMs = 0;
 void IRAM_ATTR onRadioInterrupt() {
     BaseType_t higherPriorityTaskWoken = pdFALSE;
     const uint64_t signal = static_cast<uint64_t>(esp_timer_get_time());
-    if (interruptQueue != nullptr) {
+    if (interruptQueue != nullptr)
         xQueueOverwriteFromISR(interruptQueue, &signal, &higherPriorityTaskWoken);
-    }
-    if (higherPriorityTaskWoken == pdTRUE) {
+    if (higherPriorityTaskWoken == pdTRUE)
         portYIELD_FROM_ISR();
-    }
 }
 
-void routeReceivedFrame(ReceivedFrame& received, uint64_t irqAtUs) {
+void routeReceivedFrame(ReceivedFrame &received, uint64_t irqAtUs) {
     namespace s = radiosensors::security;
     namespace f = s::frames;
     namespace r = radiosensors::replay;
@@ -212,43 +215,58 @@ void routeReceivedFrame(ReceivedFrame& received, uint64_t irqAtUs) {
     const bool join = header == f::kJoinRequestHeader || header == f::kJoinConfirmHeader;
     portENTER_CRITICAL(&statsMux);
     ++taskStats.v3Frames;
-    if (telemetry) ++taskStats.v3TelemetryFrames;
-    if (!telemetry && !session && !join) ++taskStats.unsupportedFrameKinds;
+    if (telemetry)
+        ++taskStats.v3TelemetryFrames;
+    if (!telemetry && !session && !join)
+        ++taskStats.unsupportedFrameKinds;
     portEXIT_CRITICAL(&statsMux);
-    if (received.targetId != config::nodeId || received.senderId > UINT8_MAX) return;
+    if (received.targetId != config::nodeId || received.senderId > UINT8_MAX)
+        return;
     if (join) {
         const bool request = header == f::kJoinRequestHeader;
         if (received.control != 0 ||
-            (request && (currentProfile.load() != Profile::Commissioning || received.senderId != 0)) ||
+            (request &&
+             (currentProfile.load() != Profile::Commissioning || received.senderId != 0)) ||
             (!request && (currentProfile.load() != Profile::Operational || received.senderId == 0)))
             return;
         received.kind = request ? radiosensors::protocol::FrameKind::JoinRequest
                                 : radiosensors::protocol::FrameKind::JoinConfirm;
         const bool queued = xQueueSendToBack(receivedFrameQueue, &received, 0) == pdPASS;
         portENTER_CRITICAL(&statsMux);
-        if (queued) ++taskStats.rxFramesQueued;
-        else ++taskStats.rxFramesDropped;
+        if (queued)
+            ++taskStats.rxFramesQueued;
+        else
+            ++taskStats.rxFramesDropped;
         portEXIT_CRITICAL(&statsMux);
         return;
     }
-    if ((!telemetry && !session) || currentProfile.load() != Profile::Operational) return;
+    if ((!telemetry && !session) || currentProfile.load() != Profile::Operational)
+        return;
     n::OpenedFrame opened;
-    const auto status = registry_store::receiveSecure(
-        {static_cast<uint8_t>(received.targetId), static_cast<uint8_t>(received.senderId), received.control},
-        received.data, received.size,
-        uxQueueSpacesAvailable(telemetryFrameQueue) != 0,
-        uxQueueSpacesAvailable(sessionFrameQueue) != 0, opened);
+    const auto status =
+        registry_store::receiveSecure({static_cast<uint8_t>(received.targetId),
+                                       static_cast<uint8_t>(received.senderId),
+                                       received.control},
+                                      received.data,
+                                      received.size,
+                                      uxQueueSpacesAvailable(telemetryFrameQueue) != 0,
+                                      uxQueueSpacesAvailable(sessionFrameQueue) != 0,
+                                      opened);
     if (status != n::ReceiveStatus::Ok) {
         portENTER_CRITICAL(&statsMux);
-        if (status == n::ReceiveStatus::FailedTag) ++taskStats.failedTags;
-        else if (status == n::ReceiveStatus::Busy) {
-            if (telemetry) ++taskStats.telemetryFramesDropped;
-            else ++taskStats.sessionFramesDropped;
-        } else {
-            if (telemetry) ++taskStats.telemetryRejectedInactive;
-            else ++taskStats.sessionFramesRejected;
-        }
-        if (received.ackRequested) ++taskStats.ackRequestsIgnored;
+        if (status == n::ReceiveStatus::FailedTag)
+            ++taskStats.failedTags;
+        else if (status == n::ReceiveStatus::Busy)
+            if (telemetry)
+                ++taskStats.telemetryFramesDropped;
+            else
+                ++taskStats.sessionFramesDropped;
+        else if (telemetry)
+            ++taskStats.telemetryRejectedInactive;
+        else
+            ++taskStats.sessionFramesRejected;
+        if (received.ackRequested)
+            ++taskStats.ackRequestsIgnored;
         portEXIT_CRITICAL(&statsMux);
         return;
     }
@@ -257,7 +275,8 @@ void routeReceivedFrame(ReceivedFrame& received, uint64_t irqAtUs) {
     const bool duplicate = action == r::Action::Duplicate;
     s::Ack ack;
     if (action == r::Action::CounterFloor) {
-        ack.hasCounterFloor = true; ack.counterFloor = opened.decision.floor;
+        ack.hasCounterFloor = true;
+        ack.counterFloor = opened.decision.floor;
     } else if (action == r::Action::Challenge) {
         ack.hasChallenge = true;
         memcpy(ack.challenge, opened.decision.challenge, sizeof(ack.challenge));
@@ -265,50 +284,68 @@ void routeReceivedFrame(ReceivedFrame& received, uint64_t irqAtUs) {
         ack.commandPending = commands::hasPending(static_cast<uint8_t>(received.senderId));
         if (opened.payloadSize != 0)
             ack.hasPowerTarget = power_control::target(static_cast<uint8_t>(received.senderId),
-                                                       opened.payload[0], ack.powerTarget);
+                                                       opened.payload[0],
+                                                       ack.powerTarget);
     }
     const bool recoveryAck = ack.hasCounterFloor || ack.hasChallenge;
     const bool normalAck = received.ackRequested && (accepted || duplicate) &&
-        (telemetry || header == f::kCommandResultHeader);
+                           (telemetry || header == f::kCommandResultHeader);
     if (recoveryAck || normalAck) {
-        uint8_t bytes[s::kMaxAckPayloadSize + s::kGatewayTagSize]; size_t size = 0;
-        if (s::sealAck(opened.mac, {static_cast<uint8_t>(received.senderId),100,0x80},
-                       opened.counter, ack, bytes, sizeof(bytes), size)) {
+        uint8_t bytes[s::kMaxAckPayloadSize + s::kGatewayTagSize];
+        size_t size = 0;
+        if (s::sealAck(opened.mac,
+                       {static_cast<uint8_t>(received.senderId), 100, 0x80},
+                       opened.counter,
+                       ack,
+                       bytes,
+                       sizeof(bytes),
+                       size)) {
             rfm69.sendACK(bytes, static_cast<uint8_t>(size));
             portENTER_CRITICAL(&statsMux);
             if (irqAtUs != 0) {
                 const uint32_t elapsed = static_cast<uint32_t>(esp_timer_get_time() - irqAtUs);
                 ++taskStats.acksMeasured;
                 taskStats.lastAckUs = elapsed;
-                if (elapsed > taskStats.maxAckUs) taskStats.maxAckUs = elapsed;
-                if (elapsed > 40000) ++taskStats.acksOver40ms;
+                if (elapsed > taskStats.maxAckUs)
+                    taskStats.maxAckUs = elapsed;
+                if (elapsed > 40000)
+                    ++taskStats.acksOver40ms;
             }
-            if (telemetry) ++taskStats.telemetryAcksSent;
-            else if (header == f::kCommandResultHeader) ++taskStats.commandResultAcksSent;
-            if (ack.commandPending) ++taskStats.commandHintsSent;
-            if (ack.hasPowerTarget) ++taskStats.powerTargetsSent;
+            if (telemetry)
+                ++taskStats.telemetryAcksSent;
+            else if (header == f::kCommandResultHeader)
+                ++taskStats.commandResultAcksSent;
+            if (ack.commandPending)
+                ++taskStats.commandHintsSent;
+            if (ack.hasPowerTarget)
+                ++taskStats.powerTargetsSent;
             portEXIT_CRITICAL(&statsMux);
         }
     } else if (duplicate && opened.replySize != 0) {
         rfm69.send(received.senderId, opened.reply, static_cast<uint8_t>(opened.replySize), false);
     }
     portENTER_CRITICAL(&statsMux);
-    if (duplicate || action == r::Action::CounterFloor) ++taskStats.replayFrames;
-    if (ack.hasChallenge) ++taskStats.activationChallenges;
+    if (duplicate || action == r::Action::CounterFloor)
+        ++taskStats.replayFrames;
+    if (ack.hasChallenge)
+        ++taskStats.activationChallenges;
     portEXIT_CRITICAL(&statsMux);
     // An accepted ready may have lost its first reply to storage contention.
     // Until a reply is cached, its retransmission can retry the session handler.
-    if (!accepted && !opened.retryCommandReady) return;
+    if (!accepted && !opened.retryCommandReady)
+        return;
     received.counter = opened.counter;
     received.retryCommandReady = opened.retryCommandReady;
     memcpy(received.salt, opened.salt, sizeof(received.salt));
     received.kind = telemetry ? radiosensors::protocol::FrameKind::Telemetry
-        : header == f::kCommandReadyHeader ? radiosensors::protocol::FrameKind::CommandReady
-                                          : radiosensors::protocol::FrameKind::CommandResult;
+                    : header == f::kCommandReadyHeader
+                        ? radiosensors::protocol::FrameKind::CommandReady
+                        : radiosensors::protocol::FrameKind::CommandResult;
     // The application codec consumes its header and unchanged payload layout;
     // the authenticated radio envelope never enters telemetry storage.
     if (telemetry) {
-        received.data[0] = radiosensors::protocol::encodeHeader(radiosensors::protocol::FrameKind::Telemetry);
+        received.data[0] =
+            radiosensors::protocol::encodeHeader(radiosensors::protocol::FrameKind::Telemetry);
         memcpy(received.data + 1, opened.payload, opened.payloadSize);
         received.size = static_cast<uint8_t>(opened.payloadSize + 1);
     } else {
@@ -317,15 +354,19 @@ void routeReceivedFrame(ReceivedFrame& received, uint64_t irqAtUs) {
     }
     // The radio task is the sole producer; capacity was checked before the
     // counter was accepted, and consumers can only free space meanwhile.
-    const bool queued = xQueueSendToBack(telemetry ? telemetryFrameQueue : sessionFrameQueue, &received, 0) == pdPASS;
+    const bool queued =
+        xQueueSendToBack(telemetry ? telemetryFrameQueue : sessionFrameQueue, &received, 0) ==
+        pdPASS;
     portENTER_CRITICAL(&statsMux);
-    if (telemetry) {
-        if (queued) ++taskStats.telemetryFramesQueued;
-        else ++taskStats.telemetryFramesDropped;
-    } else {
-        if (queued) ++taskStats.sessionFramesQueued;
-        else ++taskStats.sessionFramesDropped;
-    }
+    if (telemetry)
+        if (queued)
+            ++taskStats.telemetryFramesQueued;
+        else
+            ++taskStats.telemetryFramesDropped;
+    else if (queued)
+        ++taskStats.sessionFramesQueued;
+    else
+        ++taskStats.sessionFramesDropped;
     portEXIT_CRITICAL(&statsMux);
 }
 
@@ -338,14 +379,20 @@ void drainReceivedFrame(uint64_t irqAtUs = 0) {
     }
     ReceivedFrame received{};
     received.size = rfm69.DATALEN;
-    received.senderId = rfm69.SENDERID; received.targetId = rfm69.TARGETID;
-    received.control = rfm69.control; received.rssi = rfm69.RSSI;
-    received.ackRequested = rfm69.ACKRequested(); received.receivedAtMs = millis();
-    if (received.size <= sizeof(received.data)) memcpy(received.data, rfm69.DATA, received.size);
+    received.senderId = rfm69.SENDERID;
+    received.targetId = rfm69.TARGETID;
+    received.control = rfm69.control;
+    received.rssi = rfm69.RSSI;
+    received.ackRequested = rfm69.ACKRequested();
+    received.receivedAtMs = millis();
+    if (received.size <= sizeof(received.data))
+        memcpy(received.data, rfm69.DATA, received.size);
     portENTER_CRITICAL(&statsMux);
-    ++taskStats.packets; taskStats.bytes += received.size;
+    ++taskStats.packets;
+    taskStats.bytes += received.size;
     taskStats.lastPacketMs = received.receivedAtMs;
-    taskStats.lastSenderId = received.senderId; taskStats.lastRssi = received.rssi;
+    taskStats.lastSenderId = received.senderId;
+    taskStats.lastRssi = received.rssi;
     portEXIT_CRITICAL(&statsMux);
     routeReceivedFrame(received, irqAtUs);
     rfm69.receiveDone();
@@ -354,7 +401,8 @@ void drainReceivedFrame(uint64_t irqAtUs = 0) {
 // The module keeps its state through an ESP32 reset; without the RESET line
 // only a power cycle clears one left mid-reception.
 void resetModule() {
-    if (config::reset < 0) return;
+    if (config::reset < 0)
+        return;
     pinMode(config::reset, OUTPUT);
     digitalWrite(config::reset, HIGH);
     delayMicroseconds(100);
@@ -363,48 +411,44 @@ void resetModule() {
 }
 
 uint32_t frfToHz(const uint8_t msb, const uint8_t mid, const uint8_t lsb) {
-    return static_cast<uint32_t>(
-        RF69_FSTEP * ((uint32_t(msb) << 16) | (uint32_t(mid) << 8) | lsb));
+    return static_cast<uint32_t>(RF69_FSTEP * ((uint32_t(msb) << 16) | (uint32_t(mid) << 8) | lsb));
 }
 
 // The register snapshot cannot catch a wrong carrier: a module that kept its
 // reset default of 915 MHz through initialize() was remembered that way and
 // then heard nothing. The carrier is therefore compared with the band itself.
 bool frequencyConfigured() {
-    const uint8_t frf[] = {
-        rfm69.readReg(REG_FRFMSB), rfm69.readReg(REG_FRFMID),
-        rfm69.readReg(REG_FRFLSB)};
+    const uint8_t frf[] = {rfm69.readReg(REG_FRFMSB),
+                           rfm69.readReg(REG_FRFMID),
+                           rfm69.readReg(REG_FRFLSB)};
     currentFrequencyHz.store(frfToHz(frf[0], frf[1], frf[2]));
-    if (memcmp(frf, kExpectedFrf, sizeof(frf)) == 0) return true;
+    if (memcmp(frf, kExpectedFrf, sizeof(frf)) == 0)
+        return true;
     portENTER_CRITICAL(&statsMux);
     ++taskStats.frequencyFaults;
     portEXIT_CRITICAL(&statsMux);
     Serial.printf(
         "RFM69 frequency reads %luHz, expected %luHz\n",
         static_cast<unsigned long>(currentFrequencyHz.load()),
-        static_cast<unsigned long>(
-            frfToHz(kExpectedFrf[0], kExpectedFrf[1], kExpectedFrf[2])));
+        static_cast<unsigned long>(frfToHz(kExpectedFrf[0], kExpectedFrf[1], kExpectedFrf[2])));
     return false;
 }
 
 uint8_t readCheckedRegister(const uint8_t address) {
     const uint8_t value = rfm69.readReg(address);
     // RestartRx is a trigger, not a setting.
-    return address == REG_PACKETCONFIG2
-        ? static_cast<uint8_t>(value & ~RF_PACKET2_RXRESTART)
-        : value;
+    return address == REG_PACKETCONFIG2 ? static_cast<uint8_t>(value & ~RF_PACKET2_RXRESTART)
+                                        : value;
 }
 
 // Called once the radio task has configured the module and returned it to RX.
 void rememberRegisters() {
     expectedRegistersValid.store(false);
     // checkModule() restores a module the library did not leave in RX.
-    if (currentState.load() != State::Receiving || RFM69::_mode != RF69_MODE_RX) {
+    if (currentState.load() != State::Receiving || RFM69::_mode != RF69_MODE_RX)
         return;
-    }
-    for (size_t index = 0; index < sizeof(kCheckedRegisters); ++index) {
+    for (size_t index = 0; index < sizeof(kCheckedRegisters); ++index)
         expectedRegisters[index] = readCheckedRegister(kCheckedRegisters[index]);
-    }
     expectedRegistersValid.store(true);
 }
 
@@ -420,10 +464,8 @@ void restoreModule() {
     // module that left RX behind its back would never be sent back.
     RFM69::_mode = RF69_MODE_STANDBY;
     const bool restored =
-        rfm69.initialize(
-            config::frequencyBand, config::nodeId, currentNetworkId.load()) &&
-        rfm69.getVersion() == kExpectedVersion &&
-        frequencyConfigured();
+        rfm69.initialize(config::frequencyBand, config::nodeId, currentNetworkId.load()) &&
+        rfm69.getVersion() == kExpectedVersion && frequencyConfigured();
     if (restored) {
         configurePower();
         rfm69.encrypt(nullptr);
@@ -431,24 +473,27 @@ void restoreModule() {
         rememberRegisters();
     }
     portENTER_CRITICAL(&statsMux);
-    if (restored) ++taskStats.moduleRestores;
-    else ++taskStats.moduleRestoreFailures;
+    if (restored)
+        ++taskStats.moduleRestores;
+    else
+        ++taskStats.moduleRestoreFailures;
     portEXIT_CRITICAL(&statsMux);
-    Serial.println(restored
-        ? "RFM69 restored"
-        : "RFM69 restore failed; retrying at the next check");
+    Serial.println(restored ? "RFM69 restored"
+                            : "RFM69 restore failed; retrying at the next check");
 }
 
 // Reads OpMode's mode bits once the sequencer has finished a transition.
 uint8_t settledMode() {
     const uint32_t started = millis();
     while ((rfm69.readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_MODEREADY) == 0 &&
-           millis() - started < kModeReadyTimeoutMs) {}
+           millis() - started < kModeReadyTimeoutMs) {
+    }
     return rfm69.readReg(REG_OPMODE) & kOpModeModeMask;
 }
 
 void checkModule() {
-    if (currentState.load() != State::Receiving) return;
+    if (currentState.load() != State::Receiving)
+        return;
     // Between operations the radio task always leaves the library in RX.
     if (RFM69::_mode != RF69_MODE_RX) {
         Serial.printf("RFM69 left in mode %u instead of RX\n", RFM69::_mode);
@@ -465,20 +510,22 @@ void checkModule() {
         restoreModule();
         return;
     }
-    if (!expectedRegistersValid.load()) return;
+    if (!expectedRegistersValid.load())
+        return;
     for (size_t index = 0; index < sizeof(kCheckedRegisters); ++index) {
         const uint8_t actual = readCheckedRegister(kCheckedRegisters[index]);
         if (actual != expectedRegisters[index]) {
-            Serial.printf(
-                "RFM69 register 0x%02x reads 0x%02x, expected 0x%02x\n",
-                kCheckedRegisters[index], actual, expectedRegisters[index]);
+            Serial.printf("RFM69 register 0x%02x reads 0x%02x, expected 0x%02x\n",
+                          kCheckedRegisters[index],
+                          actual,
+                          expectedRegisters[index]);
             restoreModule();
             return;
         }
     }
 }
 
-void processCommand(const RadioCommand& command) {
+void processCommand(const RadioCommand &command) {
     if (command.kind == CommandKind::BeginCommissioning) {
 
         commissioningEnabled = true;
@@ -514,16 +561,20 @@ void processCommand(const RadioCommand& command) {
             commissioningEnabled = false;
         }
     } else if (command.kind == CommandKind::SessionReply) {
-        uint8_t sealed[radiosensors::replay::kMaxReplySize]; size_t size = 0;
-        if (registry_store::commandReply(static_cast<uint8_t>(command.targetId), command.salt,
-                command.counter, command.header, command.data, command.size, sealed, sizeof(sealed), size))
+        uint8_t sealed[radiosensors::replay::kMaxReplySize];
+        size_t size = 0;
+        if (registry_store::commandReply(static_cast<uint8_t>(command.targetId),
+                                         command.salt,
+                                         command.counter,
+                                         command.header,
+                                         command.data,
+                                         command.size,
+                                         sealed,
+                                         sizeof(sealed),
+                                         size))
             rfm69.send(command.targetId, sealed, static_cast<uint8_t>(size), false);
     } else {
-        rfm69.send(
-            command.targetId,
-            command.data,
-            command.size,
-            command.requestAck);
+        rfm69.send(command.targetId, command.data, command.size, command.requestAck);
         if (command.switchAfterSend) {
             if (command.profile == Profile::Commissioning && commissioningEnabled) {
                 rfm69.setNetwork(commissioningNetworkId);
@@ -545,9 +596,8 @@ void processCommand(const RadioCommand& command) {
     portENTER_CRITICAL(&statsMux);
     ++taskStats.commandsProcessed;
     portEXIT_CRITICAL(&statsMux);
-    if (command.reportCompletion && commandCompletionQueue != nullptr) {
+    if (command.reportCompletion && commandCompletionQueue != nullptr)
         xQueueSendToBack(commandCompletionQueue, &command.completionId, 0);
-    }
 }
 
 // Initial setup supplies the operational network before traffic is enabled.
@@ -555,19 +605,18 @@ bool acceptsCommands() {
     return commandQueue != nullptr && operationalEnabled.load();
 }
 
-bool queueAndWaitForCompletion(RadioCommand& command) {
+bool queueAndWaitForCompletion(RadioCommand &command) {
     if (commandQueue == nullptr || commandCompletionQueue == nullptr ||
         synchronousCommandMutex == nullptr ||
-        xSemaphoreTake(
-            synchronousCommandMutex, kCommandCompletionTimeout) != pdTRUE) {
+        xSemaphoreTake(synchronousCommandMutex, kCommandCompletionTimeout) != pdTRUE) {
         return false;
     }
 
     uint32_t staleCompletion = 0;
-    while (xQueueReceive(commandCompletionQueue, &staleCompletion, 0) == pdPASS) {}
+    while (xQueueReceive(commandCompletionQueue, &staleCompletion, 0) == pdPASS) {
+    }
     command.reportCompletion = true;
-    command.completionId = nextCompletionId.fetch_add(
-        1, std::memory_order_relaxed);
+    command.completionId = nextCompletionId.fetch_add(1, std::memory_order_relaxed);
     const bool queued = xQueueSendToBack(commandQueue, &command, 0) == pdPASS;
     if (queued) {
         portENTER_CRITICAL(&statsMux);
@@ -583,11 +632,12 @@ bool queueAndWaitForCompletion(RadioCommand& command) {
     const TickType_t started = xTaskGetTickCount();
     while (queued) {
         const TickType_t elapsed = xTaskGetTickCount() - started;
-        if (elapsed >= kCommandCompletionTimeout) break;
+        if (elapsed >= kCommandCompletionTimeout)
+            break;
         uint32_t completedId = 0;
-        if (xQueueReceive(
-                commandCompletionQueue, &completedId,
-                kCommandCompletionTimeout - elapsed) != pdPASS) {
+        if (xQueueReceive(commandCompletionQueue,
+                          &completedId,
+                          kCommandCompletionTimeout - elapsed) != pdPASS) {
             break;
         }
         if (completedId == command.completionId) {
@@ -621,21 +671,18 @@ void serviceMissedInterrupt() {
     drainReceivedFrame();
 }
 
-void radioTask(void*) {
+void radioTask(void *) {
     for (;;) {
-        QueueSetMemberHandle_t ready =
-            xQueueSelectFromSet(radioQueueSet, kMissedInterruptCheck);
+        QueueSetMemberHandle_t ready = xQueueSelectFromSet(radioQueueSet, kMissedInterruptCheck);
         uint64_t signal = 0;
         if (ready == nullptr) {
             serviceMissedInterrupt();
-        } else if (ready == interruptQueue &&
-                   xQueueReceive(interruptQueue, &signal, 0) == pdPASS) {
+        } else if (ready == interruptQueue && xQueueReceive(interruptQueue, &signal, 0) == pdPASS) {
             serviceInterrupt(signal);
         } else {
             // If RX and a command became ready together, always drain the FIFO first.
-            if (xQueueReceive(interruptQueue, &signal, 0) == pdPASS) {
+            if (xQueueReceive(interruptQueue, &signal, 0) == pdPASS)
                 serviceInterrupt(signal);
-            }
             RadioCommand command{};
             if (xQueueReceive(commandQueue, &command, 0) == pdPASS) {
                 processCommand(command);
@@ -651,7 +698,7 @@ void radioTask(void*) {
     }
 }
 
-}  // namespace
+} // namespace
 
 bool begin() {
     currentState.store(State::Starting);
@@ -671,13 +718,9 @@ bool begin() {
         pinMode(config::chipSelect, OUTPUT);
         digitalWrite(config::chipSelect, HIGH);
         delay(kInitializationRecoveryDelayMs);
-        if (!radioSpi.begin(
-                config::sck, config::miso, config::mosi,
-                config::chipSelect)) {
+        if (!radioSpi.begin(config::sck, config::miso, config::mosi, config::chipSelect)) {
             Serial.printf("RFM69 SPI initialization attempt %u failed\n", attempt);
-        } else if (!rfm69.initialize(
-                       config::frequencyBand, config::nodeId,
-                       operationalNetworkId)) {
+        } else if (!rfm69.initialize(config::frequencyBand, config::nodeId, operationalNetworkId)) {
             Serial.printf("RFM69 register probe attempt %u failed\n", attempt);
         } else if (frequencyConfigured()) {
             initialized = true;
@@ -695,10 +738,9 @@ bool begin() {
     if (detectedVersion != kExpectedVersion) {
         currentState.store(State::VersionMismatch);
         rfm69.sleep();
-        Serial.printf(
-            "RFM69 version mismatch: expected 0x%02x, read 0x%02x\n",
-            kExpectedVersion,
-            detectedVersion);
+        Serial.printf("RFM69 version mismatch: expected 0x%02x, read 0x%02x\n",
+                      kExpectedVersion,
+                      detectedVersion);
         return false;
     }
 
@@ -706,7 +748,8 @@ bool begin() {
     configuredBitRate = rfm69.getBitRate();
 
     rfm69.encrypt(nullptr);
-    if (!operationalEnabled.load()) rfm69.sleep();
+    if (!operationalEnabled.load())
+        rfm69.sleep();
 
     interruptQueue = xQueueCreate(1, sizeof(uint64_t));
     receivedFrameQueue = xQueueCreate(kRxQueueDepth, sizeof(ReceivedFrame));
@@ -717,10 +760,9 @@ bool begin() {
     synchronousCommandMutex = xSemaphoreCreateMutex();
     radioQueueSet = xQueueCreateSet(1 + kCommandQueueDepth);
     if (interruptQueue == nullptr || receivedFrameQueue == nullptr ||
-        telemetryFrameQueue == nullptr || sessionFrameQueue == nullptr ||
-        commandQueue == nullptr || commandCompletionQueue == nullptr ||
-        synchronousCommandMutex == nullptr || radioQueueSet == nullptr ||
-        xQueueAddToSet(interruptQueue, radioQueueSet) != pdPASS ||
+        telemetryFrameQueue == nullptr || sessionFrameQueue == nullptr || commandQueue == nullptr ||
+        commandCompletionQueue == nullptr || synchronousCommandMutex == nullptr ||
+        radioQueueSet == nullptr || xQueueAddToSet(interruptQueue, radioQueueSet) != pdPASS ||
         xQueueAddToSet(commandQueue, radioQueueSet) != pdPASS) {
         currentState.store(State::TaskFailed);
         rfm69.sleep();
@@ -730,14 +772,13 @@ bool begin() {
 
     // Keeps the first check out of the rest of begin(), which still uses SPI.
     lastRegisterCheckMs = millis();
-    if (xTaskCreatePinnedToCore(
-            radioTask,
-            "rfm69-rx",
-            kTaskStackSize,
-            nullptr,
-            kTaskPriority,
-            &radioTaskHandle,
-            kTaskCore) != pdPASS) {
+    if (xTaskCreatePinnedToCore(radioTask,
+                                "rfm69-rx",
+                                kTaskStackSize,
+                                nullptr,
+                                kTaskPriority,
+                                &radioTaskHandle,
+                                kTaskCore) != pdPASS) {
         currentState.store(State::TaskFailed);
         rfm69.sleep();
         Serial.println("RFM69 receive task creation failed");
@@ -754,52 +795,52 @@ bool begin() {
     currentState.store(State::Receiving);
     rememberRegisters();
 
-    Serial.printf(
-        "RFM69 ready: version=0x%02x frequency=%luHz bitrate=%lubps "
-        "variant=%s power=%ddBm SPI=%s pins=%d/%d/%d/%d irq=%d\n",
-        detectedVersion,
-        currentFrequencyHz.load(),
-        configuredBitRate,
-        config::highPower ? "HW" : "W",
-        config::txPowerDbm,
-        spiHostName(),
-        config::sck,
-        config::miso,
-        config::mosi,
-        config::chipSelect,
-        config::interrupt);
+    Serial.printf("RFM69 ready: version=0x%02x frequency=%luHz bitrate=%lubps "
+                  "variant=%s power=%ddBm SPI=%s pins=%d/%d/%d/%d irq=%d\n",
+                  detectedVersion,
+                  currentFrequencyHz.load(),
+                  configuredBitRate,
+                  config::highPower ? "HW" : "W",
+                  config::txPowerDbm,
+                  spiHostName(),
+                  config::sck,
+                  config::miso,
+                  config::mosi,
+                  config::chipSelect,
+                  config::interrupt);
     return true;
 }
 
-bool receive(ReceivedFrame& frame, const TickType_t waitTicks) {
+bool receive(ReceivedFrame &frame, const TickType_t waitTicks) {
     if (receivedFrameQueue == nullptr) {
-        if (waitTicks > 0) vTaskDelay(waitTicks);
+        if (waitTicks > 0)
+            vTaskDelay(waitTicks);
         return false;
     }
     return xQueueReceive(receivedFrameQueue, &frame, waitTicks) == pdPASS;
 }
 
-bool receiveTelemetry(ReceivedFrame& frame, const TickType_t waitTicks) {
+bool receiveTelemetry(ReceivedFrame &frame, const TickType_t waitTicks) {
     if (telemetryFrameQueue == nullptr) {
-        if (waitTicks > 0) vTaskDelay(waitTicks);
+        if (waitTicks > 0)
+            vTaskDelay(waitTicks);
         return false;
     }
     return xQueueReceive(telemetryFrameQueue, &frame, waitTicks) == pdPASS;
 }
 
-bool receiveSessionFrame(ReceivedFrame& frame, const TickType_t waitTicks) {
+bool receiveSessionFrame(ReceivedFrame &frame, const TickType_t waitTicks) {
     if (sessionFrameQueue == nullptr) {
-        if (waitTicks > 0) vTaskDelay(waitTicks);
+        if (waitTicks > 0)
+            vTaskDelay(waitTicks);
         return false;
     }
     return xQueueReceive(sessionFrameQueue, &frame, waitTicks) == pdPASS;
 }
 
 bool requestProfile(const Profile profile) {
-    if (!acceptsCommands() ||
-        (profile == Profile::Commissioning && !commissioningEnabled)) {
+    if (!acceptsCommands() || (profile == Profile::Commissioning && !commissioningEnabled))
         return false;
-    }
     RadioCommand command{};
     command.kind = CommandKind::SetProfile;
     command.profile = profile;
@@ -807,63 +848,75 @@ bool requestProfile(const Profile profile) {
 }
 
 bool beginCommissioning() {
-    if (!acceptsCommands()) return false;
+    if (!acceptsCommands())
+        return false;
     RadioCommand command{};
     command.kind = CommandKind::BeginCommissioning;
     return queueAndWaitForCompletion(command);
 }
 
 bool applyInstallation(const uint8_t networkId) {
-    if (commandQueue == nullptr || networkId == 0) return false;
+    if (commandQueue == nullptr || networkId == 0)
+        return false;
     RadioCommand command{};
-    command.kind = CommandKind::ApplyInstallation; command.networkId = networkId;
+    command.kind = CommandKind::ApplyInstallation;
+    command.networkId = networkId;
     return queueAndWaitForCompletion(command);
 }
 
-bool sendCommandReply(const ReceivedFrame& ready, uint8_t header, const uint8_t* payload, size_t size) {
+bool sendCommandReply(const ReceivedFrame &ready,
+                      uint8_t header,
+                      const uint8_t *payload,
+                      size_t size) {
     if (!acceptsCommands() || size > radiosensors::security::frames::kMaxCommandPayloadSize ||
-        (size != 0 && !payload)) return false;
+        (size != 0 && !payload))
+        return false;
     RadioCommand command{};
     command.kind = CommandKind::SessionReply;
-    command.targetId = ready.senderId; command.counter = ready.counter; command.header = header;
+    command.targetId = ready.senderId;
+    command.counter = ready.counter;
+    command.header = header;
     memcpy(command.salt, ready.salt, sizeof(command.salt));
-    if (size != 0) memcpy(command.data, payload, size);
+    if (size != 0)
+        memcpy(command.data, payload, size);
     command.size = static_cast<uint8_t>(size);
     const bool queued = xQueueSendToBack(commandQueue, &command, 0) == pdPASS;
     portENTER_CRITICAL(&statsMux);
-    if (queued) ++taskStats.commandsQueued;
-    else ++taskStats.commandsDropped;
+    if (queued)
+        ++taskStats.commandsQueued;
+    else
+        ++taskStats.commandsDropped;
     portEXIT_CRITICAL(&statsMux);
     return queued;
 }
 
-bool send(
-    const uint16_t targetId,
-    const uint8_t* const data,
-    const size_t size,
-    const bool requestAck) {
-    if (!acceptsCommands() || data == nullptr || size > kMaxPayloadSize) {
+bool send(const uint16_t targetId,
+          const uint8_t *const data,
+          const size_t size,
+          const bool requestAck) {
+    if (!acceptsCommands() || data == nullptr || size > kMaxPayloadSize)
         return false;
-    }
     RadioCommand command{};
     command.kind = CommandKind::Send;
     command.targetId = targetId;
     command.size = static_cast<uint8_t>(size);
     command.requestAck = requestAck;
-    for (size_t index = 0; index < size; ++index) command.data[index] = data[index];
+    for (size_t index = 0; index < size; ++index)
+        command.data[index] = data[index];
     const bool queued = xQueueSendToBack(commandQueue, &command, 0) == pdPASS;
     portENTER_CRITICAL(&statsMux);
-    if (queued) ++taskStats.commandsQueued;
-    else ++taskStats.commandsDropped;
+    if (queued)
+        ++taskStats.commandsQueued;
+    else
+        ++taskStats.commandsDropped;
     portEXIT_CRITICAL(&statsMux);
     return queued;
 }
 
-bool sendThenSwitchProfile(
-    const uint16_t targetId,
-    const uint8_t* const data,
-    const size_t size,
-    const Profile profile) {
+bool sendThenSwitchProfile(const uint16_t targetId,
+                           const uint8_t *const data,
+                           const size_t size,
+                           const Profile profile) {
     if (!acceptsCommands() || data == nullptr || size > kMaxPayloadSize ||
         (profile == Profile::Commissioning && !commissioningEnabled)) {
         return false;
@@ -874,7 +927,8 @@ bool sendThenSwitchProfile(
     command.size = static_cast<uint8_t>(size);
     command.profile = profile;
     command.switchAfterSend = true;
-    for (size_t index = 0; index < size; ++index) command.data[index] = data[index];
+    for (size_t index = 0; index < size; ++index)
+        command.data[index] = data[index];
     return queueAndWaitForCompletion(command);
 }
 
@@ -882,62 +936,57 @@ State state() {
     return currentState.load();
 }
 
-const char* stateName() {
+const char *stateName() {
     switch (state()) {
-        case State::Stopped:
-            return "stopped";
-        case State::Starting:
-            return "starting";
-        case State::SpiInitializationFailed:
-            return "spi_initialization_failed";
-        case State::InitializationFailed:
-            return "initialization_failed";
-        case State::VersionMismatch:
-            return "version_mismatch";
-        case State::NetworkMissing:
-            return "network_missing";
-        case State::TaskFailed:
-            return "task_failed";
-        case State::Receiving:
-            return "receiving";
+    case State::Stopped:
+        return "stopped";
+    case State::Starting:
+        return "starting";
+    case State::SpiInitializationFailed:
+        return "spi_initialization_failed";
+    case State::InitializationFailed:
+        return "initialization_failed";
+    case State::VersionMismatch:
+        return "version_mismatch";
+    case State::NetworkMissing:
+        return "network_missing";
+    case State::TaskFailed:
+        return "task_failed";
+    case State::Receiving:
+        return "receiving";
     }
     return "unknown";
 }
 
-const char* frequencyBandName() {
+const char *frequencyBandName() {
     switch (config::frequencyBand) {
-        case RF69_315MHZ:
-            return "315";
-        case RF69_433MHZ:
-            return "433";
-        case RF69_868MHZ:
-            return "868";
-        case RF69_915MHZ:
-            return "915";
-        default:
-            return "unknown";
+    case RF69_315MHZ:
+        return "315";
+    case RF69_433MHZ:
+        return "433";
+    case RF69_868MHZ:
+        return "868";
+    case RF69_915MHZ:
+        return "915";
+    default:
+        return "unknown";
     }
 }
 
-const char* spiHostName() {
-    if (config::spiHost == HSPI) {
+const char *spiHostName() {
+    if (config::spiHost == HSPI)
         return "HSPI";
-    }
-    if (config::spiHost == FSPI) {
+    if (config::spiHost == FSPI)
         return "FSPI";
-    }
 #if defined(VSPI)
-    if (config::spiHost == VSPI) {
+    if (config::spiHost == VSPI)
         return "VSPI";
-    }
 #endif
     return "unknown";
 }
 
-const char* profileName() {
-    return currentProfile.load() == Profile::Commissioning
-        ? "commissioning"
-        : "operational";
+const char *profileName() {
+    return currentProfile.load() == Profile::Commissioning ? "commissioning" : "operational";
 }
 
 uint32_t stackFreeBytes() {
@@ -973,8 +1022,10 @@ Snapshot snapshot() {
     result.failedTags = taskStats.failedTags;
     result.replayFrames = taskStats.replayFrames;
     result.activationChallenges = taskStats.activationChallenges;
-    result.acksMeasured = taskStats.acksMeasured; result.lastAckUs = taskStats.lastAckUs;
-    result.maxAckUs = taskStats.maxAckUs; result.acksOver40ms = taskStats.acksOver40ms;
+    result.acksMeasured = taskStats.acksMeasured;
+    result.lastAckUs = taskStats.lastAckUs;
+    result.maxAckUs = taskStats.maxAckUs;
+    result.acksOver40ms = taskStats.acksOver40ms;
     result.emptyApplicationFrames = taskStats.emptyApplicationFrames;
     result.unsupportedProtocolVersions = taskStats.unsupportedProtocolVersions;
     result.unsupportedFrameKinds = taskStats.unsupportedFrameKinds;
@@ -998,4 +1049,4 @@ Snapshot snapshot() {
     return result;
 }
 
-}  // namespace gateway::radio
+} // namespace gateway::radio

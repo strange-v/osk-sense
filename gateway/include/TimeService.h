@@ -14,8 +14,8 @@ enum class State : uint8_t {
 void begin();
 void loop();
 State state();
-const char* stateName();
+const char *stateName();
 uint64_t unixTimeMs();
 uint64_t lastSyncUnixMs();
 
-}  // namespace gateway::time_service
+} // namespace gateway::time_service

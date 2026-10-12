@@ -12,10 +12,11 @@ enum class ButtonGesture : uint8_t {
 };
 
 class ProvisioningButton {
-public:
+  public:
     static constexpr uint32_t kLongPressMs = 10000;
 
-    explicit ProvisioningButton(const uint8_t pin) : pin_(pin) {}
+    explicit ProvisioningButton(const uint8_t pin) : pin_(pin) {
+    }
 
     void begin();
 
@@ -24,7 +25,7 @@ public:
     // for the duration of the hold.
     ButtonGesture takeGesture();
 
-private:
+  private:
     static void onEdge();
     bool settledAt(uint8_t level) const;
 
@@ -32,5 +33,5 @@ private:
     static volatile bool edgePending_;
 };
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

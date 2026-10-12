@@ -24,14 +24,10 @@ constexpr uint8_t kUnusedPins[] = {
 node::NodeRadio radio(NODE_RFM69_CS, NODE_RFM69_IRQ);
 node::LowPowerClock clock;
 node::ProvisioningButton button(NODE_BUTTON_PIN);
-Profile profile(
-    NODE_REED_PIN, Wire, NODE_SHT40_ADDRESS,
-    NODE_BINARY_CLIMATE_REPORT_INTERVAL_MS);
-node::CommissioningService commissioning(
-    radio, Profile::kProfileId);
-node::NodeRuntime<Profile> runtime(
-    profile, radio, commissioning, clock, button);
-}
+Profile profile(NODE_REED_PIN, Wire, NODE_SHT40_ADDRESS, NODE_BINARY_CLIMATE_REPORT_INTERVAL_MS);
+node::CommissioningService commissioning(radio, Profile::kProfileId);
+node::NodeRuntime<Profile> runtime(profile, radio, commissioning, clock, button);
+} // namespace
 
 void setup() {
 #if defined(NODE_DEBUG)

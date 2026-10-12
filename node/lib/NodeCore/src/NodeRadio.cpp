@@ -15,16 +15,17 @@ constexpr uint32_t kAckWaitMs = 40;
 }
 
 NodeRadio::NodeRadio(const uint8_t chipSelect, const uint8_t interruptPin)
-    : radio_(chipSelect, interruptPin) {}
+    : radio_(chipSelect, interruptPin) {
+}
 
 bool NodeRadio::begin(const uint8_t nodeId, const uint8_t networkId) {
-    const bool initialized =
-        radio_.initialize(NODE_RFM69_FREQUENCY, nodeId, networkId);
+    const bool initialized = radio_.initialize(NODE_RFM69_FREQUENCY, nodeId, networkId);
     radio_.setHighPower(true);
     // The RFM69 releases MISO while deselected, which would leave the input
     // floating through every sleep. The weak pull-up does not disturb SPI.
     pinMode(PIN_SPI_MISO, INPUT_PULLUP);
-    if (initialized) frequencyMsb_ = radio_.readReg(REG_FRFMSB);
+    if (initialized)
+        frequencyMsb_ = radio_.readReg(REG_FRFMSB);
     return initialized;
 }
 
@@ -47,12 +48,13 @@ void NodeRadio::setPowerLevel(const uint8_t level) {
 // itself comes back on its default frequency, with AES off and sync value 1.
 bool NodeRadio::configured() {
     return radio_.readReg(REG_FRFMSB) == frequencyMsb_ &&
-        (radio_.readReg(REG_PACKETCONFIG2) & RF_PACKET2_AES_ON) == 0 &&
-        radio_.readReg(REG_SYNCVALUE2) == network_;
+           (radio_.readReg(REG_PACKETCONFIG2) & RF_PACKET2_AES_ON) == 0 &&
+           radio_.readReg(REG_SYNCVALUE2) == network_;
 }
 
 bool NodeRadio::ensureConfigured() {
-    if (configured()) return true;
+    if (configured())
+        return true;
 #if defined(NODE_DEBUG)
     debugLine(F("rf lost"));
 #endif
@@ -68,10 +70,14 @@ bool NodeRadio::ensureConfigured() {
     return configured();
 }
 
-bool NodeRadio::sendAcknowledged(
-    const uint8_t gatewayId, const uint8_t* frame, const uint8_t size,
-    const uint8_t attempts, const osk::crypto::Cmac& mac, const uint32_t counter, security::Ack& ack,
-    int8_t& downlinkRssi) {
+bool NodeRadio::sendAcknowledged(const uint8_t gatewayId,
+                                 const uint8_t *frame,
+                                 const uint8_t size,
+                                 const uint8_t attempts,
+                                 const osk::crypto::Cmac &mac,
+                                 const uint32_t counter,
+                                 security::Ack &ack,
+                                 int8_t &downlinkRssi) {
     ack = security::Ack{};
     // sendWithRetry() without its RSSI: the RFM69 keeps measuring the channel
     // after a frame ends, so a read after reception sees anything from the
@@ -83,18 +89,18 @@ bool NodeRadio::sendAcknowledged(
         bool synced = false;
         int8_t rssi = protocol::kNoDownlinkRssi;
         while (static_cast<uint32_t>(millis() - sent) < kAckWaitMs) {
-            const bool sync = (radio_.readReg(REG_IRQFLAGS1) &
-                               RF_IRQFLAGS1_SYNCADDRESSMATCH) != 0;
-            if (sync && !synced) {
+            const bool sync = (radio_.readReg(REG_IRQFLAGS1) & RF_IRQFLAGS1_SYNCADDRESSMATCH) != 0;
+            if (sync && !synced)
                 rssi = protocol::downlinkRssiValue(radio_.readRSSI());
-            }
             synced = sync;
-            if (!radio_.ACKReceived(gatewayId)) continue;
+            if (!radio_.ACKReceived(gatewayId))
+                continue;
             const security::Transport transport = receivedTransport();
             const uint8_t ackSize = radio_.DATALEN;
             uint8_t encoded[security::kMaxAckPayloadSize + security::kGatewayTagSize];
             if (transport.target != address_ || transport.control != 0x80 ||
-                ackSize > sizeof(encoded)) continue;
+                ackSize > sizeof(encoded))
+                continue;
             memcpy(encoded, radio_.DATA, ackSize);
             // Tag verification must not keep the radio in standby.
             radio_.sleep();
@@ -111,35 +117,38 @@ bool NodeRadio::sendAcknowledged(
     return false;
 }
 
-void NodeRadio::send(
-    const uint8_t recipient, const uint8_t* frame, const uint8_t size) {
+void NodeRadio::send(const uint8_t recipient, const uint8_t *frame, const uint8_t size) {
     radio_.send(recipient, frame, size, false);
 }
 
-bool NodeRadio::receive(
-    const uint32_t timeoutMs, const uint8_t expectedSender, uint8_t* output,
-    const uint8_t expectedSize) {
-    return receiveMatching(
-               timeoutMs, expectedSender, output, expectedSize,
-               expectedSize) == expectedSize;
+bool NodeRadio::receive(const uint32_t timeoutMs,
+                        const uint8_t expectedSender,
+                        uint8_t *output,
+                        const uint8_t expectedSize) {
+    return receiveMatching(timeoutMs, expectedSender, output, expectedSize, expectedSize) ==
+           expectedSize;
 }
 
-uint8_t NodeRadio::receiveFrame(
-    const uint32_t timeoutMs, const uint8_t expectedSender, uint8_t* output,
-    const uint8_t capacity) {
+uint8_t NodeRadio::receiveFrame(const uint32_t timeoutMs,
+                                const uint8_t expectedSender,
+                                uint8_t *output,
+                                const uint8_t capacity) {
     return receiveMatching(timeoutMs, expectedSender, output, 1, capacity);
 }
 
-uint8_t NodeRadio::receiveMatching(
-    const uint32_t timeoutMs, const uint8_t expectedSender, uint8_t* output,
-    const uint8_t minimumSize, const uint8_t maximumSize) {
+uint8_t NodeRadio::receiveMatching(const uint32_t timeoutMs,
+                                   const uint8_t expectedSender,
+                                   uint8_t *output,
+                                   const uint8_t minimumSize,
+                                   const uint8_t maximumSize) {
     const uint32_t started = millis();
     radio_.receiveDone();
     while (static_cast<uint32_t>(millis() - started) < timeoutMs) {
-        if (!radio_.receiveDone()) continue;
+        if (!radio_.receiveDone())
+            continue;
         const uint8_t size = radio_.DATALEN;
-        if (radio_.TARGETID == address_ && radio_.SENDERID == expectedSender && size >= minimumSize &&
-            size <= maximumSize) {
+        if (radio_.TARGETID == address_ && radio_.SENDERID == expectedSender &&
+            size >= minimumSize && size <= maximumSize) {
             memcpy(output, radio_.DATA, size);
             return size;
         }
@@ -154,8 +163,9 @@ void NodeRadio::sleep() {
 
 security::Transport NodeRadio::receivedTransport() const {
     return security::Transport{static_cast<uint8_t>(radio_.TARGETID),
-                               static_cast<uint8_t>(radio_.SENDERID),radio_.control};
+                               static_cast<uint8_t>(radio_.SENDERID),
+                               radio_.control};
 }
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

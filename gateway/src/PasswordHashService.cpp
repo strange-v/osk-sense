@@ -17,12 +17,12 @@ constexpr BaseType_t kWorkerCore = ARDUINO_RUNNING_CORE;
 constexpr TickType_t kWatchdogFeedInterval = pdMS_TO_TICKS(1000);
 
 struct Job {
-    const char* password;
+    const char *password;
     size_t passwordLength;
-    const uint8_t* salt;
+    const uint8_t *salt;
     size_t saltLength;
     uint32_t iterations;
-    uint8_t* output;
+    uint8_t *output;
     size_t outputLength;
     SemaphoreHandle_t completed;
     int result;
@@ -30,39 +30,39 @@ struct Job {
 
 SemaphoreHandle_t workerMutex = nullptr;
 
-void run(void* context) {
-    auto& job = *static_cast<Job*>(context);
-    job.result = mbedtls_pkcs5_pbkdf2_hmac_ext(
-        MBEDTLS_MD_SHA256,
-        reinterpret_cast<const unsigned char*>(job.password),
-        job.passwordLength,
-        job.salt,
-        job.saltLength,
-        job.iterations,
-        job.outputLength,
-        job.output);
+void run(void *context) {
+    auto &job = *static_cast<Job *>(context);
+    job.result =
+        mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
+                                      reinterpret_cast<const unsigned char *>(job.password),
+                                      job.passwordLength,
+                                      job.salt,
+                                      job.saltLength,
+                                      job.iterations,
+                                      job.outputLength,
+                                      job.output);
     xSemaphoreGive(job.completed);
     vTaskDelete(nullptr);
 }
 
-}  // namespace
+} // namespace
 
 bool begin() {
-    if (workerMutex != nullptr) return true;
+    if (workerMutex != nullptr)
+        return true;
     workerMutex = xSemaphoreCreateMutex();
     return workerMutex != nullptr;
 }
 
-bool computePbkdf2Sha256(
-    const char* const password,
-    const size_t passwordLength,
-    const uint8_t* const salt,
-    const size_t saltLength,
-    const uint32_t iterations,
-    uint8_t* const output,
-    const size_t outputLength) {
-    if (workerMutex == nullptr || password == nullptr || salt == nullptr ||
-        output == nullptr || iterations == 0 || outputLength == 0 ||
+bool computePbkdf2Sha256(const char *const password,
+                         const size_t passwordLength,
+                         const uint8_t *const salt,
+                         const size_t saltLength,
+                         const uint32_t iterations,
+                         uint8_t *const output,
+                         const size_t outputLength) {
+    if (workerMutex == nullptr || password == nullptr || salt == nullptr || output == nullptr ||
+        iterations == 0 || outputLength == 0 ||
         xSemaphoreTake(workerMutex, portMAX_DELAY) != pdTRUE) {
         return false;
     }
@@ -84,14 +84,13 @@ bool computePbkdf2Sha256(
         completed,
         -1,
     };
-    const BaseType_t created = xTaskCreatePinnedToCore(
-        run,
-        "password_hash",
-        kWorkerStackSize,
-        &job,
-        kWorkerPriority,
-        nullptr,
-        kWorkerCore);
+    const BaseType_t created = xTaskCreatePinnedToCore(run,
+                                                       "password_hash",
+                                                       kWorkerStackSize,
+                                                       &job,
+                                                       kWorkerPriority,
+                                                       nullptr,
+                                                       kWorkerCore);
     if (created != pdPASS) {
         vSemaphoreDelete(completed);
         xSemaphoreGive(workerMutex);
@@ -110,4 +109,4 @@ bool computePbkdf2Sha256(
     return job.result == 0;
 }
 
-}  // namespace gateway::password_hash
+} // namespace gateway::password_hash

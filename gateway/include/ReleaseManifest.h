@@ -11,10 +11,9 @@ constexpr size_t kMaxSignatureSize = 72;
 // Base64 of the largest signature.
 constexpr size_t kMaxSignatureLineLength = 96;
 // manifest.signed: the signature line, "\n", then the exact manifest bytes.
-constexpr size_t kMaxSignedManifestSize =
-    kMaxSignatureLineLength + 1 + kMaxManifestSize;
+constexpr size_t kMaxSignedManifestSize = kMaxSignatureLineLength + 1 + kMaxManifestSize;
 constexpr size_t kMaxFileNameLength = 64;
-constexpr size_t kMaxVersionLength = 17;  // 65535.65535.65535
+constexpr size_t kMaxVersionLength = 17; // 65535.65535.65535
 constexpr size_t kSha256Size = 32;
 // The Web UI image is gzip with a 4 KB deflate window (zlib wbits 12), so the
 // gateway inflates it with a 4 KB buffer. make_manifest.py compresses with the
@@ -63,30 +62,38 @@ enum class Status : uint8_t {
 };
 
 // Strict major.minor.patch: decimal, no leading zeros, each part <= 65535.
-bool parseVersion(const char* text, Version& version);
-int compare(const Version& left, const Version& right);
+bool parseVersion(const char *text, Version &version);
+int compare(const Version &left, const Version &right);
 
-bool verifySignature(
-    const uint8_t* manifest, size_t size,
-    const uint8_t* signature, size_t signatureSize);
+bool verifySignature(const uint8_t *manifest,
+                     size_t size,
+                     const uint8_t *signature,
+                     size_t signatureSize);
 
 // Reads an already verified manifest: the entry for `board`, if it is newer
 // than `currentVersion`.
-Status parse(
-    const uint8_t* manifest, size_t size, const char* board,
-    const char* currentVersion, Release& release);
+Status parse(const uint8_t *manifest,
+             size_t size,
+             const char *board,
+             const char *currentVersion,
+             Release &release);
 
 // Signature first, then parse(): nothing unsigned is ever interpreted.
-Status read(
-    const uint8_t* manifest, size_t size,
-    const uint8_t* signature, size_t signatureSize,
-    const char* board, const char* currentVersion, Release& release);
+Status read(const uint8_t *manifest,
+            size_t size,
+            const uint8_t *signature,
+            size_t signatureSize,
+            const char *board,
+            const char *currentVersion,
+            Release &release);
 
 // Splits manifest.signed and calls read().
-Status readSigned(
-    const uint8_t* signedManifest, size_t size,
-    const char* board, const char* currentVersion, Release& release);
+Status readSigned(const uint8_t *signedManifest,
+                  size_t size,
+                  const char *board,
+                  const char *currentVersion,
+                  Release &release);
 
-const char* statusName(Status status);
+const char *statusName(Status status);
 
-}  // namespace gateway::release
+} // namespace gateway::release

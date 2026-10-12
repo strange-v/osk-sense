@@ -52,16 +52,16 @@ Firmware updates are the one outbound connection: HTTPS to GitHub Releases, star
 
 Release versions name a build; contract versions decide compatibility. Compatibility never follows from a release version, except the Web UI's `major.minor` check against the firmware.
 
-| Version | Source | Changes when |
-| --- | --- | --- |
-| Gateway release (firmware and Web UI) | `gateway/include/FirmwareVersion.h`, equal to the Git tag | Every release: patch for fixes, minor when `/ui/*` changes |
-| Node release | `node/lib/NodeCore/include/NodeFirmware.h` | Every node release, independently of the gateway |
-| `/api` | `gateway/include/ApiVersion.h` | Incompatible change to `/api` |
-| WebSocket stream | `GatewayStream.h` `kVersion` | Incompatible change to the stream |
-| Radio protocol | `RadioProtocol.h` `kProtocolMajor` | Incompatible frame change |
-| Gateway NVS, node registry | `GatewayStorage.h`, `RegistryPersistence.h` | Incompatible persisted layout |
-| Backup container, payload | `BackupCrypto.cpp` `kPrefix`, `BackupCodec.cpp` `kPayloadVersion` | Incompatible backup file |
-| Release manifest | `make_manifest.py` `MANIFEST_FORMAT` | Incompatible manifest |
+| Version                               | Source                                                            | Changes when                                               |
+| ------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| Gateway release (firmware and Web UI) | `gateway/include/FirmwareVersion.h`, equal to the Git tag         | Every release: patch for fixes, minor when `/ui/*` changes |
+| Node release                          | `node/lib/NodeCore/include/NodeFirmware.h`                        | Every node release, independently of the gateway           |
+| `/api`                                | `gateway/include/ApiVersion.h`                                    | Incompatible change to `/api`                              |
+| WebSocket stream                      | `GatewayStream.h` `kVersion`                                      | Incompatible change to the stream                          |
+| Radio protocol                        | `RadioProtocol.h` `kProtocolMajor`                                | Incompatible frame change                                  |
+| Gateway NVS, node registry            | `GatewayStorage.h`, `RegistryPersistence.h`                       | Incompatible persisted layout                              |
+| Backup container, payload             | `BackupCrypto.cpp` `kPrefix`, `BackupCodec.cpp` `kPayloadVersion` | Incompatible backup file                                   |
+| Release manifest                      | `make_manifest.py` `MANIFEST_FORMAT`                              | Incompatible manifest                                      |
 
 ## Documentation ownership
 

@@ -6,4 +6,9 @@ interface Props {
 
 defineProps<Props>()
 </script>
-<template><div class="metric"><dt>{{ label }}</dt><dd>{{ value }}</dd></div></template>
+<template>
+  <div class="metric">
+    <dt>{{ label }}</dt>
+    <dd>{{ value }}</dd>
+  </div>
+</template>

@@ -35,8 +35,7 @@ constexpr size_t kFactoryKeySize = 16;
 constexpr uint16_t kSecretsStorageVersion = 3;
 constexpr size_t kDeviceSecretSize = 32;
 constexpr size_t kSecretsSnapshotSize = 51;
-static_assert(kSecretsSnapshotSize ==
-                  15 + kDeviceSecretSize + kSnapshotCrcSize,
+static_assert(kSecretsSnapshotSize == 15 + kDeviceSecretSize + kSnapshotCrcSize,
               "installation secrets snapshot layout changed");
 
 // The command book shares NVS with the registry and authentication, so it
@@ -131,7 +130,7 @@ struct CommandRecord {
     uint8_t argumentSize;
     uint8_t arguments[protocol::kMaxCommandArgumentSize];
     CommandState state;
-    protocol::CommandStatus status;  // zero while pending
+    protocol::CommandStatus status; // zero while pending
     uint8_t resultSize;
     uint8_t result[protocol::kMaxCommandResultDataSize];
     uint64_t queuedAtUnixMs;
@@ -164,61 +163,60 @@ enum class CodecStatus : uint8_t {
 GatewaySettings defaultSettings();
 AuthenticationData defaultAuthentication();
 InstallationSecrets defaultSecrets();
-bool settingsEqual(const GatewaySettings& left, const GatewaySettings& right);
-bool authenticationEqual(const AuthenticationData& left, const AuthenticationData& right);
-bool secretsEqual(const InstallationSecrets& left, const InstallationSecrets& right);
+bool settingsEqual(const GatewaySettings &left, const GatewaySettings &right);
+bool authenticationEqual(const AuthenticationData &left, const AuthenticationData &right);
+bool secretsEqual(const InstallationSecrets &left, const InstallationSecrets &right);
 
-CodecStatus encodeSettings(
-    const GatewaySettings& value, uint32_t generation,
-    uint8_t* output, size_t capacity);
-CodecStatus decodeSettings(
-    const uint8_t* data, size_t size,
-    GatewaySettings& value, uint32_t& generation);
-CodecStatus encodeAuthentication(
-    const AuthenticationData& value, uint32_t generation,
-    uint8_t* output, size_t capacity);
-CodecStatus decodeAuthentication(
-    const uint8_t* data, size_t size,
-    AuthenticationData& value, uint32_t& generation);
-CodecStatus encodeSecrets(
-    const InstallationSecrets& value, uint32_t generation,
-    uint8_t* output, size_t capacity);
-CodecStatus decodeSecrets(
-    const uint8_t* data, size_t size,
-    InstallationSecrets& value, uint32_t& generation);
+CodecStatus
+encodeSettings(const GatewaySettings &value, uint32_t generation, uint8_t *output, size_t capacity);
+CodecStatus
+decodeSettings(const uint8_t *data, size_t size, GatewaySettings &value, uint32_t &generation);
+CodecStatus encodeAuthentication(const AuthenticationData &value,
+                                 uint32_t generation,
+                                 uint8_t *output,
+                                 size_t capacity);
+CodecStatus decodeAuthentication(const uint8_t *data,
+                                 size_t size,
+                                 AuthenticationData &value,
+                                 uint32_t &generation);
+CodecStatus encodeSecrets(const InstallationSecrets &value,
+                          uint32_t generation,
+                          uint8_t *output,
+                          size_t capacity);
+CodecStatus
+decodeSecrets(const uint8_t *data, size_t size, InstallationSecrets &value, uint32_t &generation);
 
 CommandBook defaultCommandBook();
-bool commandBooksEqual(const CommandBook& left, const CommandBook& right);
-CodecStatus encodeCommandBook(
-    const CommandBook& value, uint32_t generation,
-    uint8_t* output, size_t capacity);
-CodecStatus decodeCommandBook(
-    const uint8_t* data, size_t size,
-    CommandBook& value, uint32_t& generation);
+bool commandBooksEqual(const CommandBook &left, const CommandBook &right);
+CodecStatus
+encodeCommandBook(const CommandBook &value, uint32_t generation, uint8_t *output, size_t capacity);
+CodecStatus
+decodeCommandBook(const uint8_t *data, size_t size, CommandBook &value, uint32_t &generation);
 
 class SlotStorage {
-public:
-    virtual ~SlotStorage() {}
+  public:
+    virtual ~SlotStorage() {
+    }
     virtual bool exists(uint8_t slot) = 0;
-    virtual bool read(uint8_t slot, uint8_t* output, size_t capacity, size_t& size) = 0;
-    virtual bool write(uint8_t slot, const uint8_t* data, size_t size) = 0;
+    virtual bool read(uint8_t slot, uint8_t *output, size_t capacity, size_t &size) = 0;
+    virtual bool write(uint8_t slot, const uint8_t *data, size_t size) = 0;
 };
 
 enum class LoadStatus : uint8_t { Loaded, Empty, Corrupt };
 
-template<
-    typename Model,
-    size_t SnapshotSize,
-    CodecStatus (*Encode)(const Model&, uint32_t, uint8_t*, size_t),
-    CodecStatus (*Decode)(const uint8_t*, size_t, Model&, uint32_t&),
-    bool (*Equal)(const Model&, const Model&),
-    Model (*DefaultValue)()>
+template <typename Model,
+          size_t SnapshotSize,
+          CodecStatus (*Encode)(const Model &, uint32_t, uint8_t *, size_t),
+          CodecStatus (*Decode)(const uint8_t *, size_t, Model &, uint32_t &),
+          bool (*Equal)(const Model &, const Model &),
+          Model (*DefaultValue)()>
 class DualSlotStore {
-public:
-    explicit DualSlotStore(SlotStorage& storage)
-        : storage_(storage), current_{}, generation_(0), activeSlot_(-1), loaded_(false) {}
+  public:
+    explicit DualSlotStore(SlotStorage &storage)
+        : storage_(storage), current_{}, generation_(0), activeSlot_(-1), loaded_(false) {
+    }
 
-    LoadStatus load(Model& value) {
+    LoadStatus load(Model &value) {
         uint8_t buffer[SnapshotSize]{};
         uint32_t newestGeneration = 0;
         int8_t newestSlot = -1;
@@ -227,10 +225,12 @@ public:
         for (uint8_t slot = 0; slot < 2; ++slot) {
             anySlotExists = anySlotExists || storage_.exists(slot);
             size_t size = 0;
-            if (!storage_.read(slot, buffer, sizeof(buffer), size)) continue;
+            if (!storage_.read(slot, buffer, sizeof(buffer), size))
+                continue;
             Model candidate{};
             uint32_t candidateGeneration = 0;
-            if (Decode(buffer, size, candidate, candidateGeneration) != CodecStatus::Ok) continue;
+            if (Decode(buffer, size, candidate, candidateGeneration) != CodecStatus::Ok)
+                continue;
             if (newestSlot < 0 ||
                 static_cast<int32_t>(candidateGeneration - newestGeneration) > 0) {
                 newest = candidate;
@@ -254,19 +254,23 @@ public:
         return LoadStatus::Loaded;
     }
 
-    bool save(const Model& value) {
-        if (loaded_ && Equal(current_, value)) return true;
+    bool save(const Model &value) {
+        if (loaded_ && Equal(current_, value))
+            return true;
         uint8_t buffer[SnapshotSize]{};
         const uint32_t nextGeneration = generation_ + 1U;
-        if (Encode(value, nextGeneration, buffer, sizeof(buffer)) != CodecStatus::Ok) return false;
+        if (Encode(value, nextGeneration, buffer, sizeof(buffer)) != CodecStatus::Ok)
+            return false;
         const uint8_t targetSlot = activeSlot_ == 0 ? 1 : 0;
-        if (!storage_.write(targetSlot, buffer, sizeof(buffer))) return false;
+        if (!storage_.write(targetSlot, buffer, sizeof(buffer)))
+            return false;
         size_t verifySize = 0;
         Model verified{};
         uint32_t verifiedGeneration = 0;
         if (!storage_.read(targetSlot, buffer, sizeof(buffer), verifySize) ||
             Decode(buffer, verifySize, verified, verifiedGeneration) != CodecStatus::Ok ||
-            verifiedGeneration != nextGeneration || !Equal(verified, value)) return false;
+            verifiedGeneration != nextGeneration || !Equal(verified, value))
+            return false;
         current_ = value;
         generation_ = nextGeneration;
         activeSlot_ = static_cast<int8_t>(targetSlot);
@@ -274,23 +278,41 @@ public:
         return true;
     }
 
-    uint32_t generation() const { return generation_; }
+    uint32_t generation() const {
+        return generation_;
+    }
 
-private:
-    SlotStorage& storage_;
+  private:
+    SlotStorage &storage_;
     Model current_;
     uint32_t generation_;
     int8_t activeSlot_;
     bool loaded_;
 };
 
-using SettingsStore = DualSlotStore<GatewaySettings, kSettingsSnapshotSize,
-    encodeSettings, decodeSettings, settingsEqual, defaultSettings>;
-using AuthenticationStore = DualSlotStore<AuthenticationData, kAuthSnapshotSize,
-    encodeAuthentication, decodeAuthentication, authenticationEqual, defaultAuthentication>;
-using SecretsStore = DualSlotStore<InstallationSecrets, kSecretsSnapshotSize,
-    encodeSecrets, decodeSecrets, secretsEqual, defaultSecrets>;
-using CommandStore = DualSlotStore<CommandBook, kCommandsSnapshotSize,
-    encodeCommandBook, decodeCommandBook, commandBooksEqual, defaultCommandBook>;
+using SettingsStore = DualSlotStore<GatewaySettings,
+                                    kSettingsSnapshotSize,
+                                    encodeSettings,
+                                    decodeSettings,
+                                    settingsEqual,
+                                    defaultSettings>;
+using AuthenticationStore = DualSlotStore<AuthenticationData,
+                                          kAuthSnapshotSize,
+                                          encodeAuthentication,
+                                          decodeAuthentication,
+                                          authenticationEqual,
+                                          defaultAuthentication>;
+using SecretsStore = DualSlotStore<InstallationSecrets,
+                                   kSecretsSnapshotSize,
+                                   encodeSecrets,
+                                   decodeSecrets,
+                                   secretsEqual,
+                                   defaultSecrets>;
+using CommandStore = DualSlotStore<CommandBook,
+                                   kCommandsSnapshotSize,
+                                   encodeCommandBook,
+                                   decodeCommandBook,
+                                   commandBooksEqual,
+                                   defaultCommandBook>;
 
-}  // namespace radiosensors::gateway_storage
+} // namespace radiosensors::gateway_storage

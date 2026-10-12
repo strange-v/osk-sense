@@ -31,20 +31,21 @@ struct LoginResult {
 };
 
 bool begin();
-LoginStatus login(
-    const char* username, const char* password, LoginResult& result);
-LoginStatus createSession(
-    uint32_t userId, radiosensors::gateway_storage::UserRole role,
-    const char* username, size_t usernameLength, LoginResult& result);
-bool authorize(
-    const char* sessionToken, const char* csrfToken, bool requireCsrf,
-    Principal& principal);
-bool logout(const char* sessionToken);
+LoginStatus login(const char *username, const char *password, LoginResult &result);
+LoginStatus createSession(uint32_t userId,
+                          radiosensors::gateway_storage::UserRole role,
+                          const char *username,
+                          size_t usernameLength,
+                          LoginResult &result);
+bool authorize(const char *sessionToken,
+               const char *csrfToken,
+               bool requireCsrf,
+               Principal &principal);
+bool logout(const char *sessionToken);
 void invalidateUserSessions(uint32_t userId);
-bool createApiToken(
-    char output[kApiTokenCharacters + 1],
-    uint8_t hash[radiosensors::gateway_storage::kTokenHashSize]);
-bool authorizeBearer(const char* token, uint16_t requiredScopes);
+bool createApiToken(char output[kApiTokenCharacters + 1],
+                    uint8_t hash[radiosensors::gateway_storage::kTokenHashSize]);
+bool authorizeBearer(const char *token, uint16_t requiredScopes);
 void loop();
 
-}  // namespace gateway::authentication
+} // namespace gateway::authentication

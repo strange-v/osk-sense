@@ -20,7 +20,8 @@ uint16_t BatteryMonitor::readMillivolts() const {
     ADC0.INTFLAGS = ADC_RESRDY_bm;
     ADC0.CTRLA = ADC_LOWLAT_bm | ADC_ENABLE_bm;
     ADC0.COMMAND = ADC_MODE_BURST_gc | ADC_START_IMMEDIATE_gc;
-    while ((ADC0.INTFLAGS & ADC_RESRDY_bm) == 0) {}
+    while ((ADC0.INTFLAGS & ADC_RESRDY_bm) == 0) {
+    }
     const uint32_t result = ADC0.RESULT;
     // LOWLAT keeps the reference powered; disable the whole ADC before sleep.
     ADC0.CTRLA = 0;
@@ -28,5 +29,5 @@ uint16_t BatteryMonitor::readMillivolts() const {
     return static_cast<uint16_t>((result * 10UL + 32UL) / 64UL);
 }
 
-}  // namespace node
-}  // namespace radiosensors
+} // namespace node
+} // namespace radiosensors

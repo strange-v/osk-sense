@@ -17,8 +17,7 @@ namespace gateway::ota {
 namespace {
 
 constexpr uint16_t kOtaPort = 3232;
-std::atomic<State> currentState{
-    config::enabled ? State::WaitingForNetwork : State::Disabled};
+std::atomic<State> currentState{config::enabled ? State::WaitingForNetwork : State::Disabled};
 std::atomic<uint8_t> currentProgress{0};
 bool started = false;
 bool filesystemUpdate = false;
@@ -26,21 +25,19 @@ bool filesystemUpdate = false;
 void configureCallbacks() {
     ArduinoOTA.onStart([]() {
         filesystemUpdate = ArduinoOTA.getCommand() == U_SPIFFS;
-        if (filesystemUpdate) web_ui::prepareForFilesystemUpdate();
+        if (filesystemUpdate)
+            web_ui::prepareForFilesystemUpdate();
         currentProgress.store(0);
         currentState.store(State::Updating);
-        Serial.printf("OTA %s update started\n",
-                      filesystemUpdate ? "filesystem" : "firmware");
+        Serial.printf("OTA %s update started\n", filesystemUpdate ? "filesystem" : "firmware");
     });
 
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        const uint8_t percent = total == 0
-            ? 0
-            : static_cast<uint8_t>((static_cast<uint64_t>(progress) * 100U) / total);
+        const uint8_t percent =
+            total == 0 ? 0 : static_cast<uint8_t>((static_cast<uint64_t>(progress) * 100U) / total);
         const uint8_t previous = currentProgress.exchange(percent);
-        if (percent == 100 || percent >= previous + 10) {
+        if (percent == 100 || percent >= previous + 10)
             Serial.printf("OTA progress: %u%%\n", percent);
-        }
         diagnostics::feedWatchdog();
     });
 
@@ -59,7 +56,7 @@ void configureCallbacks() {
     });
 }
 
-}  // namespace
+} // namespace
 
 void begin() {
     if (!config::enabled) {
@@ -72,9 +69,8 @@ void begin() {
 }
 
 void loop() {
-    if (!config::enabled) {
+    if (!config::enabled)
         return;
-    }
 
     if (!started) {
         if (!ethernet::hasIp()) {
@@ -92,7 +88,8 @@ void loop() {
     }
 
     recovery::Guard guard(0);
-    if (guard && !recovery::blocked() && !backup::busy()) ArduinoOTA.handle();
+    if (guard && !recovery::blocked() && !backup::busy())
+        ArduinoOTA.handle();
 }
 
 bool enabled() {
@@ -103,18 +100,18 @@ State state() {
     return currentState.load();
 }
 
-const char* stateName() {
+const char *stateName() {
     switch (state()) {
-        case State::Disabled:
-            return "disabled";
-        case State::WaitingForNetwork:
-            return "waiting_for_network";
-        case State::Ready:
-            return "ready";
-        case State::Updating:
-            return "updating";
-        case State::Failed:
-            return "failed";
+    case State::Disabled:
+        return "disabled";
+    case State::WaitingForNetwork:
+        return "waiting_for_network";
+    case State::Ready:
+        return "ready";
+    case State::Updating:
+        return "updating";
+    case State::Failed:
+        return "failed";
     }
 
     return "unknown";
@@ -124,4 +121,4 @@ uint8_t progressPercent() {
     return currentProgress.load();
 }
 
-}  // namespace gateway::ota
+} // namespace gateway::ota

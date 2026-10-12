@@ -1,6 +1,10 @@
 /* Application shell: sidebar, topbar, page frame. */
 
-.app-layout { min-height: 100vh; display: grid; grid-template-columns: 224px minmax(0, 1fr); }
+.app-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+}
 
 .sidebar {
   position: sticky;
@@ -14,15 +18,55 @@
   background: var(--bg-shell);
 }
 
-.brand { display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-1) var(--space-2); color: var(--ink); text-decoration: none; }
-.brand-mark { width: 30px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-md); background: var(--primary-strong); }
-.brand-mark i { display: block; width: 2px; border-radius: 1px; background: #fff; }
-.brand-mark i:nth-child(1) { height: 8px; }
-.brand-mark i:nth-child(2) { height: 16px; }
-.brand-mark i:nth-child(3) { height: 11px; }
-.brand-name { min-width: 0; overflow: hidden; font-size: var(--text-md); font-weight: 600; letter-spacing: .01em; text-overflow: ellipsis; white-space: nowrap; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  color: var(--ink);
+  text-decoration: none;
+}
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  background: var(--primary-strong);
+}
+.brand-mark i {
+  display: block;
+  width: 2px;
+  border-radius: 1px;
+  background: #fff;
+}
+.brand-mark i:nth-child(1) {
+  height: 8px;
+}
+.brand-mark i:nth-child(2) {
+  height: 16px;
+}
+.brand-mark i:nth-child(3) {
+  height: 11px;
+}
+.brand-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-.primary-nav { display: grid; gap: 2px; }
+.primary-nav {
+  display: grid;
+  gap: 2px;
+}
 .primary-nav a {
   display: flex;
   align-items: center;
@@ -35,19 +79,45 @@
   text-decoration: none;
   font-size: var(--text-md);
   font-weight: 500;
-  transition: color var(--transition), background var(--transition);
+  transition:
+    color var(--transition),
+    background var(--transition);
 }
-.primary-nav a:hover { color: var(--ink); background: var(--surface-hover); }
-.primary-nav a.router-link-active { border-left-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.primary-nav a:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+.primary-nav a.router-link-active {
+  border-left-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
 /* Keyboard focus deepens the item's own background rather than drawing a ring
    around it -- the ring cut across the sidebar's edge. The active item already
    carries --primary-soft, so it needs a stronger mix to shift at all. */
-.primary-nav a:focus-visible { outline: none; color: var(--ink); background: var(--surface-hover); }
-.primary-nav a.router-link-active:focus-visible { color: var(--primary); background: color-mix(in srgb, var(--primary) 22%, transparent); }
-.nav-icon { width: 20px; flex: none; display: grid; place-items: center; font-size: var(--text-lg); }
+.primary-nav a:focus-visible {
+  outline: none;
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+.primary-nav a.router-link-active:focus-visible {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.nav-icon {
+  width: 20px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: var(--text-lg);
+}
 
-
-.workspace { min-width: 0; display: flex; min-height: 100vh; flex-direction: column; }
+.workspace {
+  min-width: 0;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
 .topbar {
   min-height: 56px;
   display: flex;
@@ -58,13 +128,41 @@
   border-bottom: 1px solid var(--line);
   background: var(--bg-shell);
 }
-.gateway-address { overflow: hidden; color: var(--muted); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
-.topbar-actions { display: flex; align-items: center; gap: var(--space-2); }
-.workspace > main { width: 100%; max-width: 1280px; margin: 0 auto; flex: 1; }
-footer { padding: var(--space-5); color: var(--muted); font-size: var(--text-xs); text-align: center; }
+.gateway-address {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.workspace > main {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  flex: 1;
+}
+footer {
+  padding: var(--space-5);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}
 
-.standalone-layout { min-height: 100vh; display: flex; flex-direction: column; }
-.standalone-layout > main { width: min(100% - 32px, 1280px); margin: auto; flex: 1; }
+.standalone-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.standalone-layout > main {
+  width: min(100% - 32px, 1280px);
+  margin: auto;
+  flex: 1;
+}
 .standalone-header {
   min-height: 56px;
   display: flex;
@@ -74,25 +172,56 @@ footer { padding: var(--space-5); color: var(--muted); font-size: var(--text-xs)
   border-bottom: 1px solid var(--line);
   background: var(--bg-shell);
 }
-.standalone-header .brand { padding-inline: 0; }
-.standalone-actions { display: flex; align-items: center; gap: var(--space-2); }
+.standalone-header .brand {
+  padding-inline: 0;
+}
+.standalone-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 
-.page { padding: var(--space-6); }
-.page.narrow, .page.auth { margin: auto; padding-top: var(--space-8); }
-.page.narrow { width: min(620px, 100%); }
+.page {
+  padding: var(--space-6);
+}
+.page.narrow,
+.page.auth {
+  margin: auto;
+  padding-top: var(--space-8);
+}
+.page.narrow {
+  width: min(620px, 100%);
+}
 /* Two fields and a button do not need the width the setup form asks for. */
-.page.auth { width: min(400px, 100%); }
+.page.auth {
+  width: min(400px, 100%);
+}
 
 @media (max-width: 900px) {
-  .app-layout { grid-template-columns: 64px minmax(0, 1fr); }
-  .sidebar { padding-inline: var(--space-2); }
-  .brand { justify-content: center; padding-inline: 0; }
-  .brand-name, .primary-nav a span:last-child { display: none; }
-  .primary-nav a { justify-content: center; padding-inline: var(--space-2); }
+  .app-layout {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .sidebar {
+    padding-inline: var(--space-2);
+  }
+  .brand {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .brand-name,
+  .primary-nav a span:last-child {
+    display: none;
+  }
+  .primary-nav a {
+    justify-content: center;
+    padding-inline: var(--space-2);
+  }
 }
 
 @media (max-width: 640px) {
-  .app-layout { display: block; }
+  .app-layout {
+    display: block;
+  }
   .sidebar {
     position: sticky;
     z-index: 4;
@@ -106,12 +235,36 @@ footer { padding: var(--space-5); color: var(--muted); font-size: var(--text-xs)
     border-bottom: 1px solid var(--line);
   }
   /* The rail collapses into a top bar here, so the wordmark fits again. */
-  .brand { justify-content: flex-start; }
-  .brand-name { display: block; }
-  .primary-nav { display: flex; margin-left: auto; }
-  .primary-nav a { min-width: 40px; min-height: 40px; border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--radius-md); }
-  .primary-nav a.router-link-active { border-left-color: transparent; border-bottom-color: var(--primary); }
-  .topbar { min-height: 48px; padding: var(--space-2) var(--space-3); }
-  .page { padding: var(--space-4) var(--space-3); }
-  .page.narrow, .page.auth { padding-top: var(--space-5); }
+  .brand {
+    justify-content: flex-start;
+  }
+  .brand-name {
+    display: block;
+  }
+  .primary-nav {
+    display: flex;
+    margin-left: auto;
+  }
+  .primary-nav a {
+    min-width: 40px;
+    min-height: 40px;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: var(--radius-md);
+  }
+  .primary-nav a.router-link-active {
+    border-left-color: transparent;
+    border-bottom-color: var(--primary);
+  }
+  .topbar {
+    min-height: 48px;
+    padding: var(--space-2) var(--space-3);
+  }
+  .page {
+    padding: var(--space-4) var(--space-3);
+  }
+  .page.narrow,
+  .page.auth {
+    padding-top: var(--space-5);
+  }
 }

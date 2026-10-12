@@ -19,8 +19,10 @@ async function submit() {
   failure.value = ''
   try {
     await api.login(username.value, password.value)
-    const redirect = typeof route.query.redirect === 'string' &&
-      route.query.redirect.startsWith('/') ? route.query.redirect : '/status'
+    const redirect =
+      typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+        ? route.query.redirect
+        : '/status'
     await router.replace(redirect)
   } catch (error) {
     failure.value = errorCode(error)
@@ -32,13 +34,49 @@ async function submit() {
 
 <template>
   <div class="page auth">
-    <div class="page-title"><h1>{{ $t('login.title') }}</h1><p>{{ $t('login.intro') }}</p></div>
-    <form class="setup-card" @submit.prevent="submit">
-      <label><span>{{ $t('login.username') }}</span><input v-model.trim="username" autocomplete="username" maxlength="32" autofocus></label>
-      <label><span>{{ $t('login.password') }}</span><input v-model="password" type="password" autocomplete="current-password" maxlength="128"></label>
-      <div v-if="revoked && !failure" class="notice">{{ $t('login.sessionRevoked') }}</div>
-      <div v-if="failure" class="notice error">{{ $t(`error.${failure}`) }}</div>
-      <button class="button primary full" :disabled="saving || !username || !password" type="submit">{{ saving ? $t('login.signingIn') : $t('login.submit') }}</button>
+    <div class="page-title">
+      <h1>{{ $t('login.title') }}</h1>
+      <p>{{ $t('login.intro') }}</p>
+    </div>
+    <form
+      class="setup-card"
+      @submit.prevent="submit"
+    >
+      <label
+        ><span>{{ $t('login.username') }}</span
+        ><input
+          v-model.trim="username"
+          autocomplete="username"
+          maxlength="32"
+          autofocus
+      /></label>
+      <label
+        ><span>{{ $t('login.password') }}</span
+        ><input
+          v-model="password"
+          type="password"
+          autocomplete="current-password"
+          maxlength="128"
+      /></label>
+      <div
+        v-if="revoked && !failure"
+        class="notice"
+      >
+        {{ $t('login.sessionRevoked') }}
+      </div>
+      <div
+        v-if="failure"
+        class="notice error"
+      >
+        {{ $t(`error.${failure}`) }}
+      </div>
+      <button
+        class="button primary full"
+        :disabled="saving || !username || !password"
+        type="submit"
+      >
+        {{ saving ? $t('login.signingIn') : $t('login.submit') }}
+      </button>
     </form>
   </div>
 </template>

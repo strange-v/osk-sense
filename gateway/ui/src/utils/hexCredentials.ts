@@ -7,7 +7,16 @@ export const PAIRING_KEY_HEX_LENGTH = 32 // 16-byte factory key
 // Cyrillic letters that are visually identical to Latin hex digits on a
 // standard keyboard layout switch (А/а, В/в, С/с, Е/е only — the remaining
 // hex digits have no common Cyrillic look-alike).
-const CYRILLIC_TO_LATIN: Record<string, string> = { А: 'A', а: 'A', В: 'B', в: 'B', С: 'C', с: 'C', Е: 'E', е: 'E' }
+const CYRILLIC_TO_LATIN: Record<string, string> = {
+  А: 'A',
+  а: 'A',
+  В: 'B',
+  в: 'B',
+  С: 'C',
+  с: 'C',
+  Е: 'E',
+  е: 'E',
+}
 
 // Strips everything but hex digits, mapping look-alike Cyrillic letters and
 // separators/quotes/whitespace away first.
@@ -90,8 +99,12 @@ export function parsePairingPaste(text: string): ParsedPairingCredentials {
   const keyMatch = trimmed.match(/factory[_-]?key["'\s:=]+([0-9a-fA-FА-Яа-я\-:\s]{10,})/i)
   if (uidMatch || keyMatch) {
     return {
-      uid: uidMatch ? normalizeHexFragment(uidMatch[1]).slice(0, PAIRING_UID_HEX_LENGTH) : undefined,
-      key: keyMatch ? normalizeHexFragment(keyMatch[1]).slice(0, PAIRING_KEY_HEX_LENGTH) : undefined,
+      uid: uidMatch
+        ? normalizeHexFragment(uidMatch[1]).slice(0, PAIRING_UID_HEX_LENGTH)
+        : undefined,
+      key: keyMatch
+        ? normalizeHexFragment(keyMatch[1]).slice(0, PAIRING_KEY_HEX_LENGTH)
+        : undefined,
     }
   }
 

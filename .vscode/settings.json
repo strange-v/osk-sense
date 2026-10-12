@@ -1,0 +1,15 @@
+{
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+  "prettier.prettierPath": "./gateway/ui/node_modules/prettier",
+  "prettier.requireConfig": true,
+  "clang-format.style": "file",
+  "clang-format.executable": "${workspaceRoot}/gateway/ui/node_modules/.bin/clang-format",
+  "clang-format.executable.windows": "${workspaceRoot}/gateway/ui/node_modules/clang-format-node/bin/cfn-win32-x64/clang-format.exe",
+  "[javascript][javascriptreact][typescript][typescriptreact][vue][css][scss][json][jsonc][markdown][yaml][html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[c][cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  }
+}

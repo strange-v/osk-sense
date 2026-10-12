@@ -24,12 +24,12 @@ struct Snapshot {
 };
 
 bool begin();
-bool accept(const radio::ReceivedFrame& frame);
-bool find(uint8_t nodeId, Record& record);
+bool accept(const radio::ReceivedFrame &frame);
+bool find(uint8_t nodeId, Record &record);
 void erase(uint8_t nodeId);
 // Forgets every cached reading. Pairs with the registry clear performed by the
 // radio network reset.
 void clear();
 Snapshot snapshot();
 
-}  // namespace gateway::telemetry_store
+} // namespace gateway::telemetry_store

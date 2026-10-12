@@ -21,4 +21,4 @@ bool close();
 Snapshot snapshot();
 uint32_t stackFreeBytes();
 
-}  // namespace gateway::commissioning
+} // namespace gateway::commissioning

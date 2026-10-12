@@ -32,16 +32,17 @@ bool expectedDeviceUidPresent = false;
 osk::crypto::Cmac factoryMac;
 portMUX_TYPE transactionMux = portMUX_INITIALIZER_UNLOCKED;
 
-bool matchesExpectedDevice(const uint8_t* deviceUid) {
+bool matchesExpectedDevice(const uint8_t *deviceUid) {
     portENTER_CRITICAL(&transactionMux);
     const bool matches = expectedDeviceUidPresent &&
-        memcmp(expectedDeviceUid, deviceUid, sizeof(expectedDeviceUid)) == 0;
+                         memcmp(expectedDeviceUid, deviceUid, sizeof(expectedDeviceUid)) == 0;
     portEXIT_CRITICAL(&transactionMux);
     return matches;
 }
 
-void setExpectedDevice(const uint8_t* deviceUid, const uint8_t* key) {
-    osk::crypto::Cmac mac; osk::crypto::cmacInit(mac, key);
+void setExpectedDevice(const uint8_t *deviceUid, const uint8_t *key) {
+    osk::crypto::Cmac mac;
+    osk::crypto::cmacInit(mac, key);
     portENTER_CRITICAL(&transactionMux);
     memcpy(expectedDeviceUid, deviceUid, sizeof(expectedDeviceUid));
     expectedDeviceUidPresent = true;
@@ -81,17 +82,19 @@ void returnToPairingIfOpen() {
     }
 }
 
-void handleJoinRequest(const radio::ReceivedFrame& frame) {
+void handleJoinRequest(const radio::ReceivedFrame &frame) {
     namespace s = radiosensors::security;
     namespace t = s::pairing;
     recovery::Guard windowGuard;
-    if (!windowGuard || recovery::blocked()) return;
+    if (!windowGuard || recovery::blocked())
+        return;
     increment(&Snapshot::joinRequests);
     if (!status::pairingActive() || frame.senderId != 0 || awaitingConfirm) {
         increment(&Snapshot::rejectedFrames);
         return;
     }
-    osk::crypto::Cmac mac; uint8_t expectedUid[radiosensors::protocol::kDeviceUidSize];
+    osk::crypto::Cmac mac;
+    uint8_t expectedUid[radiosensors::protocol::kDeviceUidSize];
     portENTER_CRITICAL(&transactionMux);
     const bool present = expectedDeviceUidPresent;
     if (present) {
@@ -99,18 +102,27 @@ void handleJoinRequest(const radio::ReceivedFrame& frame) {
         memcpy(expectedUid, expectedDeviceUid, sizeof(expectedUid));
     }
     portEXIT_CRITICAL(&transactionMux);
-    if (!present) { increment(&Snapshot::rejectedFrames); return; }
+    if (!present) {
+        increment(&Snapshot::rejectedFrames);
+        return;
+    }
     const auto secrets = configuration_store::secrets();
     uint8_t encoded[s::frames::kJoinAcceptSize];
     status::indicate(status::Indication::PersistingNode);
     const auto result = registry_store::pairingRequestAndSave(
-        mac, expectedUid,
-        {static_cast<uint8_t>(frame.targetId),0,frame.control},
-        frame.data, frame.size, secrets.operationalNetworkId, {0,100,0},
-        encoded, sizeof(encoded));
+        mac,
+        expectedUid,
+        {static_cast<uint8_t>(frame.targetId), 0, frame.control},
+        frame.data,
+        frame.size,
+        secrets.operationalNetworkId,
+        {0, 100, 0},
+        encoded,
+        sizeof(encoded));
     memset(&mac, 0, sizeof(mac));
     if (result != t::Status::Accept && result != t::Status::RepeatedAccept) {
-        increment(result == t::Status::StorageError ? &Snapshot::storageErrors : &Snapshot::rejectedFrames);
+        increment(result == t::Status::StorageError ? &Snapshot::storageErrors
+                                                    : &Snapshot::rejectedFrames);
         status::indicate(status::Indication::Error, 3000);
         return;
     }
@@ -125,19 +137,24 @@ void handleJoinRequest(const radio::ReceivedFrame& frame) {
     status::indicate(status::Indication::AwaitingConfirm);
 }
 
-void handleJoinConfirm(const radio::ReceivedFrame& frame) {
+void handleJoinConfirm(const radio::ReceivedFrame &frame) {
     namespace t = radiosensors::security::pairing;
     recovery::Guard windowGuard;
-    if (!windowGuard || recovery::blocked()) return;
+    if (!windowGuard || recovery::blocked())
+        return;
     increment(&Snapshot::joinConfirms);
     uint8_t encoded[radiosensors::security::frames::kJoinCompleteSize];
     const auto result = registry_store::pairingConfirmAndSave(
         static_cast<uint8_t>(frame.senderId),
-        {static_cast<uint8_t>(frame.targetId),static_cast<uint8_t>(frame.senderId),frame.control},
-        frame.data, frame.size, encoded, sizeof(encoded));
+        {static_cast<uint8_t>(frame.targetId), static_cast<uint8_t>(frame.senderId), frame.control},
+        frame.data,
+        frame.size,
+        encoded,
+        sizeof(encoded));
     const bool newlyConfirmed = result == t::Status::Complete;
     if (!newlyConfirmed && result != t::Status::RepeatedComplete) {
-        increment(result == t::Status::StorageError ? &Snapshot::storageErrors : &Snapshot::rejectedFrames);
+        increment(result == t::Status::StorageError ? &Snapshot::storageErrors
+                                                    : &Snapshot::rejectedFrames);
         status::indicate(status::Indication::Error, 3000);
         return;
     }
@@ -146,9 +163,11 @@ void handleJoinConfirm(const radio::ReceivedFrame& frame) {
         return;
     }
     increment(&Snapshot::joinCompletesQueued);
-    if (newlyConfirmed) increment(&Snapshot::nodesActivated);
+    if (newlyConfirmed)
+        increment(&Snapshot::nodesActivated);
     if (matchesExpectedDevice(encoded + 1)) {
-        awaitingConfirm = false; confirmDeadline = 0;
+        awaitingConfirm = false;
+        confirmDeadline = 0;
         if (status::closePairing()) {
             clearExpectedDevice();
             status::indicate(status::Indication::PairingSucceeded, 1000);
@@ -156,31 +175,33 @@ void handleJoinConfirm(const radio::ReceivedFrame& frame) {
     }
 }
 
-void task(void*) {
+void task(void *) {
     for (;;) {
         radio::ReceivedFrame received{};
         if (radio::receive(received, pdMS_TO_TICKS(100))) {
-            if (received.kind == radiosensors::protocol::FrameKind::JoinRequest) {
+            if (received.kind == radiosensors::protocol::FrameKind::JoinRequest)
                 handleJoinRequest(received);
-            } else if (received.kind == radiosensors::protocol::FrameKind::JoinConfirm) {
+            else if (received.kind == radiosensors::protocol::FrameKind::JoinConfirm)
                 handleJoinConfirm(received);
-            }
         }
         clearExpectedDevice(true);
-        if (awaitingConfirm &&
-            static_cast<int32_t>(millis() - confirmDeadline) >= 0) {
+        if (awaitingConfirm && static_cast<int32_t>(millis() - confirmDeadline) >= 0) {
             increment(&Snapshot::confirmTimeouts);
             returnToPairingIfOpen();
         }
     }
 }
 
-}  // namespace
+} // namespace
 
 bool begin() {
-    if (xTaskCreatePinnedToCore(
-            task, "commissioning", kTaskStackSize, nullptr, kTaskPriority,
-            &taskHandle, kTaskCore) != pdPASS) {
+    if (xTaskCreatePinnedToCore(task,
+                                "commissioning",
+                                kTaskStackSize,
+                                nullptr,
+                                kTaskPriority,
+                                &taskHandle,
+                                kTaskCore) != pdPASS) {
         Serial.println("Commissioning task creation failed");
         return false;
     }
@@ -188,13 +209,14 @@ bool begin() {
     return true;
 }
 
-bool open(
-    const uint8_t deviceUid[radiosensors::protocol::kDeviceUidSize],
-    const uint8_t factoryKey[radiosensors::gateway_storage::kFactoryKeySize]) {
-    if (deviceUid == nullptr || factoryKey == nullptr) return false;
+bool open(const uint8_t deviceUid[radiosensors::protocol::kDeviceUidSize],
+          const uint8_t factoryKey[radiosensors::gateway_storage::kFactoryKeySize]) {
+    if (deviceUid == nullptr || factoryKey == nullptr)
+        return false;
     awaitingConfirm = false;
     confirmDeadline = 0;
-    if (!status::openPairing()) return false;
+    if (!status::openPairing())
+        return false;
     setExpectedDevice(deviceUid, factoryKey);
     if (!radio::beginCommissioning()) {
         status::closePairing();
@@ -221,4 +243,4 @@ Snapshot snapshot() {
     return value;
 }
 
-}  // namespace gateway::commissioning
+} // namespace gateway::commissioning

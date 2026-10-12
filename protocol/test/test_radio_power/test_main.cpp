@@ -5,16 +5,21 @@ using namespace radiosensors::radio_power;
 
 namespace {
 
-uint8_t report(ControlState& state, uint8_t level, int16_t rssi,
-               uint8_t policy = kPolicyAuto, uint8_t ceiling = 31,
+uint8_t report(ControlState &state,
+               uint8_t level,
+               int16_t rssi,
+               uint8_t policy = kPolicyAuto,
+               uint8_t ceiling = 31,
                bool fallback = false) {
     return observe(state, policy, ceiling, Report{level, fallback, rssi});
 }
 
-}  // namespace
+} // namespace
 
-void setUp() {}
-void tearDown() {}
+void setUp() {
+}
+void tearDown() {
+}
 
 void test_policy_encoding() {
     TEST_ASSERT_FALSE(isFixedPolicy(kPolicyAuto));
@@ -44,9 +49,8 @@ void test_strong_link_steps_down_after_enough_reports() {
 
 void test_link_inside_the_window_is_left_alone() {
     ControlState state{};
-    for (int index = 0; index < 5; ++index) {
+    for (int index = 0; index < 5; ++index)
         TEST_ASSERT_EQUAL_UINT8(9, report(state, 9, -80));
-    }
     TEST_ASSERT_EQUAL_UINT8(9, report(state, 9, -76));
 }
 
@@ -121,12 +125,11 @@ void test_restarted_node_is_sent_back_to_the_wanted_level() {
 
     // The node restarted at its ceiling, without a fallback.
     TEST_ASSERT_EQUAL_UINT8(7, report(state, 20, -70, kPolicyAuto, 20));
-    for (int index = 0; index < 4; ++index) {
+    for (int index = 0; index < 4; ++index)
         TEST_ASSERT_EQUAL_UINT8(7, report(state, 7, -80, kPolicyAuto, 20));
-    }
 }
 
-int main(int, char**) {
+int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_policy_encoding);
     RUN_TEST(test_first_report_keeps_the_reported_level);

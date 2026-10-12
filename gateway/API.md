@@ -4,10 +4,10 @@ JSON responses use `Content-Type: application/json`. Unless noted otherwise, end
 
 There are two API surfaces, split by how fast they may change rather than by who calls them:
 
-| Prefix | Contents | Stability |
-| --- | --- | --- |
+| Prefix | Contents                     | Stability                               |
+| ------ | ---------------------------- | --------------------------------------- |
 | `/api` | the external client contract | changes only with an `api_version` bump |
-| `/ui` | everything the Web UI needs | may change whenever the firmware does |
+| `/ui`  | everything the Web UI needs  | may change whenever the firmware does   |
 
 `/health` and `/ws` sit outside both: the first is an unversioned liveness probe, the second versions itself through `stream_version`.
 
@@ -15,11 +15,11 @@ There are two API surfaces, split by how fast they may change rather than by who
 
 One number per wire contract, and nothing else is a version. They move independently.
 
-| Number | Governs | Checked by |
-| --- | --- | --- |
-| `api_version` | REST under `/api` | the client, from `/api/info` |
-| `stream_version` | WebSocket frame format | the client, from `/api/info` |
-| `protocol_major` | radio frames, see [PROTOCOL.md](../protocol/PROTOCOL.md) | nodes |
+| Number           | Governs                                                  | Checked by                   |
+| ---------------- | -------------------------------------------------------- | ---------------------------- |
+| `api_version`    | REST under `/api`                                        | the client, from `/api/info` |
+| `stream_version` | WebSocket frame format                                   | the client, from `/api/info` |
+| `protocol_major` | radio frames, see [PROTOCOL.md](../protocol/PROTOCOL.md) | nodes                        |
 
 A bump means a breaking change; additive changes never bump. A consumer therefore declares the **set** of versions it supports and checks membership, not a minimum.
 
@@ -40,58 +40,58 @@ Authorization: Bearer <token>
 Common error body:
 
 ```json
-{"error":"machine_readable_code"}
+{ "error": "machine_readable_code" }
 ```
 
 ## Endpoint summary
 
 Client contract:
 
-| Method | Path | Authorization | Status |
-| --- | --- | --- | --- |
-| GET | `/api/info` | none | implemented |
-| GET | `/api/nodes` | session or bearer `telemetry:read` | implemented |
-| GET | `/ws` | session or bearer `telemetry:read` | provisional implementation |
+| Method | Path         | Authorization                      | Status                     |
+| ------ | ------------ | ---------------------------------- | -------------------------- |
+| GET    | `/api/info`  | none                               | implemented                |
+| GET    | `/api/nodes` | session or bearer `telemetry:read` | implemented                |
+| GET    | `/ws`        | session or bearer `telemetry:read` | provisional implementation |
 
 Web UI:
 
-| Method | Path | Authorization | Status |
-| --- | --- | --- | --- |
-| GET | `/ui/setup` | none | implemented |
-| POST | `/ui/setup` | physical setup window | implemented |
-| POST, GET, DELETE | `/ui/session` | credentials/session | implemented |
-| GET | `/ui/status` | session | implemented |
-| GET | `/ui/clients` | session | implemented |
-| GET | `/ui/telemetry/last` | session | implemented |
-| PATCH, DELETE | `/ui/nodes` | admin session + CSRF | implemented |
-| GET, PUT | `/ui/settings` | session; admin for PUT | implemented |
-| GET, POST, PUT, DELETE | `/ui/users` | admin | implemented |
-| GET, POST, DELETE | `/ui/tokens` | admin | implemented |
-| POST | `/ui/radio/reset` | admin session + CSRF | implemented |
-| POST | `/ui/pairing/open` | admin | implemented |
-| POST | `/ui/pairing/close` | admin | implemented |
-| GET | `/ui/update` | session | implemented |
-| POST | `/ui/update/check`, `/ui/update/install` | admin session + CSRF | implemented |
-| POST | `/ui/update/repair-ui` | admin session + CSRF; physical setup window before the first admin | implemented |
-| GET, POST, DELETE | `/ui/commands` | session; admin + CSRF for POST and DELETE | implemented |
-| GET | `/ui/export` | admin | planned |
-| POST | `/ui/restore` | admin plus destructive confirmation | planned |
+| Method                 | Path                                     | Authorization                                                      | Status      |
+| ---------------------- | ---------------------------------------- | ------------------------------------------------------------------ | ----------- |
+| GET                    | `/ui/setup`                              | none                                                               | implemented |
+| POST                   | `/ui/setup`                              | physical setup window                                              | implemented |
+| POST, GET, DELETE      | `/ui/session`                            | credentials/session                                                | implemented |
+| GET                    | `/ui/status`                             | session                                                            | implemented |
+| GET                    | `/ui/clients`                            | session                                                            | implemented |
+| GET                    | `/ui/telemetry/last`                     | session                                                            | implemented |
+| PATCH, DELETE          | `/ui/nodes`                              | admin session + CSRF                                               | implemented |
+| GET, PUT               | `/ui/settings`                           | session; admin for PUT                                             | implemented |
+| GET, POST, PUT, DELETE | `/ui/users`                              | admin                                                              | implemented |
+| GET, POST, DELETE      | `/ui/tokens`                             | admin                                                              | implemented |
+| POST                   | `/ui/radio/reset`                        | admin session + CSRF                                               | implemented |
+| POST                   | `/ui/pairing/open`                       | admin                                                              | implemented |
+| POST                   | `/ui/pairing/close`                      | admin                                                              | implemented |
+| GET                    | `/ui/update`                             | session                                                            | implemented |
+| POST                   | `/ui/update/check`, `/ui/update/install` | admin session + CSRF                                               | implemented |
+| POST                   | `/ui/update/repair-ui`                   | admin session + CSRF; physical setup window before the first admin | implemented |
+| GET, POST, DELETE      | `/ui/commands`                           | session; admin + CSRF for POST and DELETE                          | implemented |
+| GET                    | `/ui/export`                             | admin                                                              | planned     |
+| POST                   | `/ui/restore`                            | admin plus destructive confirmation                                | planned     |
 
 Neither:
 
-| Method | Path | Authorization | Status |
-| --- | --- | --- | --- |
-| GET | `/health` | none | implemented |
+| Method | Path      | Authorization | Status      |
+| ------ | --------- | ------------- | ----------- |
+| GET    | `/health` | none          | implemented |
 
 ## External client contract
 
 An external client — the Home Assistant integration, or anything else that reads this gateway over the network — is released and updated independently of the firmware. It may therefore depend only on the three endpoints below, and `api_version` describes that set and nothing else.
 
-| Purpose | Endpoint |
-| --- | --- |
-| Identity and compatibility | `GET /api/info` |
+| Purpose                            | Endpoint         |
+| ---------------------------------- | ---------------- |
+| Identity and compatibility         | `GET /api/info`  |
 | Node registry, with its generation | `GET /api/nodes` |
-| Telemetry stream | `GET /ws` |
+| Telemetry stream                   | `GET /ws`        |
 
 A client is given its bearer token by a person, who creates it with `POST /ui/tokens` from the Web UI. Everything under `/ui` is internal and a client must not call it, including that one.
 
@@ -108,7 +108,13 @@ A consumer must ignore fields it does not recognize. Adding a field therefore ne
 Returns whether an administrator must be created and whether the physical window is open.
 
 ```json
-{"setup_required":true,"physical_window_active":false,"remaining_seconds":0,"recovery_required":false,"recovery_reason":"none"}
+{
+  "setup_required": true,
+  "physical_window_active": false,
+  "remaining_seconds": 0,
+  "recovery_required": false,
+  "recovery_reason": "none"
+}
 ```
 
 ### `POST /ui/setup`
@@ -117,19 +123,19 @@ Allowed exactly while `setup_required` and `physical_window_active` are both tru
 
 ```json
 {
-  "username":"admin",
-  "password":"strong-password",
-  "hostname":"osk-hub-floor1",
-  "operational_network_id":128
+  "username": "admin",
+  "password": "strong-password",
+  "hostname": "osk-hub-floor1",
+  "operational_network_id": 128
 }
 ```
 
-| Field | Required | Validation |
-| --- | --- | --- |
-| `username` | yes | 1..32 lowercase ASCII letters, digits, `.`, `_`, `-` |
-| `password` | yes | 8..128 UTF-8 bytes |
-| `hostname` | no | 0..32 DNS label characters; empty keeps `osk-hub-<mac>` |
-| `operational_network_id` | no | 1..255 and different from the commissioning network |
+| Field                    | Required | Validation                                              |
+| ------------------------ | -------- | ------------------------------------------------------- |
+| `username`               | yes      | 1..32 lowercase ASCII letters, digits, `.`, `_`, `-`    |
+| `password`               | yes      | 8..128 UTF-8 bytes                                      |
+| `hostname`               | no       | 0..32 DNS label characters; empty keeps `osk-hub-<mac>` |
+| `operational_network_id` | no       | 1..255 and different from the commissioning network     |
 
 Success creates the first browser session and returns the same body and cookie as login, with status `201`. Errors: `400 invalid_request`, `403 physical_setup_required`, `409 setup_busy`, `409 setup_already_complete`, `422 invalid_setup_values`, `422 invalid_operational_network_id`, or `500` for hashing/storage failure.
 
@@ -144,13 +150,16 @@ A gateway that has never been set up keeps its radio asleep; `/ui/status` report
 ### `POST /ui/session`
 
 ```json
-{"username":"admin","password":"strong-password"}
+{ "username": "admin", "password": "strong-password" }
 ```
 
 On success it returns:
 
 ```json
-{"user":{"id":1,"username":"admin","role":"admin"},"csrf_token":"32 lowercase hex characters"}
+{
+  "user": { "id": 1, "username": "admin", "role": "admin" },
+  "csrf_token": "32 lowercase hex characters"
+}
 ```
 
 The response also sets the 64-hex-character opaque session cookie. Invalid credentials return `401 invalid_credentials`; concurrent password verification returns `409 login_busy`. Error responses do not reveal whether a username exists.
@@ -168,7 +177,17 @@ Requires the session cookie and matching `X-CSRF-Token`, removes the RAM session
 `GET /api/info` is unauthenticated. It returns the stable installation identity, current boot identity and uptime, firmware and client-contract versions, Web UI state and version, board, and hostname:
 
 ```json
-{"firmware_version":"0.9.0","api_version":1,"stream_version":1,"gateway_id":"cccd7e8a5e2bd5d8b9cb754240a82fd8","boot_id":"1d52f8108f3098bdcc0e1ac5fc71be4b","uptime_seconds":1234,"ui":{"state":"ready","version":"0.9.0","required_firmware":"0.9"},"board":"Waveshare ESP32-S3-ETH + PoE","hostname":"osk-hub-a085e3e6cc20"}
+{
+  "firmware_version": "0.9.0",
+  "api_version": 1,
+  "stream_version": 1,
+  "gateway_id": "cccd7e8a5e2bd5d8b9cb754240a82fd8",
+  "boot_id": "1d52f8108f3098bdcc0e1ac5fc71be4b",
+  "uptime_seconds": 1234,
+  "ui": { "state": "ready", "version": "0.9.0", "required_firmware": "0.9" },
+  "board": "Waveshare ESP32-S3-ETH + PoE",
+  "hostname": "osk-hub-a085e3e6cc20"
+}
 ```
 
 All fields shown above are required. `api_version`, `stream_version`, and `uptime_seconds` are unsigned integers; `uptime_seconds` is the elapsed time since boot. `firmware_version` and the non-empty UI version are SemVer; `ui.version` and `ui.required_firmware` are empty when no compatible UI image is available. A consumer ignores additional fields it does not recognize.
@@ -250,16 +269,35 @@ A command changes state on a sleeping node, which fetches it in a radio session 
 `GET /ui/commands` requires a session of any role:
 
 ```json
-{"commands":[
-  {"node_id":7,"command_id":4661,"type":"set_count","arguments":{"count":1234},"queued_at_ms":1770000000000,"state":"delivered"},
-  {"node_id":9,"command_id":4660,"type":"set_count","arguments":{"count":0},"queued_at_ms":1770000000000,"state":"completed","status":"applied","completed_at_ms":1770000060000,"result":{"previous_count":7351,"count":0}}
-]}
+{
+  "commands": [
+    {
+      "node_id": 7,
+      "command_id": 4661,
+      "type": "set_count",
+      "arguments": { "count": 1234 },
+      "queued_at_ms": 1770000000000,
+      "state": "delivered"
+    },
+    {
+      "node_id": 9,
+      "command_id": 4660,
+      "type": "set_count",
+      "arguments": { "count": 0 },
+      "queued_at_ms": 1770000000000,
+      "state": "completed",
+      "status": "applied",
+      "completed_at_ms": 1770000060000,
+      "result": { "previous_count": 7351, "count": 0 }
+    }
+  ]
+}
 ```
 
-| `state` | Meaning |
-| --- | --- |
-| `pending` | Waiting for the node to open a session |
-| `delivered` | Sent to the node since this boot; its result has not arrived |
+| `state`     | Meaning                                                                     |
+| ----------- | --------------------------------------------------------------------------- |
+| `pending`   | Waiting for the node to open a session                                      |
+| `delivered` | Sent to the node since this boot; its result has not arrived                |
 | `completed` | The node reported `status`: `applied`, `unsupported`, or `invalid_argument` |
 
 An applied `set_count` also carries `"result":{"previous_count":1200,"count":1234}`, and an applied `read_info` `"result":{"profile_id":6,"firmware":"1.0.2","max_power_level":20}`. Timestamps are zero before time synchronization.
@@ -267,13 +305,13 @@ An applied `set_count` also carries `"result":{"previous_count":1200,"count":123
 `POST /ui/commands` requires an admin session plus CSRF and queues one command:
 
 ```json
-{"node_id":7,"type":"set_count","arguments":{"count":1234}}
+{ "node_id": 7, "type": "set_count", "arguments": { "count": 1234 } }
 ```
 
-| `type` | `arguments` | Profiles |
-| --- | --- | --- |
-| `set_count` | `count`: unsigned 32-bit | 6 |
-| `read_info` | none: `{}` | All |
+| `type`      | `arguments`              | Profiles |
+| ----------- | ------------------------ | -------- |
+| `set_count` | `count`: unsigned 32-bit | 6        |
+| `read_info` | none: `{}`               | All      |
 
 `read_info` refreshes the node's registry record from the running firmware ([PROTOCOL.md](../protocol/PROTOCOL.md#command-types)); use it after reflashing a node. The registry changes before the command completes, so an applied result that changed anything has already advanced `registry_generation`.
 
@@ -296,7 +334,7 @@ Settings contain hostname, mDNS enabled state, NTP enabled state, up to three NT
 `POST /ui/pairing/open` accepts manually entered per-device credentials:
 
 ```json
-{"device_uid":"102132435465768798A9","factory_key":"00112233445566778899AABBCCDDEEFF"}
+{ "device_uid": "102132435465768798A9", "factory_key": "00112233445566778899AABBCCDDEEFF" }
 ```
 
 The UID is exactly 10 bytes and the factory key exactly 16 bytes, both encoded as hexadecimal. The gateway switches the radio to commissioning network `0`, keeps the key only in RAM, and accepts a `JOIN_REQUEST` only for the supplied UID. The registry holds at most 64 nodes. The key is wiped when pairing succeeds, is closed, or expires. It is never written to settings, secrets, registry, diagnostics, or logs. `POST /ui/pairing/close` ends the window early. Both endpoints require an admin session and CSRF and return the current pairing state and remaining seconds.
@@ -308,7 +346,7 @@ An active or disabled UID returns `409 node_already_exists`. A pending UID may r
 `POST /ui/radio/reset` clears paired nodes and sets the operational network ID. It requires an admin session plus CSRF. The body is optional:
 
 ```json
-{"operational_network_id":42}
+{ "operational_network_id": 42 }
 ```
 
 A value from 1 to 255 is applied as given; omit the field to have the gateway generate one. Zero or a non-integer returns `422 invalid_operational_network_id`.
@@ -316,7 +354,7 @@ A value from 1 to 255 is applied as given; omit the field to have the gateway ge
 The operation clears the node registry, replay bounds, command book and cached telemetry before saving the network ID. It answers `202` with the applied ID and number of removed records, then restarts. Only initial setup applies the profile to the running radio, because before setup it has none.
 
 ```json
-{"operational_network_id":42,"removed_nodes":6,"restarting":true}
+{ "operational_network_id": 42, "removed_nodes": 6, "restarting": true }
 ```
 
 The gateway's own `deviceSecret` is left untouched, so `gateway_id` and the Home Assistant identity survive the reset. Browser sessions do not: they live in RAM and every client must sign in again once the gateway is back. Physical nodes are not reset remotely — each keeps its old credentials and must be factory-reset before it can be paired again.
@@ -326,18 +364,25 @@ The gateway's own `deviceSecret` is left untouched, so `gateway_id` and the Home
 The gateway updates its firmware from the signed GitHub release (see the gateway README, Releases). `GET /ui/update` returns:
 
 ```json
-{"state":"available","current_version":"0.9.0","available_version":"0.9.1","progress":0,"error":"","pending_verify":false}
+{
+  "state": "available",
+  "current_version": "0.9.0",
+  "available_version": "0.9.1",
+  "progress": 0,
+  "error": "",
+  "pending_verify": false
+}
 ```
 
-| `state` | Meaning |
-| --- | --- |
-| `idle` | nothing checked since boot |
-| `checking` | fetching and verifying the latest manifest |
-| `up_to_date` | the latest release is not newer |
-| `available` | `available_version` can be installed |
-| `installing` | writing the Web UI, then the firmware into the inactive slot; `progress` is 0–100 over both downloads |
-| `restarting` | installed; the gateway restarts in about a second |
-| `failed` | `error` names the step: `network_unavailable`, `time_not_synchronized`, `not_found`, `download_failed`, `too_large`, `bad_signature`, `malformed`, `unsupported_format`, `board_missing`, `size_mismatch`, `hash_mismatch`, `flash_begin_failed`, `write_failed`, `image_invalid`, `ui_partition_missing`, `ui_size_mismatch`, `out_of_memory` |
+| `state`      | Meaning                                                                                                                                                                                                                                                                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `idle`       | nothing checked since boot                                                                                                                                                                                                                                                                                                                     |
+| `checking`   | fetching and verifying the latest manifest                                                                                                                                                                                                                                                                                                     |
+| `up_to_date` | the latest release is not newer                                                                                                                                                                                                                                                                                                                |
+| `available`  | `available_version` can be installed                                                                                                                                                                                                                                                                                                           |
+| `installing` | writing the Web UI, then the firmware into the inactive slot; `progress` is 0–100 over both downloads                                                                                                                                                                                                                                          |
+| `restarting` | installed; the gateway restarts in about a second                                                                                                                                                                                                                                                                                              |
+| `failed`     | `error` names the step: `network_unavailable`, `time_not_synchronized`, `not_found`, `download_failed`, `too_large`, `bad_signature`, `malformed`, `unsupported_format`, `board_missing`, `size_mismatch`, `hash_mismatch`, `flash_begin_failed`, `write_failed`, `image_invalid`, `ui_partition_missing`, `ui_size_mismatch`, `out_of_memory` |
 
 `POST /ui/update/check` starts a check and `POST /ui/update/install` installs the checked release, Web UI first; both answer `202` with the status, or `409 update_busy` / `409 update_unavailable`. An install needs state `available`, no running backup, restore or ArduinoOTA upload.
 
@@ -352,7 +397,7 @@ At most four local users are stored. Roles are `admin` and `viewer`; mutations c
 `GET /ui/users` lists users without password material:
 
 ```json
-{"users":[{"id":1,"username":"admin","role":"admin","enabled":true}]}
+{ "users": [{ "id": 1, "username": "admin", "role": "admin", "enabled": true }] }
 ```
 
 `POST /ui/users` requires CSRF and accepts `username`, `password`, `role`, and an optional `enabled` flag (default `true`). It returns the new user with status `201`. `PUT /ui/users` replaces `username`, `role`, and `enabled` for the supplied `id`; an optional `password` replaces the password. A successful update revokes every session belonging to that user. `DELETE /ui/users` requires CSRF and a JSON body such as `{"id":2}`, revokes that user's sessions, and returns `204`.
@@ -366,7 +411,7 @@ There is exactly one scope, `telemetry:read`, and it covers both `GET /api/nodes
 `GET /ui/tokens` lists token metadata but never returns token hashes or the original token. `POST /ui/tokens` requires CSRF and accepts a name:
 
 ```json
-{"name":"Home Assistant"}
+{ "name": "Home Assistant" }
 ```
 
 `scopes` is optional. Omitting it grants `telemetry:read`, which is what the Web UI sends. A supplied value must be a non-empty array containing only `telemetry:read`; anything else returns `422 invalid_token_values` rather than silently granting the scope that does exist.
@@ -391,7 +436,12 @@ The WebSocket handshake accepts either the browser session cookie or a bearer to
 A client should identify itself with an `X-Client` handshake header naming the product and version, for example `home-assistant/0.3.0`. This is the only source the gateway has for who is on a socket: an API key's name is free text someone typed and need not be unique, so it says nothing about the client holding it. The gateway keeps at most 32 printable ASCII characters per client and reports them at `GET /ui/clients`:
 
 ```json
-{"clients":[{"id":3,"name":"home-assistant/0.3.0"},{"id":4,"name":""}]}
+{
+  "clients": [
+    { "id": 3, "name": "home-assistant/0.3.0" },
+    { "id": 4, "name": "" }
+  ]
+}
 ```
 
 An empty name is a client that sent no header; it is reported as unidentified rather than attributed to a key. The endpoint requires a browser session of any role and is not available to a bearer token.
@@ -401,7 +451,7 @@ An empty name is a client that sent no header; it is reported as unidentified ra
 `GET /health` is unauthenticated and deliberately almost empty:
 
 ```json
-{"status":"ok","boot_id":"1d52f8108f3098bdcc0e1ac5fc71be4b"}
+{ "status": "ok", "boot_id": "1d52f8108f3098bdcc0e1ac5fc71be4b" }
 ```
 
 It exists so something on the network can tell the gateway is up without a credential, and so the Web UI can watch for a reboot after a radio network reset has killed every session. `boot_id` is the one detail worth publishing here: it changes on every boot, which is what distinguishes "it came back" from "it never went down", and mDNS broadcasts it anyway. Nothing else belongs in this response, and a client must not read it — see "External client contract".
@@ -410,13 +460,13 @@ It exists so something on the network can tell the gateway is up without a crede
 
 The status page shows the three security counters since boot. The root `bench` object exposes hardware measurements; durations are microseconds and counters reset at boot:
 
-| Fields | Measurement |
-| --- | --- |
-| `last_receive_us`, `max_receive_us` | V3 engine receive processing, including authentication and replay reservation/read-back |
-| `reservation_writes`, `reservation_failures` | Attempted and failed replay-bound writes |
-| `last_reservation_write_us`, `max_reservation_write_us` | NVS `putBytes` duration; excludes read-back |
+| Fields                                                         | Measurement                                                                                                                     |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `last_receive_us`, `max_receive_us`                            | V3 engine receive processing, including authentication and replay reservation/read-back                                         |
+| `reservation_writes`, `reservation_failures`                   | Attempted and failed replay-bound writes                                                                                        |
+| `last_reservation_write_us`, `max_reservation_write_us`        | NVS `putBytes` duration; excludes read-back                                                                                     |
 | `acks_measured`, `last_ack_us`, `max_ack_us`, `acks_over_40ms` | IRQ to completed ACK transmission, including scheduling, processing and radio transmit; missed-IRQ recovery frames are excluded |
-| `stack_free_bytes.radio`, `.commissioning`, `.commands` | ESP32 task minimum free stack in bytes; zero when the task is unavailable |
+| `stack_free_bytes.radio`, `.commissioning`, `.commands`        | ESP32 task minimum free stack in bytes; zero when the task is unavailable                                                       |
 
 ACK measurements do not include node reception or verification. The node's 40 ms receive deadline still requires an on-air test. No timing logs run before the ACK.
 
@@ -425,7 +475,15 @@ ACK measurements do not include node reception or verification. The node's 40 ms
 `GET /ui/telemetry/last` returns the most recently accepted telemetry record with its payload as hexadecimal, for looking at frames on the bench without a WebSocket client. It requires a browser session and does not accept a bearer token: it returns decoded node telemetry, which is what `telemetry:read` protects, and it is not part of the external client contract. Before the first frame it answers `404 no_telemetry`.
 
 ```json
-{"node_id":3,"profile_id":1,"received_at_ms":1770000000000,"rssi":-74,"size":5,"sequence":812,"payload_hex":"4002bae40c"}
+{
+  "node_id": 3,
+  "profile_id": 1,
+  "received_at_ms": 1770000000000,
+  "rssi": -74,
+  "size": 5,
+  "sequence": 812,
+  "payload_hex": "4002bae40c"
+}
 ```
 
 ## Security and backup

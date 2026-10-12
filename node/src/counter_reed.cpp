@@ -27,11 +27,9 @@ node::NodeRadio radio(NODE_RFM69_CS, NODE_RFM69_IRQ);
 node::LowPowerClock clock;
 node::ProvisioningButton button(NODE_BUTTON_PIN);
 Profile profile(NODE_REED_PIN, NODE_COUNTER_MINIMUM_PHASE_MS);
-node::CommissioningService commissioning(
-    radio, Profile::kProfileId);
-node::NodeRuntime<Profile> runtime(
-    profile, radio, commissioning, clock, button);
-}
+node::CommissioningService commissioning(radio, Profile::kProfileId);
+node::NodeRuntime<Profile> runtime(profile, radio, commissioning, clock, button);
+} // namespace
 
 void setup() {
 #if defined(NODE_DEBUG)

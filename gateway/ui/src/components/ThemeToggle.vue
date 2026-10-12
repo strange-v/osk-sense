@@ -20,7 +20,11 @@ function choose(value: ThemePreference) {
 </script>
 
 <template>
-  <div class="segmented" role="group" :aria-label="$t('theme.label')">
+  <div
+    class="segmented"
+    role="group"
+    :aria-label="$t('theme.label')"
+  >
     <button
       v-for="value in THEME_PREFERENCES"
       :key="value"

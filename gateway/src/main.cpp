@@ -27,18 +27,18 @@ namespace {
 
 constexpr uint32_t kSerialStartupDelayMs = 1000;
 
-const char* ethernetControllerName(gateway::board::EthernetController controller) {
+const char *ethernetControllerName(gateway::board::EthernetController controller) {
     switch (controller) {
-        case gateway::board::EthernetController::Lan8720:
-            return "LAN8720 (RMII)";
-        case gateway::board::EthernetController::W5500:
-            return "W5500 (SPI)";
+    case gateway::board::EthernetController::Lan8720:
+        return "LAN8720 (RMII)";
+    case gateway::board::EthernetController::W5500:
+        return "W5500 (SPI)";
     }
 
     return "unknown";
 }
 
-}  // namespace
+} // namespace
 
 void setup() {
     Serial.begin(115200);
@@ -54,23 +54,23 @@ void setup() {
     Serial.println("OSK Sense Hub");
     Serial.printf("Firmware: %s\n", gateway::firmware::version);
     Serial.printf("Board: %s\n", gateway::board::current.name);
-    Serial.printf(
-        "Ethernet: %s\n",
-        ethernetControllerName(gateway::board::current.ethernetController));
+    Serial.printf("Ethernet: %s\n",
+                  ethernetControllerName(gateway::board::current.ethernetController));
     Serial.printf("PoE profile: %s\n", gateway::board::current.hasPoe ? "yes" : "no");
     Serial.printf("Reset reason: %s\n", gateway::diagnostics::resetReason());
 
     gateway::recovery::begin();
-    if (!gateway::recovery::blocked()) gateway::configuration_store::begin();
+    if (!gateway::recovery::blocked())
+        gateway::configuration_store::begin();
     gateway::identity::begin();
     Serial.printf("Hostname: %s\n", gateway::identity::hostname());
     Serial.printf("Gateway ID: %s\n", gateway::identity::gatewayId());
     Serial.printf("Boot ID: %s\n", gateway::identity::bootId());
-    if (!gateway::password_hash::begin()) {
+    if (!gateway::password_hash::begin())
         Serial.println("Password hash worker initialization failed");
-    }
     gateway::authentication::begin();
-    if (!gateway::recovery::blocked()) gateway::registry_store::begin();
+    if (!gateway::recovery::blocked())
+        gateway::registry_store::begin();
     gateway::telemetry_store::begin();
     gateway::status::begin();
     gateway::ethernet::begin();
@@ -78,12 +78,12 @@ void setup() {
     gateway::mdns_service::begin();
     gateway::web_ui::begin();
     const bool radioReady = !gateway::recovery::blocked() && gateway::radio::begin();
-    if (radioReady) {
+    if (radioReady)
         gateway::commissioning::begin();
-    } else {
+    else
         Serial.println("Commissioning disabled because RFM69 is unavailable");
-    }
-    if (!gateway::recovery::blocked()) gateway::commands::begin(radioReady);
+    if (!gateway::recovery::blocked())
+        gateway::commands::begin(radioReady);
     gateway::web_server::begin();
     gateway::ota::begin();
     gateway::update::begin();
@@ -100,26 +100,22 @@ void loop() {
     gateway::time_service::loop();
     gateway::mdns_service::loop();
     gateway::radio::ReceivedFrame telemetry{};
-    for (uint8_t drained = 0;
-         drained < 16 && gateway::radio::receiveTelemetry(telemetry);
+    for (uint8_t drained = 0; drained < 16 && gateway::radio::receiveTelemetry(telemetry);
          ++drained) {
         if (gateway::telemetry_store::accept(telemetry)) {
             gateway::telemetry_store::Record record{};
-            if (gateway::telemetry_store::find(
-                    static_cast<uint8_t>(telemetry.senderId), record)) {
+            if (gateway::telemetry_store::find(static_cast<uint8_t>(telemetry.senderId), record)) {
                 gateway::web_server::publishTelemetry(record);
                 gateway::power_control::observe(record);
             }
-            Serial.printf(
-                "Telemetry stored: sender=%u bytes=%u rssi=%d\n",
-                telemetry.senderId,
-                telemetry.size,
-                telemetry.rssi);
+            Serial.printf("Telemetry stored: sender=%u bytes=%u rssi=%d\n",
+                          telemetry.senderId,
+                          telemetry.size,
+                          telemetry.rssi);
         } else {
-            Serial.printf(
-                "Telemetry store rejected frame: sender=%u bytes=%u\n",
-                telemetry.senderId,
-                telemetry.size);
+            Serial.printf("Telemetry store rejected frame: sender=%u bytes=%u\n",
+                          telemetry.senderId,
+                          telemetry.size);
         }
     }
     gateway::status::loop();

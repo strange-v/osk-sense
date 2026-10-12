@@ -20,10 +20,17 @@ const state = vi.hoisted(() => ({
   radioCounters: { failed_tags: 0, replay_frames: 0, activation_challenges: 0 },
 }))
 const health = () => ({
-  status: 'ok', firmware: '2.1.0',
+  status: 'ok',
+  firmware: '2.1.0',
   ethernet: { has_ip: true, ip: '192.168.1.10', state: 'connected' },
-  radio: { present: true, frequency_hz: 868_000_000, network_id: 137, counters: { ...state.radioCounters } },
-  storage: { ready: true }, registry: { ready: state.registryReady, records: 1, generation: 4 },
+  radio: {
+    present: true,
+    frequency_hz: 868_000_000,
+    network_id: 137,
+    counters: { ...state.radioCounters },
+  },
+  storage: { ready: true },
+  registry: { ready: state.registryReady, records: 1, generation: 4 },
   telemetry: { nodes_seen: 1, updates: 3 },
   time: { state: 'synchronized', unix_ms: 1_700_000_000_000, last_sync_ms: 1_700_000_000_000 },
   websocket: { clients: state.clients, connections: 2, messages_sent: 512, messages_dropped: 0 },
@@ -32,7 +39,11 @@ const health = () => ({
 const gatewayApi = vi.hoisted(() => ({
   poll: {
     status: vi.fn(),
-    info: vi.fn(async () => ({ firmware_version: '2.1.0', hostname: 'osk-hub', ui: { version: '0.1.0' } })),
+    info: vi.fn(async () => ({
+      firmware_version: '2.1.0',
+      hostname: 'osk-hub',
+      ui: { version: '0.1.0' },
+    })),
     nodes: vi.fn(async () => ({ nodes: [] })),
     clients: vi.fn(async () => ({ clients: [...state.streamClients] })),
   },
@@ -41,16 +52,27 @@ const gatewayApi = vi.hoisted(() => ({
 vi.mock('../api/client', () => ({
   api: gatewayApi,
   errorCode: () => 'generic',
-  get sessionUser() { return { value: { id: 1, username: 'admin', role: state.role } } },
+  get sessionUser() {
+    return { value: { id: 1, username: 'admin', role: state.role } }
+  },
 }))
 
 import StatusView from './StatusView.vue'
 
-const token = (over: Partial<ApiToken> = {}): ApiToken =>
-  ({ id: 1, name: 'Home Assistant', enabled: true, created_at_ms: 1_700_000_000_000, scopes: ['telemetry:read'], ...over })
+const token = (over: Partial<ApiToken> = {}): ApiToken => ({
+  id: 1,
+  name: 'Home Assistant',
+  enabled: true,
+  created_at_ms: 1_700_000_000_000,
+  scopes: ['telemetry:read'],
+  ...over,
+})
 
 async function mountView() {
-  const router = createRouter({ history: createWebHistory(), routes: [{ path: '/:rest(.*)*', component: { template: '<div />' } }] })
+  const router = createRouter({
+    history: createWebHistory(),
+    routes: [{ path: '/:rest(.*)*', component: { template: '<div />' } }],
+  })
   await router.push('/status')
   await router.isReady()
   const wrapper = mount(StatusView, {
@@ -77,13 +99,18 @@ beforeEach(() => {
     return { tokens: [...state.tokens] }
   })
 })
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 describe('StatusView clients card', () => {
   it('marks radio storage unavailable even when configuration storage is ready', async () => {
     state.registryReady = false
     const wrapper = await mountView()
-    const storage = wrapper.findAll('.health-list > div').find((row) => row.get('dt').text() === en.status.storage)
+    const storage = wrapper
+      .findAll('.health-list > div')
+      .find((row) => row.get('dt').text() === en.status.storage)
     expect(storage?.get('strong').text()).toBe(en.common.attention)
     wrapper.unmount()
   })
@@ -91,7 +118,11 @@ describe('StatusView clients card', () => {
     state.radioCounters = { failed_tags: 7, replay_frames: 0, activation_challenges: 12 }
     const wrapper = await mountView()
     const rows = wrapper.get('.radio-security-card').findAll('dl > div')
-    expect(rows.map((row) => row.get('dt').text())).toEqual([en.status.failedTags, en.status.replayFrames, en.status.activationChallenges])
+    expect(rows.map((row) => row.get('dt').text())).toEqual([
+      en.status.failedTags,
+      en.status.replayFrames,
+      en.status.activationChallenges,
+    ])
     expect(rows.map((row) => row.get('dd').text())).toEqual(['7', '0', '12'])
     expect(wrapper.find('.attention-banner').exists()).toBe(false)
     wrapper.unmount()
@@ -102,7 +133,11 @@ describe('StatusView clients card', () => {
     state.radioCounters = { failed_tags: 2, replay_frames: 5, activation_challenges: 1 }
     await vi.advanceTimersByTimeAsync(10_000)
     await flushPromises()
-    const values = () => wrapper.get('.radio-security-card').findAll('dd').map((cell) => cell.text())
+    const values = () =>
+      wrapper
+        .get('.radio-security-card')
+        .findAll('dd')
+        .map((cell) => cell.text())
     expect(values()).toEqual(['2', '5', '1'])
     state.radioCounters = { failed_tags: 0, replay_frames: 0, activation_challenges: 0 }
     await vi.advanceTimersByTimeAsync(10_000)
@@ -151,7 +186,10 @@ describe('StatusView clients card', () => {
   it('counts a client that sent no identity instead of guessing one', async () => {
     state.clients = 2
     state.tokens = [token({ name: 'Home Assistant' })]
-    state.streamClients = [{ id: 3, name: 'home-assistant/0.3.0' }, { id: 4, name: '' }]
+    state.streamClients = [
+      { id: 3, name: 'home-assistant/0.3.0' },
+      { id: 4, name: '' },
+    ]
     const wrapper = await mountView()
 
     const rows = card(wrapper).findAll('.client-list .integration-row')

@@ -2,7 +2,18 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import SignalBars from '../components/SignalBars.vue'
-import { HOSTNAME_MAX_BYTES, RSSI_MAX_DBM, RSSI_MIN_DBM, byteLength, countdown, isMeasuredRssi, isValidHostname, signal, truncateToBytes, volts } from './format'
+import {
+  HOSTNAME_MAX_BYTES,
+  RSSI_MAX_DBM,
+  RSSI_MIN_DBM,
+  byteLength,
+  countdown,
+  isMeasuredRssi,
+  isValidHostname,
+  signal,
+  truncateToBytes,
+  volts,
+} from './format'
 
 // The RFM69 driver returns -RegRssiValue/2 from an 8-bit register, so every
 // genuine reading is a negative whole dBm no lower than -128.
@@ -58,8 +69,8 @@ describe('SignalBars', () => {
   // Measured positions on this network, with the swing RSSI shows between
   // packets: none of them may sit on a band edge.
   it('keeps the known-good positions clear of the band edges', () => {
-    for (const rssi of [-35, -37, -40]) expect(lit(rssi)).toBe(4)   // beside the gateway
-    for (const rssi of [-71, -77, -80]) expect(lit(rssi)).toBe(3)   // balcony, one wall
+    for (const rssi of [-35, -37, -40]) expect(lit(rssi)).toBe(4) // beside the gateway
+    for (const rssi of [-71, -77, -80]) expect(lit(rssi)).toBe(3) // balcony, one wall
     for (const rssi of [-97, -100, -103]) expect(lit(rssi)).toBe(1) // outer corridor
   })
 

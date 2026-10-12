@@ -18,7 +18,8 @@ uint32_t appliedGeneration = UINT32_MAX;
 uint32_t retryAt = 0;
 
 void stop() {
-    if (!active) return;
+    if (!active)
+        return;
     MDNS.end();
     active = false;
     Serial.println("mDNS stopped");
@@ -32,9 +33,10 @@ void apply() {
         appliedGeneration = generation;
         return;
     }
-    if (active && appliedGeneration == generation) return;
-    if (!active && appliedGeneration == generation &&
-        static_cast<int32_t>(millis() - retryAt) < 0) return;
+    if (active && appliedGeneration == generation)
+        return;
+    if (!active && appliedGeneration == generation && static_cast<int32_t>(millis() - retryAt) < 0)
+        return;
     stop();
     if (!MDNS.begin(identity::hostname())) {
         Serial.println("mDNS start failed");
@@ -49,31 +51,31 @@ void apply() {
     // reachable, but the service stays unannounced: its gateway_id would be
     // the MAC-derived fallback, which discovery would offer as a new gateway.
     if (!configuration_store::ready()) {
-        Serial.printf("mDNS resolving %s.local, service not announced\n",
-                      identity::hostname());
+        Serial.printf("mDNS resolving %s.local, service not announced\n", identity::hostname());
         return;
     }
     MDNS.addService("osk-sense", "tcp", 80);
     MDNS.addServiceTxt("osk-sense", "tcp", "api", String(api::version));
-    MDNS.addServiceTxt(
-        "osk-sense", "tcp", "api_version", String(api::version));
-    MDNS.addServiceTxt(
-        "osk-sense", "tcp", "gateway_id", identity::gatewayId());
-    MDNS.addServiceTxt(
-        "osk-sense", "tcp", "boot_id", identity::bootId());
-    MDNS.addServiceTxt(
-        "osk-sense", "tcp", "stream_version",
-        String(radiosensors::stream::kVersion));
+    MDNS.addServiceTxt("osk-sense", "tcp", "api_version", String(api::version));
+    MDNS.addServiceTxt("osk-sense", "tcp", "gateway_id", identity::gatewayId());
+    MDNS.addServiceTxt("osk-sense", "tcp", "boot_id", identity::bootId());
+    MDNS.addServiceTxt("osk-sense",
+                       "tcp",
+                       "stream_version",
+                       String(radiosensors::stream::kVersion));
     MDNS.addServiceTxt("osk-sense", "tcp", "firmware", firmware::version);
     MDNS.addServiceTxt("osk-sense", "tcp", "board", board::current.name);
-    MDNS.addServiceTxt(
-        "osk-sense", "tcp", "hostname", identity::hostname());
+    MDNS.addServiceTxt("osk-sense", "tcp", "hostname", identity::hostname());
     Serial.printf("mDNS advertising %s.local\n", identity::hostname());
 }
 
-}  // namespace
+} // namespace
 
-void begin() { apply(); }
-void loop() { apply(); }
+void begin() {
+    apply();
+}
+void loop() {
+    apply();
+}
 
-}  // namespace gateway::mdns_service
+} // namespace gateway::mdns_service

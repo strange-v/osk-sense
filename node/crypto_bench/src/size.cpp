@@ -28,13 +28,15 @@ void setup() {
     cmacInit(cmac, key);
     osk::crypto::ctrApply(cmac.aes, key, frame + 7, 9);
     osk::crypto::cmacCompute(cmac, frame, 16, tag);
-    for (uint8_t i = 0; i < 16; ++i) sink[i] = tag[i] ^ frame[i];
+    for (uint8_t i = 0; i < 16; ++i)
+        sink[i] = tag[i] ^ frame[i];
 #elif defined(WITH_TWO_KEYS)
     // Boot derivation from the factory key (here `key`) and an 8-byte salt.
     uint8_t tag[16];
     uint8_t input[9];
     uint8_t encKey[16];
-    for (uint8_t i = 0; i < sizeof(input); ++i) input[i] = sink[i];
+    for (uint8_t i = 0; i < sizeof(input); ++i)
+        input[i] = sink[i];
     cmacInit(cmac, key);
     input[0] = 0x01;
     osk::crypto::cmacCompute(cmac, input, sizeof(input), encKey);
@@ -44,17 +46,21 @@ void setup() {
     cmacInit(cmac, key);
     osk::crypto::ctrApply(encryption, key, frame + 7, 9);
     osk::crypto::cmacCompute(cmac, frame, 16, tag);
-    for (uint8_t i = 0; i < 16; ++i) sink[i] = tag[i] ^ frame[i];
+    for (uint8_t i = 0; i < 16; ++i)
+        sink[i] = tag[i] ^ frame[i];
 #elif defined(WITH_CCM)
     uint8_t tag[4];
     uint8_t ackTag[4];
     osk::crypto::aesExpandKey(aes, key);
     osk::crypto::ccmSeal(aes, key, 13, frame, 1, frame + 7, 9, tag, 4);
     osk::crypto::ccmSeal(aes, key + 1, 13, frame + 1, 2, nullptr, 0, ackTag, 4);
-    for (uint8_t i = 0; i < 4; ++i) sink[i] = tag[i] ^ ackTag[i] ^ frame[i];
+    for (uint8_t i = 0; i < 4; ++i)
+        sink[i] = tag[i] ^ ackTag[i] ^ frame[i];
 #else
-    for (uint8_t i = 0; i < 16; ++i) sink[i] = key[i] ^ frame[i];
+    for (uint8_t i = 0; i < 16; ++i)
+        sink[i] = key[i] ^ frame[i];
 #endif
 }
 
-void loop() {}
+void loop() {
+}

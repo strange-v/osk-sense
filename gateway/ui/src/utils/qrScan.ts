@@ -48,7 +48,9 @@ interface DecodableImage {
 
 // createImageBitmap is the cheap path (decodes off the main thread and needs
 // no document); older WebKit needs the <img> route.
-async function loadImage(file: File): Promise<{ source: CanvasImageSource; image: DecodableImage }> {
+async function loadImage(
+  file: File,
+): Promise<{ source: CanvasImageSource; image: DecodableImage }> {
   if (typeof createImageBitmap === 'function') {
     const bitmap = await createImageBitmap(file)
     return { source: bitmap, image: bitmap }
@@ -67,7 +69,10 @@ async function loadImage(file: File): Promise<{ source: CanvasImageSource; image
         width: element.naturalWidth,
         height: element.naturalHeight,
         // Drop the decoded pixels and the blob URL together.
-        close: () => { element.src = ''; URL.revokeObjectURL(url) },
+        close: () => {
+          element.src = ''
+          URL.revokeObjectURL(url)
+        },
       },
     }
   } catch (error) {
@@ -80,13 +85,21 @@ async function loadImage(file: File): Promise<{ source: CanvasImageSource; image
 // it is rather than blown up into blur.
 function passSize(width: number, height: number, edge: number) {
   const scale = Math.min(1, edge / Math.max(width, height))
-  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  }
 }
 
 // Draws the image into a throwaway canvas at the given size and asks jsQR for
 // a code. The canvas is collapsed to 0x0 before returning so the backing
 // surface is released immediately rather than at the next garbage collection.
-function decodeAt(source: CanvasImageSource, width: number, height: number, blur: number): string | null {
+function decodeAt(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  blur: number,
+): string | null {
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height

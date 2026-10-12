@@ -130,10 +130,15 @@ function renderField(field, x, y, width, height, offset, length, variable = fals
     payload_size: 'size',
   }
   const compact = width < 54
-  const name = compact ? (compactNames[field.name] ?? displayName(field.name)) : displayName(field.name)
-  const type = field.const_raw !== undefined
-    ? (field.name === 'header' ? `0x${field.const_raw.toString(16).toUpperCase()}` : `${field.const_raw}`)
-    : encodingLabels[field.encoding]
+  const name = compact
+    ? (compactNames[field.name] ?? displayName(field.name))
+    : displayName(field.name)
+  const type =
+    field.const_raw !== undefined
+      ? field.name === 'header'
+        ? `0x${field.const_raw.toString(16).toUpperCase()}`
+        : `${field.const_raw}`
+      : encodingLabels[field.encoding]
   const range = byteRange(offset, length, variable)
   if (compact) {
     return `  <g>
@@ -162,12 +167,14 @@ function renderLegend(x, y) {
     ['bytes', 'bytes'],
   ]
   let cursor = x
-  return entries.map(([cssClass, label]) => {
-    const result = `  <rect class="${cssClass}" x="${cursor}" y="${y}" width="18" height="12" />
+  return entries
+    .map(([cssClass, label]) => {
+      const result = `  <rect class="${cssClass}" x="${cursor}" y="${y}" width="18" height="12" />
   <text class="legend-label" x="${cursor + 25}" y="${y + 11}">${label}</text>`
-    cursor += 42 + label.length * 7
-    return result
-  }).join('\n')
+      cursor += 42 + label.length * 7
+      return result
+    })
+    .join('\n')
 }
 
 function telemetrySvg() {
@@ -183,22 +190,30 @@ function telemetrySvg() {
   const firstRowY = 82
   const width = gridX + maxSize * byteWidth + margin
   const height = firstRowY + profiles.length * rowHeight + 62
-  const parts = [documentStart(
-    width,
-    height,
-    'Telemetry profile byte map',
-    'Rows are telemetry profiles and columns are application-frame byte offsets. Colors encode field representation.',
-  )]
+  const parts = [
+    documentStart(
+      width,
+      height,
+      'Telemetry profile byte map',
+      'Rows are telemetry profiles and columns are application-frame byte offsets. Colors encode field representation.',
+    ),
+  ]
   parts.push(`  <text class="title" x="${margin}" y="30">Telemetry profile byte map</text>`)
   parts.push(`  <text class="axis" x="${margin}" y="65">profile</text>`)
   for (let offset = 0; offset < maxSize; ++offset) {
-    parts.push(`  <text class="axis" x="${gridX + (offset + 0.5) * byteWidth}" y="65" text-anchor="middle">${offset}</text>`)
+    parts.push(
+      `  <text class="axis" x="${gridX + (offset + 0.5) * byteWidth}" y="65" text-anchor="middle">${offset}</text>`,
+    )
   }
 
   for (const [index, profile] of profiles.entries()) {
     const y = firstRowY + index * rowHeight
-    parts.push(`  <text class="row-name" x="${margin}" y="${y + 22}">${profile.id} · ${escapeXml(profile.name)}</text>`)
-    parts.push(`  <text class="secondary" x="${margin}" y="${y + 41}">${profile.frame_size} bytes</text>`)
+    parts.push(
+      `  <text class="row-name" x="${margin}" y="${y + 22}">${profile.id} · ${escapeXml(profile.name)}</text>`,
+    )
+    parts.push(
+      `  <text class="secondary" x="${margin}" y="${y + 41}">${profile.frame_size} bytes</text>`,
+    )
     const fields = [
       { name: 'header', offset: 0, encoding: 'uint8', const_raw: telemetry.header },
       ...telemetry.common_fields,
@@ -206,18 +221,22 @@ function telemetrySvg() {
     ].sort((left, right) => left.offset - right.offset)
     for (const field of fields) {
       const length = fieldLength(field)
-      parts.push(renderField(
-        field,
-        gridX + field.offset * byteWidth,
-        y,
-        length * byteWidth,
-        cellHeight,
-        field.offset,
-        length,
-      ))
+      parts.push(
+        renderField(
+          field,
+          gridX + field.offset * byteWidth,
+          y,
+          length * byteWidth,
+          cellHeight,
+          field.offset,
+          length,
+        ),
+      )
     }
     if (profile.frame_size < maxSize) {
-      parts.push(`  <rect class="unused" x="${gridX + profile.frame_size * byteWidth}" y="${y}" width="${(maxSize - profile.frame_size) * byteWidth}" height="${cellHeight}" />`)
+      parts.push(
+        `  <rect class="unused" x="${gridX + profile.frame_size * byteWidth}" y="${y}" width="${(maxSize - profile.frame_size) * byteWidth}" height="${cellHeight}" />`,
+      )
     }
   }
   parts.push(renderLegend(margin, height - 32))
@@ -236,24 +255,30 @@ function gatewayStreamSvg() {
   const cellHeight = 62
   const gridX = margin + labelWidth
   const firstRowY = 58
-  const longest = Math.max(...messages.map((message) =>
-    message.size.fixed ?? message.size.base + variablePreviewBytes))
+  const longest = Math.max(
+    ...messages.map((message) => message.size.fixed ?? message.size.base + variablePreviewBytes),
+  )
   const width = gridX + longest * byteWidth + margin
   const height = firstRowY + messages.length * rowHeight + 62
-  const parts = [documentStart(
-    width,
-    height,
-    'Gateway stream message layouts',
-    'The five version-one WebSocket messages are shown as proportional byte fields. The telemetry payload is variable length.',
-  )]
+  const parts = [
+    documentStart(
+      width,
+      height,
+      'Gateway stream message layouts',
+      'The five version-one WebSocket messages are shown as proportional byte fields. The telemetry payload is variable length.',
+    ),
+  ]
   parts.push(`  <text class="title" x="${margin}" y="30">Gateway stream v${stream.version}</text>`)
 
   for (const [index, message] of messages.entries()) {
     const y = firstRowY + index * rowHeight
-    const sizeLabel = message.size.fixed !== undefined
-      ? `${message.size.fixed} bytes`
-      : `${message.size.base} + payload bytes`
-    parts.push(`  <text class="row-name" x="${margin}" y="${y + 24}">${message.kind} · ${escapeXml(message.name)}</text>`)
+    const sizeLabel =
+      message.size.fixed !== undefined
+        ? `${message.size.fixed} bytes`
+        : `${message.size.base} + payload bytes`
+    parts.push(
+      `  <text class="row-name" x="${margin}" y="${y + 24}">${message.kind} · ${escapeXml(message.name)}</text>`,
+    )
     parts.push(`  <text class="secondary" x="${margin}" y="${y + 43}">${sizeLabel}</text>`)
     const fields = [
       { ...stream.common_fields[0], const_raw: stream.version },
@@ -264,16 +289,18 @@ function gatewayStreamSvg() {
     for (const field of fields) {
       const variable = field.length_from !== undefined
       const length = fieldLength(field, variablePreviewBytes)
-      parts.push(renderField(
-        field,
-        gridX + field.offset * byteWidth,
-        y,
-        length * byteWidth,
-        cellHeight,
-        field.offset,
-        length,
-        variable,
-      ))
+      parts.push(
+        renderField(
+          field,
+          gridX + field.offset * byteWidth,
+          y,
+          length * byteWidth,
+          cellHeight,
+          field.offset,
+          length,
+          variable,
+        ),
+      )
     }
   }
   parts.push(renderLegend(margin, height - 32))
@@ -299,4 +326,6 @@ const changed = [
   writeIfChanged('telemetry-profiles.svg', telemetrySvg()),
   writeIfChanged('gateway-stream.svg', gatewayStreamSvg()),
 ].filter(Boolean).length
-console.log(changed === 0 ? 'Protocol diagrams are up to date.' : `Updated ${changed} protocol diagram(s).`)
+console.log(
+  changed === 0 ? 'Protocol diagrams are up to date.' : `Updated ${changed} protocol diagram(s).`,
+)

@@ -35,7 +35,7 @@ enum class DecodeStatus : uint8_t {
 
 struct FrameView {
     FrameKind kind;
-    const uint8_t* payload;
+    const uint8_t *payload;
     size_t payloadSize;
 };
 
@@ -44,40 +44,28 @@ constexpr bool isKnownFrameKind(const uint8_t rawKind) {
 }
 
 constexpr uint8_t encodeHeader(const FrameKind kind) {
-    return static_cast<uint8_t>(
-        (kProtocolMajor << kVersionShift) |
-        (static_cast<uint8_t>(kind) & kKindMask));
+    return static_cast<uint8_t>((kProtocolMajor << kVersionShift) |
+                                (static_cast<uint8_t>(kind) & kKindMask));
 }
 
-static_assert(encodeHeader(FrameKind::Telemetry) == 0x40,
-              "v2 telemetry header changed");
-static_assert(encodeHeader(FrameKind::JoinRequest) == 0x41,
-              "v2 join-request header changed");
-static_assert(encodeHeader(FrameKind::Error) == 0x46,
-              "v2 error header changed");
-static_assert(encodeHeader(FrameKind::CommandReady) == 0x48,
-              "v2 command-ready header changed");
-static_assert(encodeHeader(FrameKind::NoCommand) == 0x49,
-              "v2 no-command header changed");
+static_assert(encodeHeader(FrameKind::Telemetry) == 0x40, "v2 telemetry header changed");
+static_assert(encodeHeader(FrameKind::JoinRequest) == 0x41, "v2 join-request header changed");
+static_assert(encodeHeader(FrameKind::Error) == 0x46, "v2 error header changed");
+static_assert(encodeHeader(FrameKind::CommandReady) == 0x48, "v2 command-ready header changed");
+static_assert(encodeHeader(FrameKind::NoCommand) == 0x49, "v2 no-command header changed");
 
-inline DecodeStatus decodeFrame(
-    const uint8_t* const data,
-    const size_t size,
-    FrameView& frame) {
-    if (data == nullptr || size < kHeaderSize) {
+inline DecodeStatus decodeFrame(const uint8_t *const data, const size_t size, FrameView &frame) {
+    if (data == nullptr || size < kHeaderSize)
         return DecodeStatus::EmptyFrame;
-    }
 
     const uint8_t header = data[0];
     const uint8_t version = (header & kVersionMask) >> kVersionShift;
-    if (version != kProtocolMajor) {
+    if (version != kProtocolMajor)
         return DecodeStatus::UnsupportedVersion;
-    }
 
     const uint8_t rawKind = header & kKindMask;
-    if (!isKnownFrameKind(rawKind)) {
+    if (!isKnownFrameKind(rawKind))
         return DecodeStatus::UnsupportedKind;
-    }
 
     frame.kind = static_cast<FrameKind>(rawKind);
     frame.payload = data + kHeaderSize;
@@ -85,5 +73,5 @@ inline DecodeStatus decodeFrame(
     return DecodeStatus::Ok;
 }
 
-}  // namespace protocol
-}  // namespace radiosensors
+} // namespace protocol
+} // namespace radiosensors

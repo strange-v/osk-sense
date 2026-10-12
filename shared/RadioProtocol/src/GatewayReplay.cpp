@@ -14,10 +14,11 @@ constexpr size_t kBoundFlagsOffset = 20;
 constexpr size_t kBoundsOffset = 28;
 constexpr size_t kCrcOffset = kSnapshotSize - 4;
 static_assert(kBoundsOffset + kNodeSlots * 4 == kCrcOffset, "bound layout");
-static_assert(kMaxReplySize == 5 + security::frames::kMaxCommandPayloadSize + security::kGatewayTagSize,
+static_assert(kMaxReplySize ==
+                  5 + security::frames::kMaxCommandPayloadSize + security::kGatewayTagSize,
               "command reply cache size");
 
-uint32_t crc32(const uint8_t* data, size_t size) {
+uint32_t crc32(const uint8_t *data, size_t size) {
     uint32_t crc = UINT32_MAX;
     for (size_t i = 0; i < size; ++i) {
         crc ^= data[i];
@@ -26,27 +27,30 @@ uint32_t crc32(const uint8_t* data, size_t size) {
     }
     return ~crc;
 }
-bool equal(const Snapshot& left, const Snapshot& right) {
+bool equal(const Snapshot &left, const Snapshot &right) {
     for (size_t i = 0; i < kNodeSlots; ++i)
         if (left.records[i].state != right.records[i].state ||
-            left.records[i].upperBound != right.records[i].upperBound) return false;
+            left.records[i].upperBound != right.records[i].upperBound)
+            return false;
     return true;
 }
-}
+} // namespace
 
-bool encode(const Snapshot& snapshot, uint32_t generation, uint8_t* output,
-            size_t size) {
-    if (!output || size != kSnapshotSize) return false;
+bool encode(const Snapshot &snapshot, uint32_t generation, uint8_t *output, size_t size) {
+    if (!output || size != kSnapshotSize)
+        return false;
     memset(output, 0, size);
     memcpy(output, kMagic, sizeof(kMagic));
     protocol::writeUint16Le(output + 4, kVersion);
     protocol::writeUint32Le(output + 6, generation);
     protocol::writeUint16Le(output + 10, kSnapshotSize);
     for (size_t i = 0; i < kNodeSlots; ++i) {
-        const Record& record = snapshot.records[i];
+        const Record &record = snapshot.records[i];
         if (record.state != RecordState::Absent && record.state != RecordState::Paired &&
-            record.state != RecordState::Bound) return false;
-        if (record.state != RecordState::Bound && record.upperBound != 0) return false;
+            record.state != RecordState::Bound)
+            return false;
+        if (record.state != RecordState::Bound && record.upperBound != 0)
+            return false;
         if (record.state != RecordState::Absent)
             output[kPresenceOffset + i / 8] |= 1U << (i % 8);
         if (record.state == RecordState::Bound)
@@ -57,21 +61,26 @@ bool encode(const Snapshot& snapshot, uint32_t generation, uint8_t* output,
     return true;
 }
 
-bool decode(const uint8_t* data, size_t size, Snapshot& snapshot, uint32_t& generation) {
+bool decode(const uint8_t *data, size_t size, Snapshot &snapshot, uint32_t &generation) {
     if (!data || size != kSnapshotSize || memcmp(data, kMagic, sizeof(kMagic)) != 0 ||
         protocol::readUint16Le(data + 4) != kVersion ||
         protocol::readUint16Le(data + 10) != kSnapshotSize ||
-        protocol::readUint32Le(data + kCrcOffset) != crc32(data, kCrcOffset)) return false;
+        protocol::readUint32Le(data + kCrcOffset) != crc32(data, kCrcOffset))
+        return false;
     Snapshot candidate;
     for (size_t i = 0; i < kNodeSlots; ++i) {
         const uint8_t mask = 1U << (i % 8);
         const bool present = data[kPresenceOffset + i / 8] & mask;
         const bool bound = data[kBoundFlagsOffset + i / 8] & mask;
-        if (bound && !present) return false;
-        Record& record = candidate.records[i];
-        record.state = bound ? RecordState::Bound : present ? RecordState::Paired : RecordState::Absent;
+        if (bound && !present)
+            return false;
+        Record &record = candidate.records[i];
+        record.state = bound     ? RecordState::Bound
+                       : present ? RecordState::Paired
+                                 : RecordState::Absent;
         record.upperBound = protocol::readUint32Le(data + kBoundsOffset + i * 4);
-        if (!bound && record.upperBound != 0) return false;
+        if (!bound && record.upperBound != 0)
+            return false;
     }
     snapshot = candidate;
     generation = protocol::readUint32Le(data + 6);
@@ -86,23 +95,29 @@ LoadStatus Store::load() {
     uint8_t bytes[kSnapshotSize];
     size_t size = 0;
     const ReadStatus status = storage_.read(bytes, sizeof(bytes), size);
-    if (status == ReadStatus::Missing) return LoadStatus::Empty;
+    if (status == ReadStatus::Missing)
+        return LoadStatus::Empty;
     if (status == ReadStatus::Error) {
         writable_ = false;
         return LoadStatus::Unactivated;
     }
-    if (status != ReadStatus::Ok) return LoadStatus::Unactivated;
-    if (!decode(bytes, size, snapshot_, generation_)) return LoadStatus::Unactivated;
+    if (status != ReadStatus::Ok)
+        return LoadStatus::Unactivated;
+    if (!decode(bytes, size, snapshot_, generation_))
+        return LoadStatus::Unactivated;
     hasSnapshot_ = true;
     return LoadStatus::Loaded;
 }
 
-bool Store::save(const Snapshot& snapshot) {
-    if (!writable_) return false;
-    if (hasSnapshot_ && equal(snapshot_, snapshot)) return true;
+bool Store::save(const Snapshot &snapshot) {
+    if (!writable_)
+        return false;
+    if (hasSnapshot_ && equal(snapshot_, snapshot))
+        return true;
     uint8_t bytes[kSnapshotSize], readback[kSnapshotSize];
     const uint32_t next = generation_ + 1;
-    if (!encode(snapshot, next, bytes, sizeof(bytes))) return false;
+    if (!encode(snapshot, next, bytes, sizeof(bytes)))
+        return false;
     size_t size = 0;
     if (!storage_.write(bytes, sizeof(bytes)) ||
         storage_.read(readback, sizeof(readback), size) != ReadStatus::Ok ||
@@ -127,8 +142,8 @@ uint32_t AcceptanceHistory::timeAt(uint16_t index) const {
     const uint16_t bit = index * kTimeBits;
     const uint16_t byte = bit / 8;
     const uint32_t packed = static_cast<uint32_t>(times_[byte]) |
-        (static_cast<uint32_t>(times_[byte + 1]) << 8) |
-        (static_cast<uint32_t>(times_[byte + 2]) << 16);
+                            (static_cast<uint32_t>(times_[byte + 1]) << 8) |
+                            (static_cast<uint32_t>(times_[byte + 2]) << 16);
     return (packed >> (bit % 8)) & kTimeMask;
 }
 
@@ -137,8 +152,8 @@ void AcceptanceHistory::setTime(uint16_t index, uint32_t time) {
     const uint16_t byte = bit / 8;
     const uint8_t shift = bit % 8;
     uint32_t packed = static_cast<uint32_t>(times_[byte]) |
-        (static_cast<uint32_t>(times_[byte + 1]) << 8) |
-        (static_cast<uint32_t>(times_[byte + 2]) << 16);
+                      (static_cast<uint32_t>(times_[byte + 1]) << 8) |
+                      (static_cast<uint32_t>(times_[byte + 2]) << 16);
     packed = (packed & ~(kTimeMask << shift)) | ((time & kTimeMask) << shift);
     times_[byte] = static_cast<uint8_t>(packed);
     times_[byte + 1] = static_cast<uint8_t>(packed >> 8);
@@ -164,7 +179,8 @@ void AcceptanceHistory::expire(uint64_t now) {
 
 uint16_t AcceptanceHistory::window(uint64_t now) {
     expire(now);
-    if (now - startedAt_ < 86400) return kMaxWindow;
+    if (now - startedAt_ < 86400)
+        return kMaxWindow;
     return count_ ? count_ : 1;
 }
 
@@ -180,12 +196,13 @@ void AcceptanceHistory::accepted(uint64_t now) {
 
 void Guard::restart() {
     for (size_t i = 0; i < kNodeSlots; ++i) {
-        Runtime& runtime = runtime_[i];
+        Runtime &runtime = runtime_[i];
         runtime = Runtime{};
-        const Record& record = store_.snapshot().records[i];
+        const Record &record = store_.snapshot().records[i];
         if (record.state == RecordState::Bound) {
             runtime.exhausted = record.upperBound == UINT32_MAX;
-            if (!runtime.exhausted) runtime.floor = record.upperBound + 1;
+            if (!runtime.exhausted)
+                runtime.floor = record.upperBound + 1;
         }
     }
 }
@@ -195,33 +212,39 @@ bool Guard::initializeFreshKeys(size_t slot) {
         return false;
     Snapshot candidate = store_.snapshot();
     candidate.records[slot] = Record{RecordState::Paired, 0};
-    if (!store_.save(candidate)) return false;
+    if (!store_.save(candidate))
+        return false;
     runtime_[slot] = Runtime{};
     return true;
 }
 
 bool Guard::forget(size_t slot) {
-    if (slot >= kNodeSlots) return false;
+    if (slot >= kNodeSlots)
+        return false;
     Snapshot candidate = store_.snapshot();
     candidate.records[slot] = Record{};
-    if (!store_.save(candidate)) return false;
+    if (!store_.save(candidate))
+        return false;
     runtime_[slot] = Runtime{};
     return true;
 }
 
 bool Guard::isDuplicate(size_t slot, uint32_t counter) const {
     if (!store_.writable() || slot >= kNodeSlots ||
-        store_.snapshot().records[slot].state == RecordState::Absent) return false;
-    const Runtime& runtime = runtime_[slot];
+        store_.snapshot().records[slot].state == RecordState::Absent)
+        return false;
+    const Runtime &runtime = runtime_[slot];
     return !runtime.exhausted && runtime.hasLast && runtime.last == counter;
 }
 
-Decision Guard::inspect(size_t slot, uint32_t counter, uint16_t window,
-                        const uint8_t* activationChallenge) {
-    if (slot >= kNodeSlots) return Decision{Action::InvalidSlot};
-    if (!store_.writable()) return Decision{Action::StorageError};
-    Runtime& runtime = runtime_[slot];
-    const Record& record = store_.snapshot().records[slot];
+Decision
+Guard::inspect(size_t slot, uint32_t counter, uint16_t window, const uint8_t *activationChallenge) {
+    if (slot >= kNodeSlots)
+        return Decision{Action::InvalidSlot};
+    if (!store_.writable())
+        return Decision{Action::StorageError};
+    Runtime &runtime = runtime_[slot];
+    const Record &record = store_.snapshot().records[slot];
     if (record.state == RecordState::Absent) {
         uint8_t difference = 0;
         if (runtime.hasChallenge && activationChallenge)
@@ -238,36 +261,44 @@ Decision Guard::inspect(size_t slot, uint32_t counter, uint16_t window,
             return decision;
         }
     } else {
-        if (runtime.exhausted) return Decision{Action::Exhausted};
-        if (runtime.hasLast && counter == runtime.last) return Decision{Action::Duplicate};
-        if (counter < runtime.floor) return Decision{Action::CounterFloor, runtime.floor};
+        if (runtime.exhausted)
+            return Decision{Action::Exhausted};
+        if (runtime.hasLast && counter == runtime.last)
+            return Decision{Action::Duplicate};
+        if (counter < runtime.floor)
+            return Decision{Action::CounterFloor, runtime.floor};
     }
-    if (window < 1) window = 1;
-    if (window > kMaxWindow) window = kMaxWindow;
+    if (window < 1)
+        window = 1;
+    if (window > kMaxWindow)
+        window = kMaxWindow;
     if (record.state != RecordState::Bound || counter > record.upperBound) {
         const uint32_t increment = window - 1;
         const uint32_t bound = counter > UINT32_MAX - increment ? UINT32_MAX : counter + increment;
         Snapshot candidate = store_.snapshot();
         candidate.records[slot] = Record{RecordState::Bound, bound};
-        if (!store_.save(candidate)) return Decision{Action::StorageError};
+        if (!store_.save(candidate))
+            return Decision{Action::StorageError};
     }
     runtime.last = counter;
     runtime.replySize = 0;
     runtime.hasLast = true;
     runtime.exhausted = counter == UINT32_MAX;
-    if (!runtime.exhausted) runtime.floor = counter + 1;
+    if (!runtime.exhausted)
+        runtime.floor = counter + 1;
     runtime.hasChallenge = false;
     return Decision{Action::Accept};
 }
 
-bool Guard::cacheReply(size_t slot, uint32_t counter, const uint8_t* wire, size_t size) {
+bool Guard::cacheReply(size_t slot, uint32_t counter, const uint8_t *wire, size_t size) {
     if (!store_.writable() || slot >= kNodeSlots || !wire || size < 11 || size > kMaxReplySize ||
         !((wire[0] == security::frames::kCommandHeader && size >= 14) ||
           (wire[0] == security::frames::kNoCommandHeader && size == 11)) ||
         protocol::readUint32Le(wire + 1) != counter)
         return false;
-    Runtime& runtime = runtime_[slot];
-    if (!runtime.hasLast || runtime.last != counter) return false;
+    Runtime &runtime = runtime_[slot];
+    if (!runtime.hasLast || runtime.last != counter)
+        return false;
     if (runtime.replySize)
         return runtime.replySize == size && memcmp(runtime.reply, wire, size) == 0;
     memcpy(runtime.reply, wire, size);
@@ -275,17 +306,22 @@ bool Guard::cacheReply(size_t slot, uint32_t counter, const uint8_t* wire, size_
     return true;
 }
 
-bool Guard::cachedReply(size_t slot, uint32_t counter, uint8_t* output,
-                        size_t capacity, size_t& size) const {
+bool Guard::cachedReply(size_t slot,
+                        uint32_t counter,
+                        uint8_t *output,
+                        size_t capacity,
+                        size_t &size) const {
     size = 0;
-    if (!store_.writable() || slot >= kNodeSlots || !output) return false;
-    const Runtime& runtime = runtime_[slot];
+    if (!store_.writable() || slot >= kNodeSlots || !output)
+        return false;
+    const Runtime &runtime = runtime_[slot];
     if (!runtime.hasLast || runtime.last != counter || !runtime.replySize ||
-        capacity < runtime.replySize) return false;
+        capacity < runtime.replySize)
+        return false;
     memcpy(output, runtime.reply, runtime.replySize);
     size = runtime.replySize;
     return true;
 }
 
-}  // namespace replay
-}  // namespace radiosensors
+} // namespace replay
+} // namespace radiosensors

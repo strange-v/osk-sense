@@ -26,9 +26,17 @@ export const router = createRouter({
     { path: '/status', component: StatusView, meta: { requiresAuth: true } },
     { path: '/nodes', component: NodesView, meta: { requiresAuth: true } },
     { path: '/settings', component: SettingsView, meta: { requiresAuth: true } },
-    { path: '/admin', component: () => import('../views/admin').then((views) => views.AdminView), meta: { requiresAuth: true, requiresAdmin: true } },
+    {
+      path: '/admin',
+      component: () => import('../views/admin').then((views) => views.AdminView),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
     // Admin-only because its one action is creating a key.
-    { path: '/home-assistant', component: () => import('../views/admin').then((views) => views.HomeAssistantView), meta: { requiresAuth: true, requiresAdmin: true } },
+    {
+      path: '/home-assistant',
+      component: () => import('../views/admin').then((views) => views.HomeAssistantView),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
