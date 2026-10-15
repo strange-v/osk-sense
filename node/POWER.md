@@ -4,7 +4,7 @@ Measured reference values and the battery budget model for battery-powered node 
 
 ## Conditions
 
-Reference measurements use an RFM69 H module at power level 2 (about 0 dBm on PA_BOOST) unless a row names another level, non-debug builds with unused pins disabled, and a Nordic PPK2 source meter at 3.0 V. `binary_sht40` rows use an ATtiny3224 at 4 MHz with V3 frames and power level 0. The other images were measured on an ATtiny1614 at 4 MHz and await remeasurement on ATtiny3224. `counter_reed` and `binary` run on the internal board. `climate_tmp112` runs on the outdoor board, supplied at the MCU rail unless a row names the supercap connector, which adds the supervisor, load switch, and charging diode. The debug and SerialUPDI adapters are disconnected during measurement.
+Reference measurements use an RFM69 H module at power level 2 (about 0 dBm on PA_BOOST) unless a row names another level, non-debug builds with unused pins disabled, and a Nordic PPK2 source meter at 3.0 V. `binary_sht40` rows use an ATtiny3224 at 4 MHz with authenticated frames and power level 0. The other images were measured on an ATtiny1614 at 4 MHz and await remeasurement on ATtiny3224. `counter_reed` and `binary` run on the internal board. `climate_tmp112` runs on the outdoor board, supplied at the MCU rail unless a row names the supercap connector, which adds the supervisor, load switch, and charging diode. The debug and SerialUPDI adapters are disconnected during measurement.
 
 ## Idle
 

@@ -55,11 +55,30 @@ Upload never writes fuses. Write them once per chip before the first upload; eve
 pio run -e climate_tmp112 -t fuses
 ```
 
+## Memory
+
+ATtiny3224 has 32 768 bytes of Flash and 3072 bytes of SRAM. Builds use megaTinyCore 2.6.7 and the 4 MHz internal clock.
+
+| Profile                |  Flash | Free Flash | Static RAM |
+| ---------------------- | -----: | ---------: | ---------: |
+| `counter_reed`         | 21 002 |     11 766 |        765 |
+| `climate_tmp112`       | 21 027 |     11 741 |        816 |
+| `binary_sht40`         | 20 868 |     11 900 |        800 |
+| `binary`               | 18 990 |     13 778 |        711 |
+| `counter_reed_debug`   | 23 019 |       9749 |        916 |
+| `climate_tmp112_debug` | 22 917 |       9851 |        967 |
+| `binary_sht40_debug`   | 23 225 |       9543 |        951 |
+| `binary_debug`         | 20 987 |     11 781 |        862 |
+
+Flash includes `.text`, `.rodata` and `.data`. `scripts/probe_v3_size.ps1 -Environment counter_reed` builds one environment, including RTC entropy collection, and inspects its ELF without uploading.
+
+Static RAM leaves at least 2105 bytes for stack and dynamic state. Debug images paint unused SRAM during startup and report `stkfree <bytes>` when the minimum remaining heap-to-stack gap decreases; release images have no painter. Debug `binary_sht40` keeps at least 1479 bytes free through pairing, telemetry and a command session, and 1533 bytes through activation after a backup restore.
+
+Node and gateway pin the same commit of the strange-v/RFM69 fork: LowPowerLab master plus a fix that truncates received frames to `RF69_MAX_DATA_LEN` bytes, where master writes up to two bytes past `RFM69::DATA` before any authentication. `test/test_rfm69_fifo` drives that parser with boundary lengths. Release environments define `RF69_NO_READALLREGS`; without it `readAllRegs()` links `Serial`, UART0 and its interrupt vectors into images that never use them.
+
 ## Runtime composition
 
-Node radio traffic uses V3 software CTR/CMAC and persistent frame counters.
-The gateway authenticates V3 traffic with per-node keys. Release and debug profiles fit the 32 KiB Flash;
-sizes and the inspection command are in [V3-SECURITY.md](../protocol/V3-SECURITY.md#flash).
+Radio traffic uses software AES-CTR/CMAC with per-node keys and persistent frame counters ([radio security](../protocol/SECURITY.md)).
 
 The SOIC-14 pin assignments are PA4 radio CS, PA7 radio IRQ, PA1/PA2/PA3
 SPI, PB0/PB1 I2C, PA5 contact, PA6 button, PA0 UPDI and PB2/PB3 UART.
@@ -67,8 +86,7 @@ Supply measurement accumulates a 16-sample burst of the ADC's VDD/10 input again
 1.024 V reference in 0.9 ms, then disables the ADC. At 1.81 and 3.28 V on a
 multimeter it reads 39–46 mV high, within the reference's ±2 %, with noise
 below 1 mV. TCB1 provides `millis()`, TCB0 captures RTC events for pairing
-entropy, and the RTC PIT provides sleep ticks. The 2000 mV transmit gate and
-stack high-water measurements on ATtiny3224 hardware remain pending; [POWER.md](POWER.md) measures `binary_sht40` on ATtiny3224 and the other
+entropy, and the RTC PIT provides sleep ticks. [POWER.md](POWER.md) measures `binary_sht40` on ATtiny3224 and the other
 images on ATtiny1614.
 
 Each environment compiles exactly one composition root from `src/` through `build_src_filter`. `NodeRuntime<Profile>` owns commissioning, the provisioning button, radio retry backoff, supply-voltage measurement, and sleep. The profile class in `include/Profiles/` owns acquisition, report scheduling, and payload encoding; the contract is documented in `NodeRuntime.h`. Profiles are template parameters, not virtual interfaces, because avr-gcc keeps vtables in RAM.
@@ -170,7 +188,7 @@ Debug builds log `tmp fail`, `rst wdt` after a watchdog reset, `rst rf` before a
 
 Network configuration uses two CRC-protected generation slots. Counter state uses a separate wear-levelled journal, and accepted `SET_COUNT` results have recoverable slots. Exact layouts are in [EEPROM.md](EEPROM.md).
 
-V3 radio frames are defined in [V3-SECURITY.md](../protocol/V3-SECURITY.md); telemetry payloads are defined in [PROTOCOL.md](../protocol/PROTOCOL.md). Profile IDs describe measurements, not installation labels.
+Radio frames are defined in [SECURITY.md](../protocol/SECURITY.md); telemetry payloads are defined in [PROTOCOL.md](../protocol/PROTOCOL.md). Profile IDs describe measurements, not installation labels.
 
 ## Native tests
 

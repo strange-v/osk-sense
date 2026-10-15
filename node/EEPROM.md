@@ -56,7 +56,7 @@ The node reserves 1024 counters before transmission and skips the reserved
 range after restart. Retries retain the same counter and bytes. If one reserve is
 invalid, the node continues 1279 above the valid one and rewrites the invalid one
 before its next reservation. If both reserves are invalid with a configuration
-present, the node discards the configuration and pairs again. See [counter persistence](../protocol/V3-SECURITY.md#counter-persistence).
+present, the node discards the configuration and pairs again. See [counter persistence](../protocol/SECURITY.md#counter-persistence).
 
 Network factory reset invalidates only the two common configuration slots. It does not modify USERROW or profile-owned EEPROM.
 

@@ -56,6 +56,7 @@ In active development; formats may still change between versions. Unfinished wor
 | Node builds, provisioning, behaviour | [node/README.md](node/README.md)             |
 | Node power consumption               | [node/POWER.md](node/POWER.md)               |
 | Radio protocol                       | [protocol/PROTOCOL.md](protocol/PROTOCOL.md) |
+| Radio security and its limits        | [protocol/SECURITY.md](protocol/SECURITY.md) |
 | Gateway REST API                     | [gateway/API.md](gateway/API.md)             |
 | Gateway WebSocket                    | [gateway/WEBSOCKET.md](gateway/WEBSOCKET.md) |
 | Development checks                   | [CONTRIBUTING.md](CONTRIBUTING.md)           |

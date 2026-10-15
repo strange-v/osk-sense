@@ -21,9 +21,9 @@ The final four bytes are CRC32 over every preceding byte, encoded little-endian.
 
 Generation advances only after a durable semantic change. Re-saving identical content is a no-op. Readers receive copies or immutable published snapshots and never retain pointers into mutable store memory.
 
-## V3 replay-bound module
+## Replay-bound module
 
-`GatewayReplay` and `ReplayBoundStorage` persist operational V3 replay bounds.
+`GatewayReplay` and `ReplayBoundStorage` persist operational replay bounds.
 NVS namespace: `radio-bound`; key: `bounds`;
 magic: `RSRB`; schema: `3`; exact size: 288 bytes.
 
@@ -176,20 +176,20 @@ Pending, active, and disabled records retain their ID. Only explicit removal rel
 
 Each stored record is 196 bytes:
 
-| Relative offset | Bytes | Field                                                                                                                               |
-| --------------: | ----: | ----------------------------------------------------------------------------------------------------------------------------------- |
-|               0 |    10 | Fixed tinyAVR factory UID                                                                                                           |
-|              10 |     1 | Node ID                                                                                                                             |
-|              11 |     2 | Profile ID, little-endian; zero invalid                                                                                             |
-|              13 |     3 | Firmware major, minor, patch                                                                                                        |
-|              16 |     1 | State: 1 pending, 2 active, 3 disabled                                                                                              |
-|              17 |     4 | Commissioning nonce; low counter word of a V3 nonce                                                                                 |
-|              21 |     1 | Display-name byte length, `0..48`                                                                                                   |
-|              22 |    48 | Display name, UTF-8, zero-padded                                                                                                    |
-|              70 |     1 | Transmit power ceiling from Join request, `0..31`                                                                                   |
-|              71 |     1 | Power policy: 0 automatic; `N + 1` fixed level `N`                                                                                  |
-|              72 |     1 | Stable replay slot, `0..63`; 255 means no V3 transaction                                                                            |
-|              73 |   123 | `PairingTransaction` snapshot, including full LE64 nonce, exact request/accept and both derived keys; zero without a V3 transaction |
+| Relative offset | Bytes | Field                                                                                                                                    |
+| --------------: | ----: | ---------------------------------------------------------------------------------------------------------------------------------------- |
+|               0 |    10 | Fixed tinyAVR factory UID                                                                                                                |
+|              10 |     1 | Node ID                                                                                                                                  |
+|              11 |     2 | Profile ID, little-endian; zero invalid                                                                                                  |
+|              13 |     3 | Firmware major, minor, patch                                                                                                             |
+|              16 |     1 | State: 1 pending, 2 active, 3 disabled                                                                                                   |
+|              17 |     4 | Commissioning nonce; low counter word of the pairing nonce                                                                               |
+|              21 |     1 | Display-name byte length, `0..48`                                                                                                        |
+|              22 |    48 | Display name, UTF-8, zero-padded                                                                                                         |
+|              70 |     1 | Transmit power ceiling from Join request, `0..31`                                                                                        |
+|              71 |     1 | Power policy: 0 automatic; `N + 1` fixed level `N`                                                                                       |
+|              72 |     1 | Stable replay slot, `0..63`; 255 means no pairing transaction                                                                            |
+|              73 |   123 | `PairingTransaction` snapshot, including full LE64 nonce, exact request/accept and both derived keys; zero without a pairing transaction |
 
 Runtime last-seen time, RSSI, telemetry, radio power control state, and counters are not persisted.
 
@@ -203,7 +203,7 @@ Runtime last-seen time, RSSI, telemetry, radio power control state, and counters
 |              12 | `count * 196` | Records                    |
 |             end |             4 | CRC32 over preceding bytes |
 
-The state flow is `absent -> pending -> active`; explicit management may set `disabled` or remove a record. Active or disabled records cannot be replaced through pairing. `RegistryPairing` authenticates before reserving a UID, persists one immutable reply per transaction and rejects retired counter words. V3 confirmation prepares the replay slot before committing Active. Matching repeated confirmation returns `JOIN_COMPLETE` without any registry or bound write.
+The state flow is `absent -> pending -> active`; explicit management may set `disabled` or remove a record. Active or disabled records cannot be replaced through pairing. `RegistryPairing` authenticates before reserving a UID, persists one immutable reply per transaction and rejects retired counter words. Confirmation prepares the replay slot before committing Active. Matching repeated confirmation returns `JOIN_COMPLETE` without any registry or bound write.
 
 Replay slots are unique and retained when removal changes record order. Committed
 removal or registry clear forgets unused replay bounds. Startup and storage reload

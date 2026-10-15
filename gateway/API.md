@@ -141,7 +141,7 @@ Success creates the first browser session and returns the same body and cookie a
 
 Secrets and settings commit before authentication. The first enabled admin record is the final commit that changes the gateway to configured.
 
-A gateway that has never been set up keeps its radio asleep; `/ui/status` reports `network_missing`. Setup applies the saved network ID to the running radio, so pairing needs no restart. V3 traffic uses the keys in each node's pairing transaction.
+A gateway that has never been set up keeps its radio asleep; `/ui/status` reports `network_missing`. Setup applies the saved network ID to the running radio, so pairing needs no restart. Radio traffic uses the keys in each node's pairing transaction.
 
 `500 setup_storage_failed` while `setup_required` is true usually means the gateway's storage did not load. NVS holds data that no store can decode, so the gateway runs on defaults, which report no admin, and refuses every write. Recover it by erasing NVS; see the README.
 
@@ -462,7 +462,7 @@ The status page shows the three security counters since boot. The root `bench` o
 
 | Fields                                                         | Measurement                                                                                                                     |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `last_receive_us`, `max_receive_us`                            | V3 engine receive processing, including authentication and replay reservation/read-back                                         |
+| `last_receive_us`, `max_receive_us`                            | Radio receive processing, including authentication and replay reservation/read-back                                             |
 | `reservation_writes`, `reservation_failures`                   | Attempted and failed replay-bound writes                                                                                        |
 | `last_reservation_write_us`, `max_reservation_write_us`        | NVS `putBytes` duration; excludes read-back                                                                                     |
 | `acks_measured`, `last_ack_us`, `max_ack_us`, `acks_over_40ms` | IRQ to completed ACK transmission, including scheduling, processing and radio transmit; missed-IRQ recovery frames are excluded |

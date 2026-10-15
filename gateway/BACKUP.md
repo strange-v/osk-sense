@@ -7,11 +7,11 @@
 3. On a clean gateway, open setup, choose **Restore backup**, select the file and enter its password. Review the gateway ID, date and node count.
 4. Enter a new administrator username/password and confirm. Press the gateway button to open the setup window, then restore. After restart, sign in and create a new Home Assistant token. A restored hostname can change the address; DHCP/MAC remain specific to the physical board.
 
-| Included                                                                                                                            | Excluded                                                 |
-| ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Hostname, mDNS, NTP, setup/pairing durations                                                                                        | Users, password hashes, API tokens, sessions             |
-| Active/disabled node UID/ID, profile, firmware metadata, state, nonce, name, power policy, V3 pairing transaction and per-node keys | Pending nodes, command book, telemetry and replay bounds |
-| Radio network ID, device secret                                                                                                     | Firmware, Web UI, OTA password, MAC, DHCP lease          |
+| Included                                                                                                                         | Excluded                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Hostname, mDNS, NTP, setup/pairing durations                                                                                     | Users, password hashes, API tokens, sessions             |
+| Active/disabled node UID/ID, profile, firmware metadata, state, nonce, name, power policy, pairing transaction and per-node keys | Pending nodes, command book, telemetry and replay bounds |
+| Radio network ID, device secret                                                                                                  | Firmware, Web UI, OTA password, MAC, DHCP lease          |
 
 Restoring the radio credentials and registry avoids re-pairing nodes present in the backup. Pending nodes are excluded and need pairing again after restore, even if they completed pairing after export. The device secret preserves `gateway_id`. A backup cannot recover later changes; a node whose credentials changed after export may need pairing again. Lost backup passwords cannot be recovered.
 
@@ -67,7 +67,7 @@ Each export uses hardware randomness for salt and nonce. The KDF runs through th
 
 Payload keys are `version` (`3`), `created_at_ms` (UTC milliseconds, zero if unavailable), `settings`, `network_id`, `device_secret`, `nodes`. Keys and UIDs are lowercase hexadecimal. Settings contain `hostname`, `mdns`, `ntp`, `pairing_seconds`, `setup_seconds`, `servers`. Each node contains `uid`, `id`, `profile`, `firmware` (three integers), `state` (2 active, 3 disabled), `nonce`, `name`, `max_power`, `power_policy`, `replay_slot`, `pairing` (123-byte transaction snapshot, including per-node keys, as hexadecimal). Values obey [storage limits](STORAGE.md); unknown nonzero profile IDs are preserved. Pending records and different container/payload versions are rejected.
 
-Restoring excludes replay bounds. Each active V3 node must receive a fresh
+Restoring excludes replay bounds. Each active node must receive a fresh
 challenge and return an Activation report;
 it needs a working reverse link before its telemetry can be published.
 

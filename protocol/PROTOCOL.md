@@ -1,20 +1,20 @@
 # OSK Sense Protocol
 
-[`protocol-manifest.json`](protocol-manifest.json) defines client-visible IDs, telemetry layouts, encodings, ranges and sentinels. [`protocol-vectors.json`](protocol-vectors.json) provides cross-language known answers. [V3-SECURITY.md](V3-SECURITY.md) defines authenticated radio frames, pairing, acknowledgements and counter persistence.
+[`protocol-manifest.json`](protocol-manifest.json) defines client-visible IDs, telemetry layouts, encodings, ranges and sentinels. [`protocol-vectors.json`](protocol-vectors.json) provides cross-language known answers. [SECURITY.md](SECURITY.md) defines authenticated radio frames, pairing, acknowledgements and counter persistence.
 
 ## Protocol layers
 
-| Layer                           | Representation                                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------------------------------- |
-| RFM69 transport                 | Target, sender and control bytes, covered by the authentication tag                               |
-| Radio traffic                   | V3 header, counter and encrypted payload with a CMAC tag; join frames are clear and authenticated |
-| Gateway telemetry and WebSocket | Application header `0x40`, common prefix and opaque profile payload                               |
+| Layer                           | Representation                                                                                 |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| RFM69 transport                 | Target, sender and control bytes, covered by the authentication tag                            |
+| Radio traffic                   | Header, counter and encrypted payload with a CMAC tag; join frames are clear and authenticated |
+| Gateway telemetry and WebSocket | Application header `0x40`, common prefix and opaque profile payload                            |
 
 The gateway authenticates and checks replay state before forwarding telemetry. It removes the radio envelope and prepends `0x40` for the application codec. The profile examples below describe this client representation. The manifest's `security_v3` object describes the radio envelope; its `radio` object describes application codec IDs.
 
 ## Frame kinds
 
-V3 headers use bits 7..5 for protocol major `3` and bits 4..0 for the kind. Unknown versions and kinds are rejected.
+Radio headers use bits 7..5 for protocol major `3` and bits 4..0 for the kind. Unknown versions and kinds are rejected.
 
 | Kind | Header | Name              |
 | ---: | -----: | ----------------- |
@@ -31,7 +31,7 @@ V3 headers use bits 7..5 for protocol major `3` and bits 4..0 for the kind. Unkn
 
 ## Sleeping-node command session
 
-A sleeping node pulls one pending command when its button is short-pressed or a telemetry ACK carries `command_pending`. Command ready has an empty payload. The gateway replies with Command or an empty No command under that ready's counter. Repeating a ready returns the same sealed reply bytes; after a gateway restart a counter-floor ACK requires a fresh ready. See [command wire layouts](V3-SECURITY.md#commands).
+A sleeping node pulls one pending command when its button is short-pressed or a telemetry ACK carries `command_pending`. Command ready has an empty payload. The gateway replies with Command or an empty No command under that ready's counter. Repeating a ready returns the same sealed reply bytes; after a gateway restart a counter-floor ACK requires a fresh ready. See [command wire layouts](SECURITY.md#commands).
 
 Command and result payloads begin with a nonzero uint16 little-endian command ID and a one-byte type or status, followed by up to eight argument or result bytes. A result carries a fresh node counter greater than the ready's counter. The gateway requires the command ID and pairing salt of its latest delivery to match.
 
@@ -92,11 +92,11 @@ The link fields come first and supply voltage last, next to the measurements. A 
 
 The node reports its actual radio state in every frame, so each RSSI the gateway measures is paired with the level the frame was sent at ([Radio power](#radio-power)). The gateway may decode the common prefix without knowing the profile. It treats bytes from offset 5 onward as opaque and forwards the complete frame together with the stored profile ID, sender ID, RSSI, and receive time in its WebSocket envelope. Telemetry from an unknown or inactive sender cannot be decoded safely and must be rejected and counted.
 
-Radio frames add a counter and authentication tag to these payloads; see [V3 frame costs](V3-SECURITY.md#frames). The examples below use radio state `02` (level 2) and downlink RSSI `BA` (−70 dBm).
+Radio frames add a counter and authentication tag to these payloads; see [frame layout](SECURITY.md#frames). The examples below use radio state `02` (level 2) and downlink RSSI `BA` (−70 dBm).
 
 ## Telemetry acknowledgement
 
-A telemetry ACK is authenticated under the node's MAC key and transmitted frame counter. It can carry `command_pending`, a power target, a counter floor or an activation challenge. Only accepted frames and immediate duplicates receive a normal ACK; duplicate frames are never published again. See [ACK format](V3-SECURITY.md#frames) and [gateway replay rules](V3-SECURITY.md#gateway-bound).
+A telemetry ACK is authenticated under the node's MAC key and transmitted frame counter. It can carry `command_pending`, a power target, a counter floor or an activation challenge. Only accepted frames and immediate duplicates receive a normal ACK; duplicate frames are never published again. See [ACK format](SECURITY.md#frames) and [gateway replay rules](SECURITY.md#gateway-bound).
 
 A node that sees `command_pending` opens a command session in the same wake-up. The node README specifies its back-off after failed sessions.
 
@@ -120,7 +120,7 @@ Registration stores one stable numeric profile ID; `read_info` replaces it after
 
 An unprovisioned node uses sender ID and network ID `0`. The gateway's explicit pairing window selects its 10-byte factory UID and unique 16-byte factory key. Join request and accept authenticate with that key; confirm and complete use the MAC key derived from the transaction's salt. The gateway stores the exact transaction before replying and prepares the replay slot before committing Active. Matching repeated confirm returns the same complete without a write.
 
-See [pairing layouts and persistence](V3-SECURITY.md#pairing) for the 64-bit request nonce, salt, assigned address and network ID. The factory key stays in gateway RAM only during the pairing window.
+See [pairing layouts and persistence](SECURITY.md#pairing) for the 64-bit request nonce, salt, assigned address and network ID. The factory key stays in gateway RAM only during the pairing window.
 
 ## Telemetry profile template
 

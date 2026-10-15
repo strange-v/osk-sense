@@ -22,7 +22,7 @@ Solar climate nodes use nominal 60/300-second reporting above/below 2500 mV; the
 
 The gateway uses address 100. IDs 1..99 are allocated persistently; 0 is for commissioning and 255 is broadcast. Registry records hold UID, node ID, profile, firmware, 64-bit commissioning nonce, immutable pairing transaction, per-node keys, replay slot and pending/active/disabled state. Pairing sets the profile and firmware; after a node is reflashed in place, an administrator's `read_info` command replaces them and the gateway announces the change like any other registry mutation.
 
-RFM69 hardware AES is disabled. V3 frames use software AES-CTR and CMAC with keys derived separately for each node; join request and accept authenticate with that node's factory key. Initial gateway setup generates an operational network ID in 1..255 and permits an advanced edit before confirmation. Ordinary changes are locked after a node is active; later changes require a staged migration design.
+RFM69 hardware AES is disabled. Radio frames use software AES-CTR and CMAC with keys derived separately for each node; join request and accept authenticate with that node's factory key. Initial gateway setup generates an operational network ID in 1..255 and permits an advanced edit before confirmation. Ordinary changes are locked after a node is active; later changes require a staged migration design.
 
 Normal telemetry is `common telemetry prefix + opaque profile payload`. The prefix carries supply voltage and the node's radio state; the gateway may decode it but does not decode profile-specific measurements. Exact radio bytes are specified only in [protocol/PROTOCOL.md](protocol/PROTOCOL.md).
 
@@ -40,7 +40,7 @@ REST carries identity, registry metadata, settings, and management. The binary W
 
 ## Persistence and security
 
-Settings, users/tokens, node registry, and installation secrets have separate NVS ownership. Mutable data uses versioned codecs, CRC32, generations and read-back validation. The pairing registry uses one atomic NVS blob; replay bounds use a separate blob excluded from backups. Restored nodes must answer an authenticated activation challenge. Existing invalid secret data is never mistaken for an empty store.
+Settings, users/tokens, node registry, and installation secrets have separate NVS ownership. Mutable data uses versioned codecs, CRC32, generations and read-back validation. The pairing registry uses one atomic NVS blob; replay bounds use a separate blob excluded from backups. Restored nodes must answer an authenticated activation challenge. Existing invalid secret data is never mistaken for an empty store. Radio keys, frames, pairing and replay protection are specified in [protocol/SECURITY.md](protocol/SECURITY.md).
 
 Passwords use salted PBKDF2-HMAC-SHA256. API tokens contain 32 random bytes, are shown once, and are stored only as SHA-256 digests. Radio keys, password hashes, token hashes, and the device secret are excluded from normal APIs and diagnostic exports.
 
@@ -65,12 +65,17 @@ Release versions name a build; contract versions decide compatibility. Compatibi
 
 ## Documentation ownership
 
-- Radio frames and payload validation: `protocol/PROTOCOL.md`.
-- REST endpoints and JSON: `gateway/API.md`.
-- WebSocket bytes and resynchronization: `gateway/WEBSOCKET.md`.
-- Persistent bytes: `gateway/STORAGE.md` and `node/EEPROM.md`.
-- Measured node consumption and battery budgets: `node/POWER.md`.
-- Build, upload, wiring, and bench use: component README files.
-- Unfinished work only: `ROADMAP.md`.
+| Topic                                                             | Document                               |
+| ----------------------------------------------------------------- | -------------------------------------- |
+| Telemetry, commands and profile payloads                          | `protocol/PROTOCOL.md`                 |
+| Radio crypto, frames, pairing, replay protection and their limits | `protocol/SECURITY.md`                 |
+| REST endpoints and JSON                                           | `gateway/API.md`                       |
+| WebSocket bytes and resynchronization                             | `gateway/WEBSOCKET.md`                 |
+| Persistent bytes                                                  | `gateway/STORAGE.md`, `node/EEPROM.md` |
+| Backup file and restore                                           | `gateway/BACKUP.md`                    |
+| Measured node consumption and battery budgets                     | `node/POWER.md`                        |
+| Build, upload, wiring, bench use, image sizes and gateway timing  | component README files                 |
+| Crypto costs and pairing entropy measurements                     | `node/crypto_bench/README.md`          |
+| Unfinished work only                                              | `ROADMAP.md`                           |
 
-Implementation history, test counts, firmware sizes, and completed iteration logs are deliberately not maintained as architecture documentation.
+Measurements live next to the component they describe, never in architecture or protocol documents. Implementation history, test counts and completed iteration logs are not documented; Git holds them.

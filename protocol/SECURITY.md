@@ -1,0 +1,288 @@
+# Radio security
+
+Authenticated, replay-resistant radio traffic between nodes and the gateway. [PROTOCOL.md](PROTOCOL.md) defines the payloads this envelope carries. A change here alters wire or storage formats, so it means reflashing nodes and resetting the gateway registry ([AGENTS.md](../AGENTS.md#pre-release-data-and-compatibility)). `protocol-manifest.json` (`security_v3`) and `protocol-vectors.json` hold the layouts and crypto known answers.
+
+| Area                                        | Summary                                                                                                                                                                                                         |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Crypto](#crypto)                           | Software AES-128: CTR encryption and a CMAC tag of 8 bytes from the node and 6 from the gateway, two keys per node, K_enc and K_mac. RFM69 hardware AES is off. One shared implementation for node and gateway. |
+| [Keys](#keys)                               | Keys per node, derived at pairing; no key shared by the nodes of a gateway                                                                                                                                      |
+| [Frames](#frames)                           | Clear header and transport header under the tag, 32-bit frame counter, plaintext ACK with a tag, one tag input format                                                                                           |
+| [Commands](#commands)                       | Sessions bound to the node's frame counter                                                                                                                                                                      |
+| [Pairing](#pairing)                         | Join frames in clear under a tag; the salt is the gateway's challenge; one transaction gives one set of reply bytes                                                                                             |
+| [Counter persistence](#counter-persistence) | Node: counter with a reserve of 1024. Gateway: an upper bound per node and a counter floor in the ACK. After a backup restore, each node is activated by an Activation report answering a fresh challenge.      |
+| [Limits](#limits)                           | What the radio security does not cover                                                                                                                                                                          |
+
+## Crypto
+
+AES-128, forward direction only: CTR for confidentiality, CMAC (RFC 4493) truncated to 8 bytes in node frames and 6 bytes in gateway frames for authenticity ([Tag length](#tag-length)), encrypt-then-MAC. CTR uses K_enc and CMAC uses K_mac, two independent [keys](#keys), as SP 800-38B requires for a CMAC key.
+
+The node and the gateway use the same implementation, in `shared/RadioProtocol`, so nonce and tag formatting are one code path checked by the same native known-answer tests. ESP32 hardware AES would gain nothing: software AES there takes microseconds against the node's 40 ms ACK window. Costs on the node, and the measured AES-CCM alternative, are in [node/crypto_bench](../node/crypto_bench/README.md#crypto).
+
+## Keys
+
+```text
+K_enc = CMAC(K_factory, 0x01 ‖ salt)
+K_mac = CMAC(K_factory, 0x02 ‖ salt)
+```
+
+A counter-mode key derivation with CMAC as the PRF (SP 800-108). "The node's keys" below means this pair.
+
+| Element    | Rule                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Salt       | 8 random bytes, the gateway's challenge for one pairing transaction, sent in clear in Join accept. It is not secret: deriving the keys needs the factory key. |
+| Node       | Stores the salt, not the keys; derives both at boot from the factory key in USERROW                                                                           |
+| Gateway    | Stores both keys in the node's registry record (32 bytes per node); it wipes the factory key after pairing, and selects the keys by the clear sender ID       |
+| Re-pairing | A new salt gives new keys; frames under the old keys fail                                                                                                     |
+| Network ID | Stays: it sets the RFM69 sync word that filters other installations                                                                                           |
+| Exposure   | Whoever has a node's QR code and recorded its pairing can derive its keys. A node read out of its flash exposes only itself.                                  |
+
+## Frames
+
+RFM69 hardware AES is off, so the transport header (length, target, sender, control) travels in clear.
+
+```text
+frame:      target | sender | control | header | counter (4) | ciphertext                 | tag (8 or 6)
+activation: target | sender | control | header | counter (4) | challenge (8) | ciphertext | tag (8)
+ACK:        target | sender | control | payload (0..10)                                   | tag (6)
+```
+
+The activation layout belongs only to the [Activation report](#backup-restore).
+
+| Field            | Rule                                                                                                                                                                                                                                                                                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transport header | Target, sender, and control are covered by every tag, so no field that steers processing, such as the ACK request flag, can be changed without failing the tag                                                                                                                                                                                      |
+| Header           | One byte, protocol major 3 and the frame kind; in clear, covered by the tag. The gateway needs the kind before decrypting, and frame length reveals it anyway.                                                                                                                                                                                      |
+| Counter          | The node's full 32-bit frame counter, little-endian. The gateway compares it with its last accepted value directly; a truncated counter would need reconstruction within a window that boot skips and gateway outages can exhaust.                                                                                                                  |
+| Ciphertext       | The kind's payload under CTR                                                                                                                                                                                                                                                                                                                        |
+| Tag              | The CMAC truncated to 8 bytes in node frames and to 6 bytes in gateway frames and ACKs ([Tag length](#tag-length))                                                                                                                                                                                                                                  |
+| ACK payload      | In plaintext: nothing in it is secret, and an ACK may change its content for the same report counter, which under CTR would reuse the keystream. Flags byte: bit 0 `command_pending`, bit 1 `power_target` (1 byte follows), bit 2 `counter_floor` (4 bytes follow, little-endian), bit 3 `challenge` (8 bytes follow); bits 2 and 3 are exclusive. |
+
+A report frame is the application frame plus 15 bytes; ACKs are 9–19 bytes.
+
+### Tag input
+
+One format for every tag, encrypt-then-MAC; CMAC needs no length prefix:
+
+```text
+logical header | target | sender | control | counter (4) | payload
+```
+
+| Frame                 | Logical header                                                          | Counter                                                            | Payload                                  |
+| --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------- |
+| Node or gateway frame | Its header byte                                                         | Its counter; for a reply, the counter of the node frame it answers | Ciphertext                               |
+| Activation report     | Its header byte                                                         | Its counter                                                        | The clear challenge, then the ciphertext |
+| ACK                   | Frame kind 31 (`0x7F`), reserved for this purpose and never transmitted | The counter of the frame it acknowledges                           | ACK payload                              |
+| Join frames           | Their header byte                                                       | Absent; see [Pairing](#pairing)                                    | Their fields                             |
+
+The header byte separates frame kinds, and the transport header gives the direction and the node. The prefix is 8 bytes, so a tag input stays within one AES block while the payload is at most 8 bytes; profiles 4 and 7 (10 and 9 bytes) need a second block, about 1.8 ms.
+
+CTR counter block, 16 bytes:
+
+| Offset | Bytes | Value                                                                                    |
+| -----: | ----: | ---------------------------------------------------------------------------------------- |
+|      0 |     1 | Direction: 0 node to gateway, 1 gateway to node                                          |
+|      1 |     1 | Node ID                                                                                  |
+|      2 |     1 | Header byte                                                                              |
+|      3 |     4 | Full frame counter, little-endian; for a reply, the counter of the node frame it answers |
+|      7 |     8 | Zero                                                                                     |
+|     15 |     1 | Block index                                                                              |
+
+### Tag length
+
+Forgery risk follows the attacker's verification attempts, about q / 2^(8 × tag bytes), not the rate of genuine reports (SP 800-38B, appendix A).
+
+| Verifier                               | Attempts available                                                                                                                               |     Tag | Risk                                                                                                                                                                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gateway, for node frames               | Always listening: a forged frame takes about 4.3 ms of air, so about 230 attempts a second, 2·10⁷ a day, 7·10⁹ a year of continuous transmission | 8 bytes | About 4·10⁻¹⁰ after a year. A 4-byte tag would reach about 0.5 % after a day and 82 % after a year, and CTR lets a recorded frame's plaintext bits be flipped, so a hit would be a chosen change such as a door state. |
+| Node, for ACK, Command, and No command | Only while it listens: about 9 attempts in the 40 ms after each transmission, about 58 in a 250 ms command window                                | 6 bytes | About 2.5·10⁻⁷ over five years for a node reporting every minute with three transmissions per report. A forged ACK changes state: it can carry `counter_floor`, which the node bounds (below).                         |
+
+These bounds hold only while every node receive loop ends at a fixed deadline. The 8-byte tag adds 4 bytes to every node frame, about 15 µC or 7 % of a report. The 6-byte ACK tag costs 2 bytes of reception over a 4-byte one, about 0.29 ms and 5 µC. The gateway counts failed tag checks per node and shows the count in its UI: CRC rejects corrupted frames before the tag check, so a failure almost always means a forgery attempt or a bug.
+
+### Rules
+
+| Rule                                                                                                                                                                                                     | Reason                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| New content takes a new counter                                                                                                                                                                          | CTR nonce uniqueness                                                                                                                      |
+| A retransmission reuses the counter and the exact bytes                                                                                                                                                  | Same plaintext under the same counter is not keystream reuse                                                                              |
+| Gateway: a counter at or above the node's floor is accepted; a repeat of the last accepted counter is re-ACKed without publishing; any other counter is not published and gets an ACK carrying the floor | Replay resistance; retransmissions do not produce duplicate reports; a node behind the floor catches up ([Gateway bound](#gateway-bound)) |
+| The ACK tag covers the acknowledged counter                                                                                                                                                              | A replayed ACK cannot confirm a different frame                                                                                           |
+| The gateway sends the ACK right after the tag check                                                                                                                                                      | The node listens 40 ms per attempt                                                                                                        |
+| The node puts the RFM69 to sleep as soon as it has copied a received ACK and checks the tag with the radio asleep. On a wrong tag it listens again, but only until the attempt's original deadline.      | Crypto with the radio in standby would nearly double its cost; a forged ACK cannot stretch the receive window                             |
+| The node accepts `counter_floor` only above its current counter and at most 256 above it, and reaches it with a single EEPROM reservation                                                                | A genuine floor is never further ahead ([Gateway bound](#gateway-bound)); a forged one cannot exhaust the counter                         |
+| The pulse count stays a full 32-bit value                                                                                                                                                                | No consumer rebuilds it across wraps or node resets                                                                                       |
+| Application payloads are not shortened to offset the envelope                                                                                                                                            | The bytes it could save cut a CR2032 node's current by under 1 %; sleep and input polling are about 77 % of it                            |
+
+A replayed ACK can only repeat an earlier ACK for the same counter, which happens when the gateway changed `command_pending` or `power_target` between retransmissions. The node then acts on stale flags until the next report; it cannot be made to accept anything the gateway did not send.
+
+## Commands
+
+Command payloads carry no session nonce: `openCommandReply()` requires the current Command ready counter before decoding an authenticated Command or No command. The gateway's `Guard` caches one sealed reply per node: caching different bytes under the same counter fails; a new accepted frame or restart discards the cache.
+
+| Payload                   | Layout                                 | Bytes |
+| ------------------------- | -------------------------------------- | ----: |
+| Command ready, No command | Empty                                  |     0 |
+| Command                   | `command_id` LE16, type, arguments     | 3..11 |
+| Command result            | `command_id` LE16, status, result data | 3..11 |
+
+Command ID is nonzero. Unknown command types remain representable for an Unsupported result; status values are 0..3. Arguments and result data each have an 8-byte limit.
+
+```text
+Node                                          Gateway
+  |-- report (c0) ----------------------------->|
+  |<-- ACK, tag(c0), command_pending -----------|
+  |-- Command ready (c1) ---------------------->|  checks tag, c1 fresh
+  |<-- Command (reply to c1) -------------------|  caches the reply bytes for c1
+  |   applies; command_id detects redelivery    |
+  |-- Command result (c2) --------------------->|  records the result
+  |<-- ACK, tag(c2) ----------------------------|
+```
+
+| Rule                                                                                                                                                                                                                                     | Reason                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The gateway has no frame counter of its own: every gateway frame answers a node frame and uses that frame's counter with direction 1                                                                                                     | No gateway counter state per node                                                                                                                                                                         |
+| The Command ready counter c1 binds the session                                                                                                                                                                                           | A reply from an older session fails its tag                                                                                                                                                               |
+| A repeated Command ready (same c1, same bytes) gets the cached reply bytes. If no reply has been cached yet, it retries the session handler. The cache holds one reply per node in RAM until the gateway accepts that node's next frame. | A changed queue cannot replace a reply already sealed under the same nonce; storage contention before sealing does not strand the session                                                                 |
+| After a restart the gateway answers a repeated c1 with `counter_floor`, not with a reply                                                                                                                                                 | Its floor is then above every counter it answered before the restart ([Gateway bound](#gateway-bound)), so a second reply under the same c1 cannot exist; the node moves on and sends a new Command ready |
+| An unactivated node after a [backup restore](#backup-restore) gets no reply to Command ready                                                                                                                                             | Its counters are not yet known to be fresh                                                                                                                                                                |
+| Each Command ready attempt listens until a fixed 250 ms deadline; a frame that fails verification neither ends nor extends it                                                                                                            | A forged frame cannot use up an attempt                                                                                                                                                                   |
+| Command result uses the node's next counter c2 and carries `command_id`                                                                                                                                                                  | An old result fails the counter check                                                                                                                                                                     |
+| A `command_id` equal to the recorded one returns the stored result without applying again                                                                                                                                                | Redelivery after a lost result                                                                                                                                                                            |
+
+## Pairing
+
+`RadioSecurityFrames` seals and verifies the complete join messages. Decoders authenticate before assigning output fields. UID is 10 bytes and `request_nonce` is unsigned LE64; profile ID is LE16.
+
+Join frames are not encrypted: nothing in them is secret, so pairing uses no CTR and cannot reuse a keystream. Every join frame carries a tag.
+
+| Frame         | Key         | Payload, in clear                                                                    | On-air bytes, including tag |
+| ------------- | ----------- | ------------------------------------------------------------------------------------ | --------------------------: |
+| Join request  | Factory key | UID, `request_nonce`, profile ID, firmware major/minor/patch, transmit power ceiling |                          33 |
+| Join accept   | Factory key | UID, `request_nonce`, salt, assigned node ID, network ID                             |                          35 |
+| Join confirm  | K_mac       | UID, `request_nonce`                                                                 |                          27 |
+| Join complete | K_mac       | UID, `request_nonce`                                                                 |                          25 |
+
+The gateway ID comes from the authenticated transport sender. Assigned node IDs are 1..99, network ID is nonzero, and transmit power ceiling is 0..31.
+
+Tag inputs follow the [common format](#tag-input) without a counter. Target, sender, and control are the transport header as sent; an unpaired node uses transport address 0:
+
+```text
+Join request:  header | target | sender | control | UID | request_nonce | profile ID | firmware | power ceiling
+Join accept:   header | target | sender | control | UID | request_nonce | salt | node ID | network ID
+Join confirm:  header | target | sender | control | UID | request_nonce | salt
+Join complete: header | target | sender | control | UID | request_nonce | salt
+```
+
+Confirm and complete include the salt in their tag although it is not on air, so both challenges bind every message after the accept, besides the keys derived from the salt.
+
+A pairing transaction is identified by (UID, `request_nonce`).
+
+| Rule                                                                                                                                                                                                                             | Reason                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| The gateway selects the factory key by the clear UID                                                                                                                                                                             | Only inside a pairing window for that UID                                                                                               |
+| The gateway stores the salt and `request_nonce` with the pending registry reservation before it sends Join accept, and answers every repeat of the same Join request with the same Join accept bytes, also after its own restart | A replayed Join request cannot make the gateway issue a second salt                                                                     |
+| A Join request with a known `request_nonce` but other fields is rejected                                                                                                                                                         | One transaction has one request                                                                                                         |
+| A replacement pending attempt must have a higher frame-counter part of `request_nonce`; an equal or lower counter is rejected. An erased counter requires explicit deletion of the registry reservation before re-enrolment.     | A delayed request cannot replace the current attempt or obtain another salt for a retired nonce                                         |
+| After Join complete the gateway rejects that `request_nonce`                                                                                                                                                                     | A finished transaction cannot restart                                                                                                   |
+| The node accepts Join accept only for its current `request_nonce`, stores the first one it accepts in its provisional configuration, and ignores later ones, even with a valid tag and another salt                              | A late accept cannot switch a transaction in progress                                                                                   |
+| The node then accepts only Join complete under the K_mac of that salt                                                                                                                                                            | The transaction finishes under the keys it fixed                                                                                        |
+| `request_nonce` is 64 bits: the node's 32-bit frame counter, then 32 bits of entropy; the node takes a new frame counter value for every pairing attempt                                                                         | A repeated `request_nonce` lets a recorded Join accept pass the factory-key tag and hand the node an old salt                           |
+| The frame counter part makes `request_nonce` unique for as long as the [counter reserve](#counter-persistence) survives                                                                                                          | Uniqueness does not rest on the entropy source                                                                                          |
+| The entropy part is mandatory                                                                                                                                                                                                    | An EEPROM erase restarts the counter while the factory key in USERROW stays; then only the entropy keeps `request_nonce` from repeating |
+| The entropy source, jitter of the 32 kHz oscillator against the main clock, is measured and checked on the chip before use ([node/crypto_bench](../node/crypto_bench/README.md)); `micros()` does not qualify                    | Right after power-up `micros()` is nearly deterministic                                                                                 |
+
+`PairingTransaction` operates on a registry-owned UID slot through an atomic, committed blob interface. Its 123-byte snapshot holds state, both transport headers, exact Join request/accept bytes, derived keys, generation and CRC-32; it holds no factory key. A failed write or mismatched readback blocks responses until reload. Corrupt data requires explicit deletion, never a fresh transaction created implicitly from the damaged record.
+
+Before committing Active, its bound adapter ensures the initial bound belongs to the pending keys. Retrying after an interrupted Active commit must preserve an already prepared bound. An Active transaction answers matching confirms without calling that adapter or writing the record.
+
+`RegistryPairing` commits the UID reservation, exact transaction snapshot and derived keys in one registry blob. Each secure record owns a stable replay slot, independent of registry order. New pending keys forget that slot before their commit; confirm checks key ownership and preserves a prepared Paired bound. Registry write or read-back failure blocks pairing until reload; corruption blocks the registry instead of selecting an older transaction. Backup preserves the transaction and keys but excludes bounds.
+
+`RadioSecurityPairing` saves the first matching accept as Provisional and fixes its salt, assignment and nonce across restarts. It authenticates complete with that salt and saves Active before allowing operational use. A failed EEPROM readback blocks confirm and complete until reload. The caller allocates the request counter, qualifies entropy and derives the session MAC from the saved salt.
+
+## Counter persistence
+
+The node never reuses a counter under its keys, also after a restart: with CTR a reused counter reuses the keystream. Under valid keys the counter never decreases; any state in which that cannot be shown discards the keys or stops transmission.
+
+| Element          | Rule                                                                                                                                                                                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node counter     | 32 bits in RAM                                                                                                                                                                                                                                                                                                |
+| Reserve          | EEPROM holds a limit R. The node uses counters below R only. To go further it first writes a new R; after a restart it continues from R, skipping the values it did not use.                                                                                                                                  |
+| N                | Each reservation adds 1024: about 1.4 writes a day at one report a minute, plus one per boot that transmits. A `counter_floor` catch-up reserves floor + 1024 in the same single write.                                                                                                                       |
+| Lazy reservation | After a restart the node writes its reservation right before its first transmission (report, Join request, or Command ready), not at boot. A reboot loop that never reaches a transmission writes nothing; one that does is bounded by the delayed first report after a brown-out ([ROADMAP](../ROADMAP.md)). |
+| Lifetime         | R belongs to the node, not to its keys: re-pairing and a network factory reset keep it. Only an EEPROM erase restarts it.                                                                                                                                                                                     |
+
+Reserve record:
+
+| Rule                                              | Detail                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Format                                            | Two slots, each R (4 bytes, little-endian) and CRC-16 (2 bytes), at the addresses in [EEPROM.md](../node/EEPROM.md). No wear ring: writes are rare.                                                                                                                                                                                                                                          |
+| Selection                                         | The larger R when both slots are valid. R only grows, so no generation number is needed.                                                                                                                                                                                                                                                                                                     |
+| One slot invalid                                  | The lost slot held the commit before or after the surviving R, and consecutive commits differ by at most 1279 (1024 plus a floor up to 255 past R). The node continues from R + 1279; before its next reservation it writes R + 1279 to the lost slot, so a later loss of either slot again recovers above every used counter. A blank slot after the first reservation takes the same path. |
+| Commit                                            | The new R goes to the slot holding the smaller or an invalid value, CRC last, then is read back. Counters at or above the old R are used only after the read-back matches. A torn write leaves the old, smaller R, which no used counter has passed.                                                                                                                                         |
+| Both slots erased, no network configuration       | A new node: the counter starts at 0                                                                                                                                                                                                                                                                                                                                                          |
+| Both slots invalid, network configuration present | The counter cannot be recovered: the node discards its keys and needs re-pairing. New keys from a new salt make a counter restarting at 0 safe.                                                                                                                                                                                                                                              |
+| Overflow                                          | When a reservation would pass 2³² − 1 the node stops transmitting for good. Re-pairing cannot help, because R is kept across it; recovery is the same as for a damaged EEPROM: erase it and pair again. That is about 8 000 years of one report a minute, or about 4 million transmitting boots.                                                                                             |
+
+`RadioSecurityStorage.h` implements both stores. Configuration saves and resets are read back before success is returned. `take()` reserves lazily and returns a new counter for new content; retransmissions retain the original frame. `advanceToFloor()` accepts a floor only for the last issued counter, within 256 values.
+
+Telemetry does not depend on the gateway's reverse link, so a node that cannot hear ACKs still delivers its reports; after a gateway restart it does so after at most M new frames.
+
+### Gateway bound
+
+Guarantee: every published frame of a node has a higher counter than every frame of that node published before it, across gateway restarts and backup restores.
+
+The gateway keeps a counter reserve instead of rewriting its registry for every accepted frame. The registry holds up to 12,560 bytes in a 64 KiB NVS partition ([STORAGE.md](../gateway/STORAGE.md)).
+
+| Element         | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bound H         | Per node, a counter is accepted only once a successfully stored H covers it. When the counter c to accept is above H, the gateway first writes H = c + M − 1, saturating at 2³² − 1; a large jump needs one write, not a loop. The reserve then covers exactly M values, c included.                                                                                                                                                                             |
+| M               | Per node, the number of frames it accepted from that node in the last 24 hours, between 1 and 256, and 256 while it has no such history: about one write a day per node, at most about six for one reporting every minute                                                                                                                                                                                                                                        |
+| Storage         | One small NVS blob with presence/state bitmaps and 4 bytes per registry slot, separate from the registry; NVS journals replacements                                                                                                                                                                                                                                                                                                                              |
+| Record states   | A present record holds H, or marks a node paired but with no frame accepted yet. Valid keys without a present record mean an [unactivated](#backup-restore) node.                                                                                                                                                                                                                                                                                                |
+| Initialization  | The gateway writes the "no frame accepted yet" state once, when the node turns active under new keys: under fresh keys every counter is fresh, so the first frame is accepted at any counter. A repeated Join confirm only repeats Join complete ([STORAGE.md](../gateway/STORAGE.md)) and never touches the record, because resetting a stored H would make old counters acceptable again.                                                                      |
+| Floor           | In RAM: the last accepted counter + 1. After a restart it starts at H + 1, because every frame accepted before the restart, and therefore every replay, has a counter at most H.                                                                                                                                                                                                                                                                                 |
+| Exhausted range | H equal to 2³² − 1 means the range under these keys is used up: H + 1 is never computed, the gateway rejects every frame under the keys and sends no `counter_floor`. Recovery is an EEPROM erase and pairing again, as for the node's overflow. The node stops earlier, because its reservation cannot pass 2³² − 1, but the gateway does not rely on that.                                                                                                     |
+| Catch-up        | A frame with a valid tag below the floor is not published. The gateway answers with an ACK carrying `counter_floor`, under the tag bound to that frame's counter. The node, which accepts it only for its current frame and only within 256 of its counter, moves to the floor and sends the report again under the new counter. A genuine floor is at most M above the node's counter: a retransmission of an accepted c after a restart meets the floor c + M. |
+| One-way nodes   | A node that cannot hear the floor passes it on its own after at most M new frames; after a lost ACK the node retries every 15 minutes and later hourly, so this gives no calendar bound                                                                                                                                                                                                                                                                          |
+| Abuse           | The floor cannot be forged (tag) or replayed (bound to one frame counter). A floor answered to an attacker's replay reaches no node that is waiting for it.                                                                                                                                                                                                                                                                                                      |
+
+`GatewayReplay` provides the bound codec, single-blob store and authenticated-frame policy. `Guard::inspect()` runs after tag verification: only `Accept` permits publication, while `Duplicate` permits re-ACK or a cached command reply. `AcceptanceHistory` counts accepted frames in the trailing 24 hours using monotonic uptime; M is 256 until a full day has been observed, then 1..256. Its 256 timestamps use packed 18-bit seconds, with exact 24-hour expiry across wraps; a history occupies at most 600 bytes. Histories are allocated for nodes that receive authenticated traffic and released when their slots stop being active. The 64-node history budget is at most 38,400 bytes plus allocator overhead.
+
+The blob must validate at load. Missing or invalid bounds make every node with existing keys unactivated. A replacement is committed and read back before acceptance. If power is lost before publication, either the previous committed bound or the new bound covers all previously published frames. A write or read-back failure blocks acceptance until reload. Fresh-key initialization refuses to reset a present record.
+
+### Backup restore
+
+A backup keeps active/disabled node keys and metadata, so restoring those nodes needs no re-pairing. Pending nodes are excluded and import rejects Pending records: their keys may already have been used after export, so restoring an unfinished pairing transaction cannot safely initialize fresh replay state. Those nodes need pairing again. A backup does not keep the bound records: a stored bound would let frames accepted after the backup, or after an earlier restore of the same backup, look fresh again. A restored node therefore has valid keys and no bound record, which makes it unactivated; the state survives any number of gateway restarts until activation stores H.
+
+The Activation report is a frame kind that carries its challenge in clear, so the gateway can check it whether or not it still remembers the challenge:
+
+```text
+Node                                           Gateway (node unactivated)
+  |-- report (c0) ----------------------------->|  valid tag, nothing published
+  |<-- ACK, challenge G ------------------------|  G pending in RAM
+  |-- Activation report (c1, G, telemetry) ---->|  G matches: stores H, then activates
+  |<-- ACK, tag(c1) ----------------------------|
+```
+
+| Situation                                                                                                   | Behaviour                                                                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unactivated node, any frame with a valid tag other than an Activation report carrying the pending challenge | Nothing published, no Command ready answered. The ACK carries `challenge`: the pending one if the gateway has one, otherwise a new random 8-byte value, which becomes pending. Repeats get the same pending challenge. |
+| Activation report whose challenge matches the pending one                                                   | The gateway stores H covering c1, activates the node, publishes the telemetry, and ACKs. Storing comes first.                                                                                                          |
+| Activation report with any other challenge, such as one issued before a gateway restart                     | Not published. The ACK carries the current pending challenge, or a new one; the node builds a new Activation report under a new counter.                                                                               |
+| ACK of an accepted Activation report lost                                                                   | The node repeats the same frame. The node is now active, so ordinary rules apply: the same counter is re-ACKed.                                                                                                        |
+| Gateway restarts after storing H but before its ACK                                                         | The repeated Activation report has a valid tag and a counter at most H, so the gateway answers with an authenticated `counter_floor`, as for any frame below the floor                                                 |
+| The node received `challenge`                                                                               | It keeps the challenge and sends its next report as an Activation report, repeating that exact frame until it is acknowledged                                                                                          |
+| Restoring the same backup again                                                                             | Every node is unactivated again and passes a new challenge; no replay window between restores                                                                                                                          |
+| One-way node                                                                                                | Cannot receive its challenge, so it needs a working reverse link to be activated; [BACKUP.md](../gateway/BACKUP.md) states this                                                                                        |
+
+Activation costs 8 bytes in one frame per node per restore; ordinary reports do not grow. Salts and challenges come from the gateway's hardware RNG, whose entropy source the gateway keeps enabled ([STORAGE.md](../gateway/STORAGE.md)).
+
+## Limits
+
+| Not covered      | Consequence                                                                                                                                                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jamming          | Anyone can block reports and ACKs; authentication cannot stop it. Do not rely on a node alone where a missed report matters.                                                                                                       |
+| Traffic analysis | Addresses, frame kinds, lengths and transmission times are visible                                                                                                                                                                 |
+| Freshness        | The counter orders frames but does not date them: a frame recorded and jammed before it first reached the gateway can still be accepted later, while its counter is above the floor. The receive time is not the measurement time. |
+| A node's own key | A node read out of its flash, or whose QR code and pairing were recorded, can send false reports in its own name. A valid tag does not prove a physical measurement.                                                               |
+| Pairing entropy  | After an EEPROM erase only 32 bits of entropy keep `request_nonce` unique. The source is measured on one chip of each type at room temperature, without a minimum-entropy bound ([ROADMAP](../ROADMAP.md)).                        |
+| Load             | Forged frames still cost the gateway a tag check and keep a listening node awake until its deadline                                                                                                                                |

@@ -124,6 +124,30 @@ python scripts/status_logger.py osk-hub-a085e3e6cc20.local admin soak.csv
 
 The node image `radio_flood` ([node README](../node/README.md)) supplies burst traffic. Two of them, about 28 frames per second together with retries after collisions, were acknowledged for 12 minutes with no dropped telemetry, no missed interrupt, and free heap steady at about 195 KB; after a reset the radio received again without a power cycle.
 
+The `bench` object of `/ui/status` holds receive-processing time, replay NVS write time, IRQ-to-ACK time and task stack minima ([API.md](API.md#liveness-and-status)). IRQ-to-ACK includes scheduling, replay read-back and the completed transmission; missed-IRQ recovery is excluded from `acks_measured`. Measured with one `binary_sht40` node: the debug image through pairing, reports, `READ_INFO`, a node reboot, a gateway reboot and a backup restore with activation; `radio_flood` for 9557 acknowledged reports at about 14 per second.
+
+| Field                                              |   Debug `binary_sht40` |          `radio_flood` |
+| -------------------------------------------------- | ---------------------: | ---------------------: |
+| `last_ack_us`, typical                             |                   3973 |                   3904 |
+| `max_ack_us`                                       |                 10 677 |                 17 705 |
+| `acks_over_40ms`                                   |                      0 |                      0 |
+| `max_receive_us`, including the reservation write  |                   7070 |                   7736 |
+| `max_reservation_write_us`                         |                   4842 |                   5692 |
+| `reservation_writes`, `reservation_failures`       |                   1, 0 |                  39, 0 |
+| `replay_frames`, `failed_tags`                     |                   1, 0 |                   1, 0 |
+| Minimum free stack: radio, commissioning, commands | 4252, 6964, 7208 bytes | 4120, 6956, 7200 bytes |
+
+`max_receive_us` stays below 8 ms; the rest of the worst ACK is task scheduling. Each `replay_frames` is a node retransmission after a lost ACK, answered and not published again.
+
+The node image `radio_replay` ([node README](../node/README.md#radio_replay)) sends two valid reports, then their exact and tampered bytes. One run published only the two valid reports:
+
+| Frame                                                                     | Gateway                                                                  |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Immediate duplicate                                                       | Same ACK, `replay_frames` +1                                             |
+| Older counter                                                             | ACK with `counter_floor` one above the last accepted, `replay_frames` +1 |
+| One bit flipped in ciphertext, tag or counter, or the ACK request cleared | No ACK, `failed_tags` +1 each                                            |
+| Same bytes from an unregistered node ID                                   | No ACK, `telemetry_rejected_inactive` +1                                 |
+
 ## Crash dumps
 
 A panic or task-watchdog reset writes a core dump to the `coredump` partition, where it stays until the next crash; `reset_reason` in `/ui/status` names the cause. Read the Waveshare dump over USB and decode it against the ELF of the running firmware:
@@ -138,9 +162,9 @@ esp-coredump --chip esp32s3 info_corefile -t raw -c core.bin .pio\build\gateway_
 
 ## Runtime
 
-One priority-11 task owns RFM69 and all FIFO/SPI operations. After 5 s without an interrupt it services a DIO0 edge it missed (`missed_interrupts` in `/ui/status`), and every 5 s it checks that the module is in RX, that its carrier is the configured band, and reads back 24 configuration registers. A module that left RX, sits on another carrier, or no longer matches what the task wrote is reset through `GATEWAY_RFM69_RESET` when wired and configured again on the current network with hardware AES disabled; `module_restores` and `module_restore_failures` count the outcomes, `frequency_faults` counts wrong carriers (also at startup, which retries), and the serial log names the register. `frequency_hz` in `/ui/status` is the carrier last read from the module. Active telemetry enters bounded queues and is acknowledged only after acceptance. Commissioning commits registry transactions in its own task. The radio task authenticates V3 traffic, checks replay state and durably reserves bounds before accepting new counters. The main loop keeps the latest opaque telemetry frame for each node and publishes it through the binary WebSocket.
+One priority-11 task owns RFM69 and all FIFO/SPI operations. After 5 s without an interrupt it services a DIO0 edge it missed (`missed_interrupts` in `/ui/status`), and every 5 s it checks that the module is in RX, that its carrier is the configured band, and reads back 24 configuration registers. A module that left RX, sits on another carrier, or no longer matches what the task wrote is reset through `GATEWAY_RFM69_RESET` when wired and configured again on the current network with hardware AES disabled; `module_restores` and `module_restore_failures` count the outcomes, `frequency_faults` counts wrong carriers (also at startup, which retries), and the serial log names the register. `frequency_hz` in `/ui/status` is the carrier last read from the module. Active telemetry enters bounded queues and is acknowledged only after acceptance. Commissioning commits registry transactions in its own task. The radio task authenticates traffic, checks replay state and durably reserves bounds before accepting new counters. The main loop keeps the latest opaque telemetry frame for each node and publishes it through the binary WebSocket.
 
-The gateway serves two API surfaces: `/api` is the external client contract (`info`, the node registry read) and moves only with `api_version`, while `/ui` is everything the Web UI needs and moves with the firmware. Outside both sit `/health`, an unauthenticated liveness probe carrying only `status` and `boot_id`, and `/ws`. See `API.md`. Settings, authentication and secrets use independent dual-slot stores; the V3 registry uses one atomic NVS blob. SNTP uses configured NTP servers and reapplies changes without reboot.
+The gateway serves two API surfaces: `/api` is the external client contract (`info`, the node registry read) and moves only with `api_version`, while `/ui` is everything the Web UI needs and moves with the firmware. Outside both sit `/health`, an unauthenticated liveness probe carrying only `status` and `boot_id`, and `/ws`. See `API.md`. Settings, authentication and secrets use independent dual-slot stores; the node registry uses one atomic NVS blob. SNTP uses configured NTP servers and reapplies changes without reboot.
 
 Before the first user exists, the Waveshare status LED blinks green and a short button press opens the physical setup window. `POST /ui/setup` creates the first admin and can set the hostname and operational network ID. Until then the radio sleeps; setup applies its operational network, so nodes can be paired without a restart. Radio encryption and authentication use separate keys per node. Pairing is opened from the management UI after manually entering the node UID and its unique factory key; a short button press can close an active pairing window.
 
@@ -150,5 +174,6 @@ References:
 - [WebSocket binary protocol](WEBSOCKET.md)
 - [Persistent storage](STORAGE.md)
 - [Installation backup and recovery](BACKUP.md)
+- [Radio security](../protocol/SECURITY.md)
 - [System architecture](../ARCHITECTURE.md)
 - [Unfinished work](../ROADMAP.md)
