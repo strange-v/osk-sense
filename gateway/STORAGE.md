@@ -150,6 +150,8 @@ The operational network ID is always `1..255`; network 0 is reserved for commiss
 
 The device secret comes from the ESP32 hardware RNG, is not the public stable gateway ID, survives ordinary settings/auth/network reset, and is reserved for local secret derivation and authenticated export.
 
+The gateway uses neither Wi-Fi nor Bluetooth, so `setup()` first enables the SAR ADC entropy source and keeps it on; every secret, salt, token and challenge depends on it. It must be disabled before Wi-Fi, Bluetooth, the ADC or I2S are started, and a running Wi-Fi or Bluetooth stack then provides the entropy.
+
 CRC32 provides neither confidentiality nor authenticity. Physical flash access can recover keys and authentication material; the production threat model accepts that risk and does not require flash encryption or secure boot.
 
 An empty namespace is initialized with a hardware-random device secret and operational network ID, with the radio unconfigured. Existing invalid slot data is reported as corruption and never overwritten automatically. A gateway whose stores do not all load runs without persistent storage until its NVS partition is erased, as the README describes; that erases every store.

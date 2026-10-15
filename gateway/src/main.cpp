@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <bootloader_random.h>
 
 #include "BoardProfile.h"
 #include "AuthenticationService.h"
@@ -41,6 +42,11 @@ const char *ethernetControllerName(gateway::board::EthernetController controller
 } // namespace
 
 void setup() {
+    // Without Wi-Fi or Bluetooth the hardware RNG has no entropy source of its
+    // own: keep the SAR ADC one on for every secret, salt and challenge. It
+    // must be disabled before Wi-Fi, Bluetooth, the ADC or I2S start; running
+    // Wi-Fi or Bluetooth then supplies entropy instead.
+    bootloader_random_enable();
     Serial.begin(115200);
 #if ARDUINO_USB_CDC_ON_BOOT
     // A host that keeps the USB CDC port open without reading it fills the
