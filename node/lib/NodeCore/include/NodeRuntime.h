@@ -276,54 +276,65 @@ template <typename Profile> class NodeRuntime {
         uint8_t frame[22];
         for (uint8_t attempt = 0; attempt < kSessionAttempts; ++attempt) {
             radio_.send(gatewayId, ready, static_cast<uint8_t>(readySize));
-            const uint8_t size =
-                radio_.receiveFrame(kSessionWindowMs, gatewayId, frame, sizeof(frame));
-            if (!size)
-                continue;
-            const auto transport = radio_.receivedTransport();
-            if (transport.control == 0x80) {
-                security::Ack ack;
-                if (!commissioning_.receiveAck(counter, transport, frame, size, ack))
+            // A frame that fails verification keeps the window open until its
+            // fixed deadline: otherwise a forged frame ahead of the gateway's
+            // reply would use up the attempt.
+            const uint32_t sent = millis();
+            for (;;) {
+                const uint32_t elapsed = static_cast<uint32_t>(millis() - sent);
+                if (elapsed >= kSessionWindowMs)
+                    break;
+                const uint8_t size = radio_.receiveFrame(kSessionWindowMs - elapsed,
+                                                         gatewayId,
+                                                         frame,
+                                                         sizeof(frame));
+                if (!size)
+                    break;
+                const auto transport = radio_.receivedTransport();
+                if (transport.control == 0x80) {
+                    security::Ack ack;
+                    if (!commissioning_.receiveAck(counter, transport, frame, size, ack))
+                        continue;
+                    if (ack.hasChallenge) {
+                        radio_.sleep();
+                        return false;
+                    }
+                    if (ack.hasCounterFloor &&
+                        !commissioning_.sealFrame(security::frames::kCommandReadyHeader,
+                                                  nullptr,
+                                                  0,
+                                                  0,
+                                                  ready,
+                                                  sizeof(ready),
+                                                  readySize,
+                                                  counter)) {
+                        radio_.sleep();
+                        return false;
+                    }
+                    break;
+                }
+                security::frames::Command decoded;
+                bool hasCommand;
+                if (transport.control != 0 ||
+                    !security::frames::openCommandReply(commissioning_.context(),
+                                                        commissioning_.config().nodeId,
+                                                        transport,
+                                                        counter,
+                                                        frame,
+                                                        size,
+                                                        decoded,
+                                                        hasCommand))
                     continue;
-                if (ack.hasChallenge) {
-                    radio_.sleep();
-                    return false;
-                }
-                if (ack.hasCounterFloor &&
-                    !commissioning_.sealFrame(security::frames::kCommandReadyHeader,
-                                              nullptr,
-                                              0,
-                                              0,
-                                              ready,
-                                              sizeof(ready),
-                                              readySize,
-                                              counter)) {
-                    radio_.sleep();
-                    return false;
-                }
-                continue;
-            }
-            security::frames::Command decoded;
-            bool hasCommand;
-            if (transport.control != 0 ||
-                !security::frames::openCommandReply(commissioning_.context(),
-                                                    commissioning_.config().nodeId,
-                                                    transport,
-                                                    counter,
-                                                    frame,
-                                                    size,
-                                                    decoded,
-                                                    hasCommand))
-                continue;
-            if (!hasCommand) {
+                if (!hasCommand) {
 #if defined(NODE_DEBUG)
-                debugLine(F("cmd none"));
+                    debugLine(F("cmd none"));
 #endif
-                radio_.sleep();
+                    radio_.sleep();
+                    return true;
+                }
+                answerCommand(decoded);
                 return true;
             }
-            answerCommand(decoded);
-            return true;
         }
 #if defined(NODE_DEBUG)
         debugLine(F("cmd timeout"));

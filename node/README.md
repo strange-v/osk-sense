@@ -146,7 +146,7 @@ The solar climate image has no finite charge to spare: a drained supercapacitor 
 
 ## Command sessions
 
-An active node opens a command session when its button is short-pressed, or when an authenticated telemetry acknowledgement carries the command-pending flag. It sends Command ready, listens 250 ms for the answer, and repeats the exact frame up to three times with the same counter. Replies must authenticate against that counter before a command runs. Input polling pauses meanwhile, as during a commissioning window.
+An active node opens a command session when its button is short-pressed, or when an authenticated telemetry acknowledgement carries the command-pending flag. It sends Command ready, listens 250 ms for the answer, and repeats the exact frame up to three times with the same counter. A frame that fails verification neither ends nor extends the 250 ms. Replies must authenticate against that counter before a command runs. Input polling pauses meanwhile, as during a commissioning window.
 
 | Command     | Handled by    | Effect                                                                                                     |
 | ----------- | ------------- | ---------------------------------------------------------------------------------------------------------- |

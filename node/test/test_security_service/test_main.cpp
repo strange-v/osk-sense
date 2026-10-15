@@ -597,6 +597,26 @@ void test_command_session_rejects_reply_from_previous_session() {
     TEST_ASSERT_EQUAL_UINT32(previous + 1, counter(RFM69::outgoing[0]));
     TEST_ASSERT_EQUAL_UINT(0, x.profile.applied);
 }
+void test_command_session_forged_frames_keep_window_open() {
+    SessionFixture x;
+    RFM69::onSend = [](const Packet &packet) {
+        TEST_ASSERT_EQUAL_UINT8(f::kCommandReadyHeader, packet.bytes[0]);
+        const uint32_t ready = counter(packet);
+        ack(ready, s::Ack{}, true);
+        Packet forged = commandReply(ready, false);
+        forged.bytes.back() ^= 1;
+        RFM69::incoming.push_back(forged);
+        Packet control = commandReply(ready, false);
+        control.transport.control = 0x10;
+        RFM69::incoming.push_back(control);
+        RFM69::incoming.push_back(commandReply(ready, false));
+    };
+    x.run();
+    TEST_ASSERT_EQUAL_UINT(1, RFM69::outgoing.size());
+    TEST_ASSERT_TRUE(RFM69::incoming.empty());
+    TEST_ASSERT_EQUAL_UINT(0, x.profile.applied);
+    TEST_ASSERT_EQUAL_UINT(1, clockSleeps);
+}
 int main() {
     setvbuf(stdout, nullptr, _IONBF, 0);
     UNITY_BEGIN();
@@ -616,5 +636,6 @@ int main() {
     RUN_TEST(test_command_session_timeout_retries_identical_ready_and_sleeps);
     RUN_TEST(test_command_session_repeated_cached_reply_applies_once_and_retries_result);
     RUN_TEST(test_command_session_rejects_reply_from_previous_session);
+    RUN_TEST(test_command_session_forged_frames_keep_window_open);
     return UNITY_END();
 }

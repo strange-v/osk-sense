@@ -420,14 +420,14 @@ megaTinyCore 2.6.7 and the 4 MHz internal clock.
 
 | V3 profile             |  Flash | Free Flash | Static RAM |
 | ---------------------- | -----: | ---------: | ---------: |
-| `counter_reed`         | 20 978 |     11 790 |        765 |
-| `climate_tmp112`       | 20 975 |     11 793 |        816 |
-| `binary_sht40`         | 20 816 |     11 952 |        800 |
-| `binary`               | 18 938 |     13 830 |        711 |
-| `counter_reed_debug`   | 22 995 |       9773 |        916 |
-| `climate_tmp112_debug` | 22 871 |       9897 |        967 |
-| `binary_sht40_debug`   | 23 181 |       9587 |        951 |
-| `binary_debug`         | 20 943 |     11 825 |        862 |
+| `counter_reed`         | 21 002 |     11 766 |        765 |
+| `climate_tmp112`       | 21 027 |     11 741 |        816 |
+| `binary_sht40`         | 20 868 |     11 900 |        800 |
+| `binary`               | 18 990 |     13 778 |        711 |
+| `counter_reed_debug`   | 23 019 |       9749 |        916 |
+| `climate_tmp112_debug` | 22 917 |       9851 |        967 |
+| `binary_sht40_debug`   | 23 225 |       9543 |        951 |
+| `binary_debug`         | 20 987 |     11 781 |        862 |
 
 Run `node/scripts/probe_v3_size.ps1 -Environment counter_reed` from PowerShell;
 the other release and debug environment names select their composition roots.
