@@ -46,7 +46,7 @@ Passwords use salted PBKDF2-HMAC-SHA256. API tokens contain 32 random bytes, are
 
 The gateway serves HTTP and WebSocket only and is intended exclusively for a trusted private LAN. It does not provide TLS/WSS and must not be exposed directly to the Internet or an untrusted network. LAN traffic capture, DNS/mDNS spoofing, a compromised LAN client, and physical flash access are outside the accepted production threat model; flash encryption and secure boot are not required.
 
-Firmware updates are the one outbound connection: HTTPS to GitHub Releases, started by an administrator. Authenticity comes from an ECDSA P-256 signature over the release manifest, checked against a key built into the firmware, and from the manifest's SHA-256 of every image; TLS only transports them. A new firmware image runs on trial and the bootloader returns to the previous one unless it confirms itself on the network.
+Firmware updates are the one outbound connection: HTTPS to GitHub Releases, started by an administrator. Authenticity comes from an ECDSA P-256 signature over the release manifest, checked against a key built into the firmware, and from the manifest's SHA-256 of every image; TLS only transports them. A new firmware image runs on trial and the bootloader returns to the previous one unless it confirms itself on the network. Development builds can add password-only ArduinoOTA ([gateway README](gateway/README.md#local-secrets-and-ota)); release builds do not include it.
 
 ## Versions
 
