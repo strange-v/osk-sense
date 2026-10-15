@@ -10,7 +10,7 @@
 | Radio traffic                   | Header, counter and encrypted payload with a CMAC tag; join frames are clear and authenticated |
 | Gateway telemetry and WebSocket | Application header `0x40`, common prefix and opaque profile payload                            |
 
-The gateway authenticates and checks replay state before forwarding telemetry. It removes the radio envelope and prepends `0x40` for the application codec. The profile examples below describe this client representation. The manifest's `security_v3` object describes the radio envelope; its `radio` object describes application codec IDs.
+The gateway authenticates and checks replay state before forwarding telemetry. It removes the radio envelope and prepends `0x40` for the application codec. The profile examples below describe this client representation. The manifest's `radio_security` object describes the radio envelope; its `radio` object describes application codec IDs.
 
 ## Frame kinds
 

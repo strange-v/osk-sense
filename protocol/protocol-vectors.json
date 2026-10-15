@@ -2,7 +2,7 @@
   "$schema": "./protocol-manifest.schema.json",
   "schema_version": 1,
   "scope": "gateway_client_telemetry_vectors",
-  "crypto_v3": {
+  "crypto": {
     "factory_key": "000102030405060708090a0b0c0d0e0f",
     "salt": "1011121314151617",
     "encryption_key": "4ac736d7387af23c7e43de5b9773c2a7",

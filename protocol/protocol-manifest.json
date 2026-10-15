@@ -2,7 +2,7 @@
   "$schema": "./protocol-manifest.schema.json",
   "schema_version": 1,
   "scope": "gateway_client_telemetry",
-  "security_v3": {
+  "radio_security": {
     "protocol_major": 3,
     "node_tag_bytes": 8,
     "gateway_tag_bytes": 6,

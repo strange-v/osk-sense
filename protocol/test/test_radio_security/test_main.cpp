@@ -46,7 +46,7 @@ std::string vectorHex(const char *name) {
     std::ifstream file("protocol-vectors.json");
     const std::string json((std::istreambuf_iterator<char>(file)),
                            std::istreambuf_iterator<char>());
-    const size_t section = json.find("\"crypto_v3\"");
+    const size_t section = json.find("\"crypto\"");
     TEST_ASSERT_NOT_EQUAL(std::string::npos, section);
     const size_t field = json.find(std::string("\"") + name + "\"", section);
     TEST_ASSERT_NOT_EQUAL(std::string::npos, field);

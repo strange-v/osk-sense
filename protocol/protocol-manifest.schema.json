@@ -4,7 +4,7 @@
   "title": "OSK Sense protocol artifacts",
   "oneOf": [{ "$ref": "#/$defs/manifest" }, { "$ref": "#/$defs/vector_document" }],
   "$defs": {
-    "security_v3": {
+    "radio_security": {
       "type": "object",
       "properties": {
         "protocol_major": { "const": 3 },
@@ -42,7 +42,7 @@
       ],
       "additionalProperties": false
     },
-    "crypto_v3": {
+    "crypto": {
       "type": "object",
       "properties": {
         "factory_key": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
@@ -390,7 +390,7 @@
             "$schema": { "type": "string" },
             "schema_version": { "const": 1 },
             "scope": { "const": "gateway_client_telemetry" },
-            "security_v3": { "$ref": "#/$defs/security_v3" },
+            "radio_security": { "$ref": "#/$defs/radio_security" },
             "radio": { "$ref": "#/$defs/radio" },
             "commands": { "$ref": "#/$defs/commands" },
             "gateway_stream": { "$ref": "#/$defs/gateway_stream" },
@@ -466,7 +466,7 @@
             "$schema": { "type": "string" },
             "schema_version": { "const": 1 },
             "scope": { "const": "gateway_client_telemetry_vectors" },
-            "crypto_v3": { "$ref": "#/$defs/crypto_v3" },
+            "crypto": { "$ref": "#/$defs/crypto" },
             "telemetry": {
               "type": "array",
               "items": { "$ref": "#/$defs/telemetry_vector" }

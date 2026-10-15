@@ -133,11 +133,11 @@ if (process.argv.includes('--print')) {
 const vectors = JSON.parse(
   readFileSync(new URL('../protocol-vectors.json', import.meta.url), 'utf8'),
 )
-assert.deepEqual(result, vectors.crypto_v3)
+assert.deepEqual(result, vectors.crypto)
 const manifest = JSON.parse(
   readFileSync(new URL('../protocol-manifest.json', import.meta.url), 'utf8'),
 )
-assert.deepEqual(manifest.security_v3, {
+assert.deepEqual(manifest.radio_security, {
   protocol_major: 3,
   node_tag_bytes: 8,
   gateway_tag_bytes: 6,
@@ -153,5 +153,5 @@ assert.deepEqual(manifest.security_v3, {
   command_payload: { envelope_bytes: 3, max_bytes: 11, ready_bytes: 0, no_command_bytes: 0 },
 })
 console.log(
-  'Validated V3 manifest, KDF, secure frames, pairing and command sessions against independent AES/CMAC.',
+  'Validated radio security manifest, KDF, secure frames, pairing and command sessions against independent AES/CMAC.',
 )
