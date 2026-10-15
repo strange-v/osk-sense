@@ -154,8 +154,9 @@ void test_frames_shorter_than_header_are_rejected() {
     }
 }
 
-// 65 and 66 fit the 66-byte FIFO and the default REG_PAYLOADLENGTH; larger
-// length bytes cover a radio that delivers them anyway.
+// A length byte of 65 and its frame exactly fill the 66-byte FIFO, so that is
+// the longest frame the radio delivers. Larger length bytes cover a FIFO that
+// holds fewer bytes than its length byte announces.
 void test_frames_longer_than_buffer_are_truncated() {
     const uint8_t lengths[] = {RF69_MAX_DATA_LEN + 4, RF69_MAX_DATA_LEN + 5, 67, 128, 255};
     for (uint8_t length : lengths) {
