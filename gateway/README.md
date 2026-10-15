@@ -27,7 +27,7 @@ The physical-presence button is BOOT/GPIO0 on Waveshare and, on WT32, a push but
 
 ## Local secrets and OTA
 
-Copy `include/LocalSecrets.example.h` to the Git-ignored `include/LocalSecrets.h`. A nonempty OTA password enables ArduinoOTA. Operational and per-device commissioning radio keys are generated or entered at runtime and are never taken from this build-time header. Existing invalid secret data is never overwritten automatically.
+Copy `include/LocalSecrets.example.h` to the Git-ignored `include/LocalSecrets.h`. A nonempty OTA password enables ArduinoOTA. Operational and per-device commissioning radio keys are generated or entered at runtime and are never taken from this build-time header. The gateway firmware never overwrites existing invalid secret data; the Arduino core can still erase the whole NVS partition at startup ([STORAGE.md](STORAGE.md)).
 
 OTA targets:
 

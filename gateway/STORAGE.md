@@ -156,6 +156,8 @@ CRC32 provides neither confidentiality nor authenticity. Physical flash access c
 
 An empty namespace is initialized with a hardware-random device secret and operational network ID, with the radio unconfigured. Existing invalid slot data is reported as corruption and never overwritten automatically. A gateway whose stores do not all load runs without persistent storage until its NVS partition is erased, as the README describes; that erases every store.
 
+One erase happens outside the gateway firmware: before `setup()`, the Arduino core erases the whole NVS partition when `nvs_flash_init()` reports no free pages or an NVS format newer than its own. The gateway then boots as after a cable erase, with a new device secret, and every paired node must pair again.
+
 This snapshot holds no commissioning profile. Every node has a unique factory commissioning key supplied with its UID, entered by hand or scanned from the node's QR code. The radio task holds the key only in RAM for one pairing transaction; it is never added to this snapshot or the registry. The commissioning network ID is a runtime constant of zero and is not stored either. The gateway wipes the key whenever the radio returns from the commissioning profile to the operational one.
 
 ## Node registry snapshot
