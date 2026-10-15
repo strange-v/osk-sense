@@ -309,14 +309,15 @@ The node never reuses a counter under its keys, also after a restart: with CTR a
 
 Reserve record:
 
-| Rule                                              | Detail                                                                                                                                                                                                                                                                                           |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Format                                            | Two slots, each R (4 bytes, little-endian) and CRC-16 (2 bytes), at the addresses in [EEPROM](#eeprom). No wear ring: writes are rare.                                                                                                                                                           |
-| Selection                                         | The larger R among the valid slots. R only grows, so no generation number is needed.                                                                                                                                                                                                             |
-| Commit                                            | The new R goes to the slot holding the smaller or an invalid value, CRC last, then is read back. Counters at or above the old R are used only after the read-back matches. A torn write leaves the old, smaller R, which no used counter has passed.                                             |
-| Both slots erased, no network configuration       | A new node: the counter starts at 0                                                                                                                                                                                                                                                              |
-| Both slots invalid, network configuration present | The counter cannot be recovered: the node discards its keys and needs re-pairing. New keys from a new salt make a counter restarting at 0 safe.                                                                                                                                                  |
-| Overflow                                          | When a reservation would pass 2³² − 1 the node stops transmitting for good. Re-pairing cannot help, because R is kept across it; recovery is the same as for a damaged EEPROM: erase it and pair again. That is about 8 000 years of one report a minute, or about 4 million transmitting boots. |
+| Rule                                              | Detail                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Format                                            | Two slots, each R (4 bytes, little-endian) and CRC-16 (2 bytes), at the addresses in [EEPROM](#eeprom). No wear ring: writes are rare.                                                                                                                                                                                                                                                       |
+| Selection                                         | The larger R when both slots are valid. R only grows, so no generation number is needed.                                                                                                                                                                                                                                                                                                     |
+| One slot invalid                                  | The lost slot held the commit before or after the surviving R, and consecutive commits differ by at most 1279 (1024 plus a floor up to 255 past R). The node continues from R + 1279; before its next reservation it writes R + 1279 to the lost slot, so a later loss of either slot again recovers above every used counter. A blank slot after the first reservation takes the same path. |
+| Commit                                            | The new R goes to the slot holding the smaller or an invalid value, CRC last, then is read back. Counters at or above the old R are used only after the read-back matches. A torn write leaves the old, smaller R, which no used counter has passed.                                                                                                                                         |
+| Both slots erased, no network configuration       | A new node: the counter starts at 0                                                                                                                                                                                                                                                                                                                                                          |
+| Both slots invalid, network configuration present | The counter cannot be recovered: the node discards its keys and needs re-pairing. New keys from a new salt make a counter restarting at 0 safe.                                                                                                                                                                                                                                              |
+| Overflow                                          | When a reservation would pass 2³² − 1 the node stops transmitting for good. Re-pairing cannot help, because R is kept across it; recovery is the same as for a damaged EEPROM: erase it and pair again. That is about 8 000 years of one report a minute, or about 4 million transmitting boots.                                                                                             |
 
 Telemetry does not depend on the gateway's reverse link, so a node that cannot hear ACKs still delivers its reports; after a gateway restart it does so after at most M new frames.
 
@@ -407,7 +408,7 @@ accepts a floor only for the last issued counter, within 256 values, and stores
 floor + 1024 before making the floor available.
 
 The `size_security_storage` bench environment compiles these stores with the
-Arduino EEPROM backend: 2534 bytes of Flash and 32 bytes of static RAM, including
+Arduino EEPROM backend: 2588 bytes of Flash and 26 bytes of static RAM, including
 the bench and Arduino core. It does not write EEPROM with its default zero sink.
 
 ## Flash
@@ -419,14 +420,14 @@ megaTinyCore 2.6.7 and the 4 MHz internal clock.
 
 | V3 profile             |  Flash | Free Flash | Static RAM |
 | ---------------------- | -----: | ---------: | ---------: |
-| `counter_reed`         | 20 844 |     11 924 |        764 |
-| `climate_tmp112`       | 20 841 |     11 927 |        815 |
-| `binary_sht40`         | 20 682 |     12 086 |        799 |
-| `binary`               | 18 804 |     13 964 |        710 |
-| `counter_reed_debug`   | 22 861 |       9907 |        915 |
-| `climate_tmp112_debug` | 22 737 |     10 031 |        966 |
-| `binary_sht40_debug`   | 23 047 |       9721 |        950 |
-| `binary_debug`         | 20 809 |     11 959 |        861 |
+| `counter_reed`         | 20 978 |     11 790 |        765 |
+| `climate_tmp112`       | 20 975 |     11 793 |        816 |
+| `binary_sht40`         | 20 816 |     11 952 |        800 |
+| `binary`               | 18 938 |     13 830 |        711 |
+| `counter_reed_debug`   | 22 995 |       9773 |        916 |
+| `climate_tmp112_debug` | 22 871 |       9897 |        967 |
+| `binary_sht40_debug`   | 23 181 |       9587 |        951 |
+| `binary_debug`         | 20 943 |     11 825 |        862 |
 
 Run `node/scripts/probe_v3_size.ps1 -Environment counter_reed` from PowerShell;
 the other release and debug environment names select their composition roots.
@@ -434,7 +435,7 @@ The script builds the selected environment, including RTC entropy
 collection, and inspects its ELF without uploading. The MCU's memory limits
 apply unchanged. Flash includes `.text`, `.rodata` and `.data`.
 
-Static RAM leaves at least 2106 bytes for stack and dynamic state. Debug images
+Static RAM leaves at least 2105 bytes for stack and dynamic state. Debug images
 paint unused SRAM during startup and report `stkfree <bytes>` when the minimum
 remaining heap-to-stack gap decreases. The painter is absent from release images.
 Debug `binary_sht40` keeps at least 1479 bytes free through pairing, telemetry

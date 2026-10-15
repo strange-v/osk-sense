@@ -44,6 +44,15 @@ secure::NetworkConfig config() {
 void seed(Eeprom &memory, size_t address, uint32_t limit) {
     secure::encodeReserve(limit, memory.bytes + address);
 }
+// Flips one bit of the reserve that holds the larger valid limit.
+void corruptNewestReserve(Eeprom &memory) {
+    uint32_t a = 0, b = 0;
+    const bool validA = secure::decodeReserve(memory.bytes + secure::kReserveA, a);
+    const bool validB = secure::decodeReserve(memory.bytes + secure::kReserveB, b);
+    TEST_ASSERT_TRUE(validA || validB);
+    const size_t address = validA && (!validB || a >= b) ? secure::kReserveA : secure::kReserveB;
+    memory.bytes[address] ^= 1;
+}
 void test_config_layout_and_crc() {
     auto value = config();
     uint8_t bytes[26];
@@ -159,7 +168,7 @@ void test_counter_corruption_requires_discarding_keys() {
     TEST_ASSERT_EQUAL_UINT32(2048, counter.limit());
     memory.bytes[30] ^= 1;
     counter.load(true);
-    TEST_ASSERT_EQUAL_UINT32(1024, counter.limit());
+    TEST_ASSERT_EQUAL_UINT32(1024 + secure::kMaxCommitStep, counter.limit());
     memory.bytes[62] ^= 1;
     TEST_ASSERT_EQUAL(secure::CounterLoadStatus::KeysMustBeDiscarded, counter.load(true));
     TEST_ASSERT_FALSE(counter.take(issued));
@@ -172,7 +181,8 @@ void test_counter_torn_write_never_reuses_counters() {
     secure::FrameCounterStore<Eeprom> first(initial);
     first.load(false);
     uint32_t issued;
-    for (unsigned i = 0; i < 1024; ++i)
+    // Both reserves valid, so the reboot below commits an ordinary reservation.
+    for (unsigned i = 0; i < 1025; ++i)
         TEST_ASSERT_TRUE(first.take(issued));
     for (int cut = 0; cut <= 6; ++cut) {
         Eeprom memory = initial;
@@ -233,7 +243,8 @@ void test_counter_floor_torn_write_and_overflow() {
     secure::FrameCounterStore<Eeprom> first(initial);
     first.load(false);
     uint32_t issued;
-    TEST_ASSERT_TRUE(first.take(issued));
+    for (unsigned i = 0; i < 1025; ++i)
+        TEST_ASSERT_TRUE(first.take(issued));
     for (int cut = 0; cut < 6; ++cut) {
         Eeprom memory = initial;
         secure::FrameCounterStore<Eeprom> writer(memory);
@@ -251,6 +262,7 @@ void test_counter_floor_torn_write_and_overflow() {
     }
     Eeprom exhausted;
     seed(exhausted, secure::kReserveA, UINT32_MAX - 512);
+    seed(exhausted, secure::kReserveB, UINT32_MAX - 1536);
     secure::FrameCounterStore<Eeprom> counter(exhausted);
     counter.load(true);
     TEST_ASSERT_FALSE(counter.take(issued));
@@ -259,6 +271,7 @@ void test_counter_floor_torn_write_and_overflow() {
     TEST_ASSERT_EQUAL(0, exhausted.updates);
     Eeprom boundary;
     seed(boundary, secure::kReserveA, UINT32_MAX - 1024);
+    seed(boundary, secure::kReserveB, UINT32_MAX - 2048);
     secure::FrameCounterStore<Eeprom> lastRange(boundary);
     lastRange.load(true);
     for (uint32_t i = 0; i < 1024; ++i) {
@@ -270,5 +283,70 @@ void test_counter_floor_torn_write_and_overflow() {
     TEST_ASSERT_EQUAL(6, boundary.updates);
     lastRange.load(false);
     TEST_ASSERT_FALSE(lastRange.take(issued));
+}
+// Every round uses counters, sometimes catches up to a floor, then loses the
+// newest reserve; short rounds lose the slot the previous recovery repaired.
+void test_counter_lost_newest_reserve_never_reuses_counters() {
+    Eeprom memory;
+    const unsigned rounds[] = {1500, 1, 300, 1, 1500, 2};
+    uint32_t highest = 0;
+    bool hasIssued = false;
+    for (unsigned round = 0; round < sizeof(rounds) / sizeof(rounds[0]); ++round) {
+        secure::FrameCounterStore<Eeprom> counter(memory);
+        TEST_ASSERT_EQUAL(round == 0 ? secure::CounterLoadStatus::Fresh
+                                     : secure::CounterLoadStatus::Loaded,
+                          counter.load(round != 0));
+        for (unsigned i = 0; i < rounds[round]; ++i) {
+            uint32_t issued;
+            TEST_ASSERT_TRUE(counter.take(issued));
+            if (hasIssued)
+                TEST_ASSERT_TRUE(issued > highest);
+            highest = issued;
+            hasIssued = true;
+            if (i == 200 && round % 2 == 0)
+                TEST_ASSERT_TRUE(counter.advanceToFloor(issued, issued + secure::kMaxFloorAdvance));
+        }
+        corruptNewestReserve(memory);
+    }
+}
+void test_counter_torn_repair_never_reuses_counters() {
+    Eeprom initial;
+    secure::FrameCounterStore<Eeprom> first(initial);
+    first.load(false);
+    uint32_t used;
+    for (unsigned i = 0; i < 1025; ++i)
+        TEST_ASSERT_TRUE(first.take(used));
+    corruptNewestReserve(initial);
+    // Cuts span the repair commit and the reservation that follows it.
+    for (int cut = 0; cut <= 12; ++cut) {
+        Eeprom memory = initial;
+        secure::FrameCounterStore<Eeprom> writer(memory);
+        TEST_ASSERT_EQUAL(secure::CounterLoadStatus::Loaded, writer.load(true));
+        TEST_ASSERT_EQUAL(initial.updates, memory.updates);
+        memory.remaining = cut;
+        memory.throwOnFailure = true;
+        uint32_t attempted = used;
+        bool success = false;
+        try {
+            success = writer.take(attempted);
+        } catch (const PowerLoss &) {
+        }
+        memory.remaining = -1;
+        secure::FrameCounterStore<Eeprom> reboot(memory);
+        TEST_ASSERT_EQUAL(secure::CounterLoadStatus::Loaded, reboot.load(true));
+        uint32_t after;
+        TEST_ASSERT_TRUE(reboot.take(after));
+        TEST_ASSERT_TRUE(after > (success ? attempted : used));
+    }
+}
+void test_counter_recovery_overflow_stops_transmission() {
+    Eeprom memory;
+    seed(memory, secure::kReserveA, UINT32_MAX - secure::kMaxCommitStep + 1);
+    secure::FrameCounterStore<Eeprom> counter(memory);
+    TEST_ASSERT_EQUAL(secure::CounterLoadStatus::Loaded, counter.load(true));
+    uint32_t issued = 99;
+    TEST_ASSERT_FALSE(counter.take(issued));
+    TEST_ASSERT_EQUAL_UINT32(99, issued);
+    TEST_ASSERT_EQUAL(0, memory.updates);
 }
 } // namespace security_store_tests

@@ -14,6 +14,10 @@ constexpr size_t kConfigB = 0x20;
 constexpr size_t kReserveB = 0x3A;
 constexpr uint32_t kReservationSize = 1024;
 constexpr uint32_t kMaxFloorAdvance = 256;
+// Largest step between consecutive reserve commits: take() adds
+// kReservationSize, advanceToFloor() adds it to a floor up to
+// kMaxFloorAdvance - 1 past the current limit.
+constexpr uint32_t kMaxCommitStep = kReservationSize + kMaxFloorAdvance - 1;
 static_assert(kConfigA + kConfigSize == kReserveA && kReserveA + kReserveSize == kConfigB &&
                   kConfigB + kConfigSize == kReserveB &&
                   kReserveB + kReserveSize == storage::kProfileAreaStart,
@@ -180,6 +184,7 @@ template <typename Storage> class FrameCounterStore {
         storage::readBlock(storage_, kReserveB, bytes, sizeof(bytes));
         const bool validB = decodeReserve(bytes, b);
         hasIssued_ = false;
+        repairing_ = false;
         if (!validA && !validB) {
             next_ = limit_ = 0;
             slot_ = 1;
@@ -187,8 +192,19 @@ template <typename Storage> class FrameCounterStore {
             return healthy_ ? CounterLoadStatus::Fresh : CounterLoadStatus::KeysMustBeDiscarded;
         }
         slot_ = validA && (!validB || a >= b) ? 0 : 1;
-        next_ = limit_ = slot_ == 0 ? a : b;
+        limit_ = slot_ == 0 ? a : b;
         healthy_ = true;
+        if (validA != validB) {
+            // The lost slot held the commit before or after the surviving
+            // one, so at most limit_ + kMaxCommitStep, and every used counter
+            // is below it. Falling back to limit_ would reissue them.
+            if (limit_ > UINT32_MAX - kMaxCommitStep)
+                healthy_ = false;
+            else
+                limit_ += kMaxCommitStep;
+            repairing_ = true;
+        }
+        next_ = limit_;
         return CounterLoadStatus::Loaded;
     }
 
@@ -198,6 +214,14 @@ template <typename Storage> class FrameCounterStore {
         if (!healthy_)
             return false;
         if (next_ == limit_) {
+            // Store the recovered bound in the lost slot first: one step of at
+            // most kMaxCommitStep, so a later loss of either slot still
+            // recovers above every used counter.
+            if (repairing_) {
+                if (!commit(limit_))
+                    return false;
+                repairing_ = false;
+            }
             if (next_ > UINT32_MAX - kReservationSize) {
                 healthy_ = false;
                 return false;
@@ -255,6 +279,7 @@ template <typename Storage> class FrameCounterStore {
     uint8_t slot_ = 1;
     bool healthy_ = false;
     bool hasIssued_ = false;
+    bool repairing_ = false;
 };
 
 } // namespace security_storage

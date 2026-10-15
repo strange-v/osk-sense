@@ -910,6 +910,9 @@ int main(int, char **) {
     RUN_TEST(security_store_tests::test_counter_readback_failure_stops_transmission);
     RUN_TEST(security_store_tests::test_counter_floor_bounded_and_one_reservation);
     RUN_TEST(security_store_tests::test_counter_floor_torn_write_and_overflow);
+    RUN_TEST(security_store_tests::test_counter_lost_newest_reserve_never_reuses_counters);
+    RUN_TEST(security_store_tests::test_counter_torn_repair_never_reuses_counters);
+    RUN_TEST(security_store_tests::test_counter_recovery_overflow_stops_transmission);
     RUN_TEST(test_layout_fills_eeprom_without_overlap);
     RUN_TEST(test_factory_credentials_round_trip_and_validation);
     RUN_TEST(test_factory_credential_store_reads_user_row_independently);
