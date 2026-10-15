@@ -313,7 +313,10 @@ void test_real_service_pairs_then_boot_skips_reserved_counters() {
     s::Ack reply;
     int8_t rssi;
     TEST_ASSERT_TRUE(reboot.sendReport(x.telemetry, sizeof(x.telemetry), 3, reply, rssi));
-    TEST_ASSERT_EQUAL_UINT32(1024, counter(RFM69::outgoing.back()));
+    // Only the first reserve has been written, so the boot recovers past the
+    // largest bound the blank one could have held.
+    TEST_ASSERT_EQUAL_UINT32(1024 + n::security_storage::kMaxCommitStep,
+                             counter(RFM69::outgoing.back()));
 }
 void test_retries_retain_exact_ciphertext_and_invalid_acks_are_ignored() {
     Fixture x;
@@ -496,11 +499,10 @@ void test_command_session_floor_reseals_ready_and_accepts_no_command() {
             reply.counterFloor = counter(packet) + 10;
             ack(counter(packet), reply);
         } else {
-            uint32_t limit;
-            TEST_ASSERT_TRUE(
-                n::security_storage::decodeReserve(EEPROM.data + n::security_storage::kReserveA,
-                                                   limit));
-            TEST_ASSERT_EQUAL_UINT32(counter(packet) + 1024, limit);
+            uint32_t a = 0, b = 0;
+            n::security_storage::decodeReserve(EEPROM.data + n::security_storage::kReserveA, a);
+            n::security_storage::decodeReserve(EEPROM.data + n::security_storage::kReserveB, b);
+            TEST_ASSERT_EQUAL_UINT32(counter(packet) + 1024, a > b ? a : b);
             RFM69::incoming.push_back(commandReply(counter(packet), false));
         }
     };
