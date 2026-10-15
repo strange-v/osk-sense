@@ -16,7 +16,7 @@ fi
 suites=("$@")
 for suite in "${suites[@]}"; do
     case "$suite" in
-        test_node_storage|test_security_service|test_pairing_entropy|test_security_pairing) ;;
+        test_node_storage|test_security_service|test_pairing_entropy|test_security_pairing|test_rfm69_fifo) ;;
         *) echo "Unknown suite: $suite" >&2; exit 2 ;;
     esac
 done
@@ -63,4 +63,18 @@ g++ "${flags[@]}" test/test_security_pairing/test_main.cpp \
     ../shared/RadioProtocol/src/RadioSecurityFrames.cpp \
     "${unity_dir}/unity.c" -o "${output}"
 "${output}"
+fi
+
+if wanted test_rfm69_fifo; then
+source ../shared/scripts/native_rfm69.sh
+# The driver itself, not its fake: sanitizers catch writes past RFM69::DATA.
+for variant in "" -DRF69_LISTENMODE_ENABLE; do
+    output="/tmp/radiosensors_test_rfm69_fifo${variant:+_listen}"
+    g++ -std=c++17 -g -fsanitize=address,undefined -fno-sanitize-recover=all \
+        -DRF69_NO_READALLREGS ${variant} \
+        -Itest/test_rfm69_fifo/fakes -I"${rfm69_dir}" -I"${unity_dir}" \
+        test/test_rfm69_fifo/test_main.cpp "${rfm69_dir}/RFM69.cpp" \
+        "${unity_dir}/unity.c" -o "${output}"
+    "${output}"
+done
 fi

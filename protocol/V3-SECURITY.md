@@ -412,21 +412,21 @@ the bench and Arduino core. It does not write EEPROM with its default zero sink.
 
 ## Flash
 
-`lib_deps` points to the `no-readallregs` branch of the strange-v/RFM69 fork, and release environments define `RF69_NO_READALLREGS`. Without it `readAllRegs()` links `Serial`, UART0, and its interrupt vectors into images that never use them.
+Node and gateway `lib_deps` pin the same commit of the strange-v/RFM69 fork: LowPowerLab master on top of a fix that truncates received frames to `RF69_MAX_DATA_LEN` bytes, where master writes up to two bytes past `RFM69::DATA`. `node/test/test_rfm69_fifo` drives that parser with boundary lengths. Node release environments define `RF69_NO_READALLREGS`. Without it `readAllRegs()` links `Serial`, UART0, and its interrupt vectors into images that never use them.
 
 ATtiny3224 has 32 768 bytes of Flash and 3072 bytes of SRAM. Builds use
 megaTinyCore 2.6.7 and the 4 MHz internal clock.
 
 | V3 profile             |  Flash | Free Flash | Static RAM |
 | ---------------------- | -----: | ---------: | ---------: |
-| `counter_reed`         | 20 885 |     11 883 |        764 |
-| `climate_tmp112`       | 20 864 |     11 904 |        815 |
-| `binary_sht40`         | 20 727 |     12 041 |        799 |
-| `binary`               | 18 851 |     13 917 |        710 |
-| `counter_reed_debug`   | 22 904 |       9864 |        915 |
-| `climate_tmp112_debug` | 22 760 |     10 008 |        966 |
-| `binary_sht40_debug`   | 23 092 |       9676 |        950 |
-| `binary_debug`         | 20 854 |     11 914 |        861 |
+| `counter_reed`         | 20 844 |     11 924 |        764 |
+| `climate_tmp112`       | 20 841 |     11 927 |        815 |
+| `binary_sht40`         | 20 682 |     12 086 |        799 |
+| `binary`               | 18 804 |     13 964 |        710 |
+| `counter_reed_debug`   | 22 861 |       9907 |        915 |
+| `climate_tmp112_debug` | 22 737 |     10 031 |        966 |
+| `binary_sht40_debug`   | 23 047 |       9721 |        950 |
+| `binary_debug`         | 20 809 |     11 959 |        861 |
 
 Run `node/scripts/probe_v3_size.ps1 -Environment counter_reed` from PowerShell;
 the other release and debug environment names select their composition roots.
