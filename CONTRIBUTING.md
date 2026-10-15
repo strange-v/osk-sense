@@ -1,4 +1,10 @@
-# Development checks
+# Contributing
+
+## Pre-release compatibility
+
+The frontend, gateway firmware and node firmware have not been released to deployed devices whose persisted data must be preserved. Change formats and contracts cleanly and reinstall, reflash or erase development data when needed. Do not add data migrations, legacy readers, compatibility branches or fallback code solely to keep data written by an earlier development version, unless that is an explicit decision.
+
+## Checks
 
 From the repository root:
 
@@ -12,11 +18,23 @@ wsl bash gateway/scripts/run_native_tests_wsl.sh
 
 Web UI tests and build are in the [gateway README](gateway/README.md#web-ui-filesystem).
 
+Native C++ tests run in WSL: `pio test -e native` does not work on Windows, which has no host `g++`. Firmware images build on Windows with `pio run -e <env>` from `node/` or `gateway/`.
+
 Run only the affected checks. Protocol and node scripts accept suite names after
 the optional `--sanitize` flag, for example `--sanitize test_security_service`
 for the node. The gateway script accepts `--backup` for backup, restore and reset
 checks, or `--registry-radio` for registry/radio storage checks. Omitting selectors
 runs all tests in that script.
+
+## Documentation
+
+Reference documents describe how the system behaves now. They are not a changelog: no "used to", no "this was added because", no comparison against an earlier version. A reader who has never seen the previous state must not be able to tell there was one. Git holds the history. [ARCHITECTURE.md](ARCHITECTURE.md#documentation-ownership) names the document for each topic.
+
+The root `README.md` is for users: what the system is, what it needs, how to get started. Developer material belongs here; component details stay in that component's README or reference documents.
+
+Shorter is better. Prefer a table to a paragraph and a sentence to a paragraph. Drop any sentence that only restates the one before it or that justifies a decision nobody is about to make differently — rationale earns its place only where it stops a plausible wrong turn.
+
+The same applies to code comments, with one addition: a comment explains what the code cannot, which is usually why an obvious alternative was rejected. It never narrates what changed.
 
 ## Formatting
 

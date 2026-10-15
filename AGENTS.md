@@ -1,5 +1,7 @@
 # Repository agent notes
 
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing code or documentation: it holds the checks, the pre-release compatibility policy (no migrations or compatibility code unless the user explicitly asks for them) and the documentation style.
+
 ## Node.js commands on Windows
 
 The user's npm installation is valid, but its system shim resolves the configured global prefix through `%APPDATA%\npm`. Sandboxed agent commands cannot read that directory. In PowerShell, run the system npm CLI directly instead of invoking `npm`, `npm.cmd`, or `pnpm`:
@@ -12,32 +14,7 @@ For example, use the same command with `test`, `run typecheck`, `run build`, or 
 
 Do not run `run typecheck` and `run build` together: `build` starts with the same `vue-tsc --noEmit`, so the pair type-checks the workspace twice. Use `typecheck` alone while iterating, and `build` when the bundle matters.
 
-## Native C++ tests
-
-Run them in WSL from the repository root. `pio test -e native` does not work on Windows: there is no host `g++`.
-
-| Component                   | Command                                                             |
-| --------------------------- | ------------------------------------------------------------------- |
-| protocol                    | `wsl bash protocol/scripts/run_native_tests_wsl.sh`                 |
-| node                        | `wsl bash node/scripts/run_native_tests_wsl.sh`                     |
-| gateway                     | `wsl bash gateway/scripts/run_native_tests_wsl.sh`                  |
-| gateway registry/radio only | `wsl bash gateway/scripts/run_native_tests_wsl.sh --registry-radio` |
-
-Firmware images build on Windows with `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e <env>` from `node/` or `gateway/`.
-
-## Pre-release data and compatibility
-
-The frontend, gateway backend/firmware, and node firmware have not been released and there are no deployed devices whose persisted data must be preserved. Do not add data migrations, legacy readers, compatibility branches, or fallback code solely to retain data written by an earlier development version. Prefer changing formats and contracts cleanly and reinstalling, reflashing, or erasing development data when needed. Add migration or backward compatibility code only when the user explicitly asks for it.
-
-## Documentation
-
-Reference documents describe how the system behaves now. They are not a changelog: no "used to", no "this was added because", no comparison against an earlier version. A reader who has never seen the previous state must not be able to tell there was one. Git holds the history.
-
-The root `README.md` is for users: what the system is, what it needs, how to get started. Developer material belongs in `CONTRIBUTING.md`; component details stay in that component's README or reference documents.
-
-Shorter is better. Prefer a table to a paragraph and a sentence to a paragraph. Drop any sentence that only restates the one before it or that justifies a decision nobody is about to make differently — rationale earns its place only where it stops a plausible wrong turn.
-
-The same applies to code comments, with one addition: a comment explains what the code cannot, which is usually why an obvious alternative was rejected. It never narrates what changed.
+PlatformIO is not on the sandbox `PATH`; build firmware with `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e <env>` from `node/` or `gateway/`.
 
 ## Answering versus changing
 

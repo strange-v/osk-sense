@@ -1,6 +1,6 @@
 # Radio security
 
-Authenticated, replay-resistant radio traffic between nodes and the gateway. [PROTOCOL.md](PROTOCOL.md) defines the payloads this envelope carries. A change here alters wire or storage formats, so it means reflashing nodes and resetting the gateway registry ([AGENTS.md](../AGENTS.md#pre-release-data-and-compatibility)). `protocol-manifest.json` (`radio_security`) and `protocol-vectors.json` hold the layouts and crypto known answers.
+Authenticated, replay-resistant radio traffic between nodes and the gateway. [PROTOCOL.md](PROTOCOL.md) defines the payloads this envelope carries. A change here alters wire or storage formats, so it means reflashing nodes and resetting the gateway registry ([CONTRIBUTING.md](../CONTRIBUTING.md#pre-release-compatibility)). `protocol-manifest.json` (`radio_security`) and `protocol-vectors.json` hold the layouts and crypto known answers.
 
 | Area                                        | Summary                                                                                                                                                                                                         |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
