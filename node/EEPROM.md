@@ -1,6 +1,6 @@
 # Node EEPROM allocation
 
-ATtiny1614 provides 256 bytes of EEPROM organized in 32-byte physical pages.
+ATtiny3224 provides 256 bytes of EEPROM organized in 64-byte physical pages.
 
 The separate 32-byte USERROW stores immutable manufacturing credentials. It is programmed through UPDI, is not part of the EEPROM address space, and survives ordinary flash/chip erase operations.
 
