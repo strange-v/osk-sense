@@ -71,7 +71,7 @@ export function truncateToBytes(value: string, max: number): string {
 }
 
 // A DNS label, mirroring validHostname() in GatewayStorage.cpp. Empty is valid
-// and means the gateway keeps its `osk-hub-<mac>` default.
+// and means the gateway keeps its `osk-hub` default.
 export const HOSTNAME_MAX_BYTES = 32
 
 export function isValidHostname(value: string): boolean {

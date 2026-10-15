@@ -130,12 +130,12 @@ Allowed exactly while `setup_required` and `physical_window_active` are both tru
 }
 ```
 
-| Field                    | Required | Validation                                              |
-| ------------------------ | -------- | ------------------------------------------------------- |
-| `username`               | yes      | 1..32 lowercase ASCII letters, digits, `.`, `_`, `-`    |
-| `password`               | yes      | 8..128 UTF-8 bytes                                      |
-| `hostname`               | no       | 0..32 DNS label characters; empty keeps `osk-hub-<mac>` |
-| `operational_network_id` | no       | 1..255 and different from the commissioning network     |
+| Field                    | Required | Validation                                           |
+| ------------------------ | -------- | ---------------------------------------------------- |
+| `username`               | yes      | 1..32 lowercase ASCII letters, digits, `.`, `_`, `-` |
+| `password`               | yes      | 8..128 UTF-8 bytes                                   |
+| `hostname`               | no       | 0..32 DNS label characters; empty keeps `osk-hub`    |
+| `operational_network_id` | no       | 1..255 and different from the commissioning network  |
 
 Success creates the first browser session and returns the same body and cookie as login, with status `201`. Errors: `400 invalid_request`, `403 physical_setup_required`, `409 setup_busy`, `409 setup_already_complete`, `422 invalid_setup_values`, `422 invalid_operational_network_id`, or `500` for hashing/storage failure.
 
@@ -186,7 +186,7 @@ Requires the session cookie and matching `X-CSRF-Token`, removes the RAM session
   "uptime_seconds": 1234,
   "ui": { "state": "ready", "version": "0.9.0", "required_firmware": "0.9" },
   "board": "Waveshare ESP32-S3-ETH + PoE",
-  "hostname": "osk-hub-a085e3e6cc20"
+  "hostname": "osk-hub"
 }
 ```
 
@@ -327,7 +327,7 @@ Settings contain hostname, mDNS enabled state, NTP enabled state, up to three NT
 
 `PUT /ui/settings` replaces the complete settings value and requires CSRF. The response is the applied value with its durable generation. mDNS and NTP services observe that generation and reapply changes without reboot; pairing and physical initial-setup windows read their configured durations when opened.
 
-`hostname` is a DNS label: lowercase ASCII letters, digits and hyphens, never leading or trailing, at most 32 characters. Empty means the gateway uses `osk-hub-<mac>`, so a device is reachable before anyone has named it. Both the mDNS name and the DHCP hostname come from this value, and `ETH.setHostname()` only applies while Ethernet starts, so a change takes effect on the next restart rather than leaving the two disagreeing. A name that collides with another device on the network is resolved by mDNS appending a suffix, which means the gateway then answers to a name nobody chose.
+`hostname` is a DNS label: lowercase ASCII letters, digits and hyphens, never leading or trailing, at most 32 characters. Empty means the gateway uses `osk-hub`, so a device is reachable before anyone has named it. Both the mDNS name and the DHCP hostname come from this value, and `ETH.setHostname()` only applies while Ethernet starts, so a change takes effect on the next restart rather than leaving the two disagreeing. A name that collides with another device on the network is resolved by mDNS appending a suffix, which means the gateway then answers to a name nobody chose.
 
 ## Pairing
 

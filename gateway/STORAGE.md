@@ -70,7 +70,7 @@ NVS namespace: `gateway-config`; slot keys: `config_a`, `config_b`; magic: `RSGC
 
 Flag bit 0 enables mDNS and bit 1 enables NTP; bits 2..7 are zero. Each NTP entry is one ASCII length byte followed by 63 zero-padded bytes. Entries after `ntp_server_count` are entirely zero. Accepted values are DNS hostnames or textual IP addresses without scheme, path, or port. Empty active entries, embedded NULs, control characters, duplicates, and values longer than 63 bytes are rejected. When NTP is enabled, count is `1..3`; when disabled, a saved list may remain.
 
-Hostname is a DNS label: lowercase ASCII letters, digits and hyphens, never leading or trailing. Empty is valid and means the gateway derives `osk-hub-<mac>`. Pairing duration is `30..900` seconds and defaults to 120. Initial setup duration is `60..1800` seconds and defaults to 600.
+Hostname is a DNS label: lowercase ASCII letters, digits and hyphens, never leading or trailing. Empty is valid and means the gateway uses `osk-hub`. Pairing duration is `30..900` seconds and defaults to 120. Initial setup duration is `60..1800` seconds and defaults to 600.
 
 Generation-zero defaults are an empty hostname, enabled mDNS and NTP, NTP servers `pool.ntp.org` and `time.cloudflare.com`, a 120-second pairing window, and a 600-second setup window. NTP changes take effect without reboot. Timezone is not stored because the gateway uses UTC. DHCP, telemetry cache, current clock, uptime, boot ID, and diagnostic counters are runtime state.
 

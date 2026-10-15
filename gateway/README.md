@@ -119,7 +119,7 @@ The first line is for the Waveshare board, the second for WT32-ETH01, which must
 `scripts/status_logger.py` appends `/ui/status` health to a CSV every five minutes: boot ID and reset reason, uptime, free heap, radio and WebSocket counters. It signs in again after a gateway restart and records an unreachable gateway as a row with an error. It asks for the password, or takes it from `OSK_PASSWORD`:
 
 ```powershell
-python scripts/status_logger.py osk-hub-a085e3e6cc20.local admin soak.csv
+python scripts/status_logger.py osk-hub.local admin soak.csv
 ```
 
 The node image `radio_flood` ([node README](../node/README.md)) supplies burst traffic. Two of them, about 28 frames per second together with retries after collisions, were acknowledged for 12 minutes with no dropped telemetry, no missed interrupt, and free heap steady at about 195 KB; after a reset the radio received again without a power cycle.

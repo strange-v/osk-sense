@@ -135,7 +135,7 @@ describe('isValidHostname', () => {
     expect(isValidHostname('a'.repeat(HOSTNAME_MAX_BYTES))).toBe(true)
   })
 
-  it('accepts empty, which keeps the MAC-derived default', () => {
+  it('accepts empty, which keeps the osk-hub default', () => {
     expect(isValidHostname('')).toBe(true)
   })
 

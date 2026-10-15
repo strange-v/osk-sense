@@ -13,7 +13,7 @@ constexpr size_t kSnapshotHeaderSize = 12;
 constexpr size_t kSnapshotCrcSize = 4;
 
 // A DNS label: RFC 1123 characters only, and short enough to type. Empty means
-// the gateway derives `osk-hub-<mac>` instead, so a device always has a working
+// the gateway uses `osk-hub` instead, so a device always has a working
 // name before anyone sets one.
 constexpr size_t kHostnameSize = 32;
 constexpr size_t kNtpServerCount = 3;

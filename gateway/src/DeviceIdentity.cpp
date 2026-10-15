@@ -10,7 +10,9 @@
 namespace gateway::identity {
 namespace {
 
-char gatewayHostname[radiosensors::gateway_storage::kHostnameSize + 1] = "osk-hub-uninitialized";
+constexpr char kDefaultHostname[] = "osk-hub";
+
+char gatewayHostname[radiosensors::gateway_storage::kHostnameSize + 1] = "osk-hub";
 char stableGatewayId[kIdentityCharacters + 1]{};
 char currentBootId[kIdentityCharacters + 1]{};
 
@@ -54,22 +56,11 @@ void createGatewayId(const uint8_t mac[6]) {
 // disagreeing about what this device is called.
 void begin() {
     uint8_t mac[6]{};
-    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK) {
-        snprintf(gatewayHostname, sizeof(gatewayHostname), "osk-hub-unknown");
+    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) != ESP_OK)
         memset(mac, 0, sizeof(mac));
-    } else {
-        snprintf(gatewayHostname,
-                 sizeof(gatewayHostname),
-                 "osk-hub-%02x%02x%02x%02x%02x%02x",
-                 mac[0],
-                 mac[1],
-                 mac[2],
-                 mac[3],
-                 mac[4],
-                 mac[5]);
-    }
-    // An empty setting keeps the MAC-derived name, so a gateway is reachable
-    // before anyone has chosen one and after a settings erase.
+    // An empty setting keeps the default name, so a gateway is reachable at
+    // osk-hub.local before anyone has chosen one and after a settings erase.
+    snprintf(gatewayHostname, sizeof(gatewayHostname), "%s", kDefaultHostname);
     const auto settings = configuration_store::settings();
     if (settings.hostnameLength != 0) {
         const size_t length = settings.hostnameLength < sizeof(gatewayHostname) - 1

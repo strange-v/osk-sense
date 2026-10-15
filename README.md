@@ -28,7 +28,7 @@ Both need an RFM69 module wired as described in the [gateway README](gateway/REA
 
 ## Getting started
 
-1. **Gateway.** Build and flash the firmware and the web UI ([gateway README](gateway/README.md)). Open `http://osk-hub-<MAC>.local` (the name is in the serial log), press the gateway button (BOOT on Waveshare) when asked, and create the admin account.
+1. **Gateway.** Build and flash the firmware and the web UI ([gateway README](gateway/README.md)). Open `http://osk-hub.local`, press the gateway button (BOOT on Waveshare) when asked, and create the admin account.
 2. **Nodes.** Flash the image for your sensor type and give each node its unique factory key; the provisioning tool also exports a pairing QR code ([node README](node/README.md)).
 3. **Pairing.** In the gateway UI open _Nodes → Add node_, scan the node's QR code or enter its UID and key, press _Add_, then press the button on the node.
 4. **Home Assistant.** On the gateway's _Connect Home Assistant_ page create a connection key, then add the [osk-sense-ha](https://github.com/strange-v/osk-sense-ha) integration with it.

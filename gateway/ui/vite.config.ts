@@ -8,7 +8,7 @@ import { firmwareSeries, firmwareVersion } from './firmwareVersion'
 const outputDirectory = fileURLToPath(new URL('../data', import.meta.url))
 const repositoryDirectory = fileURLToPath(new URL('../..', import.meta.url))
 
-const gatewayTarget = process.env.GATEWAY_URL?.trim() || 'http://osk-hub-a085e3e6cc20'
+const gatewayTarget = process.env.GATEWAY_URL?.trim() || 'http://osk-hub.local'
 const gatewayProxy = { target: gatewayTarget, changeOrigin: true }
 
 function gitSha(): string {
