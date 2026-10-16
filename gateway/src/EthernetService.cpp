@@ -64,12 +64,22 @@ bool startHardware() {
                       board::ethernetPins.mosi,
                       board::ethernetPins.chipSelect);
 
-    return ETH.begin(ETH_PHY_W5500,
-                     board::ethernetPins.phyAddress,
-                     board::ethernetPins.chipSelect,
-                     board::ethernetPins.interrupt,
-                     board::ethernetPins.reset,
-                     ethernetSpi);
+    if (!ETH.begin(ETH_PHY_W5500,
+                   board::ethernetPins.phyAddress,
+                   board::ethernetPins.chipSelect,
+                   board::ethernetPins.interrupt,
+                   board::ethernetPins.reset,
+                   ethernetSpi))
+        return false;
+    // The W5500 driver opens its socket with IPv4 multicast blocked and lifts
+    // the block when lwIP joins a group, but the chip reads that mode only
+    // when the socket opens. mDNS queries would then never arrive, so reopen
+    // the socket with all multicast already allowed.
+    const esp_eth_handle_t handle = ETH.handle();
+    bool allMulticast = true;
+    return esp_eth_stop(handle) == ESP_OK &&
+           esp_eth_ioctl(handle, ETH_CMD_S_ALL_MULTICAST, &allMulticast) == ESP_OK &&
+           esp_eth_start(handle) == ESP_OK;
 #endif
 }
 
